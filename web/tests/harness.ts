@@ -83,7 +83,7 @@ async function waitFor(proc: ChildProcess, url: string, deadlineMs: number, log:
   throw new Error(`b9s web did not start within ${deadlineMs} ms:\n${log()}`);
 }
 
-export async function startProject(list: FixtureIssue[], env: Record<string, string> = {}, paired = false, nextPort: () => Promise<number> = freePort): Promise<Project> {
+export async function startProject(list: FixtureIssue[], env: Record<string, string> = {}, paired = false, nextPort: () => Promise<number> = freePort, args: string[] = []): Promise<Project> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "b9s-web-e2e-"));
   const beads = path.join(dir, ".beads");
   fs.mkdirSync(beads);
@@ -98,7 +98,7 @@ export async function startProject(list: FixtureIssue[], env: Record<string, str
   for (let attempt = 0; attempt < 5 && !proc; attempt++) {
     const port = await nextPort();
     out = "";
-    const p = spawn(BIN, ["web", ...(paired ? [] : ["--no-token"]), "--listen", `127.0.0.1:${port}`], {
+    const p = spawn(BIN, ["web", ...(paired ? [] : ["--no-token"]), "--listen", `127.0.0.1:${port}`, ...args], {
       cwd: dir,
       env: {
         ...process.env, ...env,
