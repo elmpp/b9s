@@ -115,7 +115,9 @@ func doltConnectionConfig(source DataSource, database string) (*mysql.Config, er
 	if cfg.User == "" {
 		cfg.User = "root"
 	}
-	cfg.Passwd = os.Getenv("BEADS_DOLT_PASSWORD")
+	if !source.Passwordless {
+		cfg.Passwd = os.Getenv("BEADS_DOLT_PASSWORD")
+	}
 	if cfg.Passwd != "" && !isTrustedDoltEndpoint(cfg.Addr) {
 		return nil, fmt.Errorf("refusing to send BEADS_DOLT_PASSWORD to untrusted Dolt endpoint %q; add the exact host:port to %s", cfg.Addr, trustedDoltEndpointsEnv)
 	}

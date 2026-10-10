@@ -76,6 +76,10 @@ type DataSource struct {
 	Database string `json:"database,omitempty"`
 	// User is the Dolt connection user (only used for SourceTypeDolt)
 	User string `json:"user,omitempty"`
+	// Passwordless marks a Dolt endpoint that authenticates its user without
+	// a password, such as the loopback proxy of a proxied-server store, so
+	// BEADS_DOLT_PASSWORD is never sent to it.
+	Passwordless bool `json:"passwordless,omitempty"`
 }
 
 // String returns a human-readable description of the source
@@ -206,7 +210,7 @@ func DiscoverSources(opts DiscoveryOptions) ([]DataSource, error) {
 // beadsMetadata mirrors the fields b9s reads from .beads/metadata.json.
 // This is the same file bd writes, so b9s and bd always agree on connection details.
 type beadsMetadata struct {
-	DoltMode       string `json:"dolt_mode"`        // "embedded" or "server"
+	DoltMode       string `json:"dolt_mode"`        // "embedded", "server" or "proxied-server"
 	DoltServerHost string `json:"dolt_server_host"` // default: 127.0.0.1
 	DoltServerPort int    `json:"dolt_server_port"` // deprecated by bd; see resolveDoltAddress
 	DoltServerUser string `json:"dolt_server_user"` // default: root
@@ -234,6 +238,9 @@ func discoverDoltSources(beadsDir string, opts DiscoveryOptions) ([]DataSource, 
 
 	if meta.DoltMode == "embedded" {
 		return []DataSource{embeddedDoltSource(beadsDir, meta, opts)}, nil
+	}
+	if meta.DoltMode == proxiedServerMode {
+		return []DataSource{proxiedServerSource(beadsDir, meta, opts)}, nil
 	}
 	if meta.DoltMode != "server" {
 		return nil, nil

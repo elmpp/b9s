@@ -64,7 +64,7 @@ func NewDoltReader(source DataSource) (*DoltReader, error) {
 		user = "root"
 	}
 
-	cfg, err := doltConnectionConfig(DataSource{Type: SourceTypeDolt, Path: addr, User: user}, dbName)
+	cfg, err := doltConnectionConfig(DataSource{Type: SourceTypeDolt, Path: addr, User: user, Passwordless: source.Passwordless}, dbName)
 	if err != nil {
 		return nil, err
 	}

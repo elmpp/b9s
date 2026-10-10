@@ -217,6 +217,7 @@ b9s reads the `.beads` directory of the current folder, or the one in `BEADS_DIR
 |--------|---------------|
 | Dolt server | `.beads/metadata.json` with `"dolt_mode": "server"` |
 | Embedded Dolt | `.beads/metadata.json` with `"dolt_mode": "embedded"`, the default of `bd init` |
+| Proxied Dolt server | `.beads/metadata.json` with `"dolt_mode": "proxied-server"`, as in Gas City workspaces and rigs |
 | SQLite | `.beads/beads.db`, from older `bd` versions |
 | JSONL | `.beads/issues.jsonl`, also in linked git worktrees |
 
@@ -225,6 +226,8 @@ A configured Dolt server always wins, even over a newer JSONL file. If b9s canno
 b9s reads embedded Dolt (`bd init` without `--server`) by running `bd export` in the project, so it needs `bd` on `PATH` and nothing else. It never opens the store itself, so your own `bd` writes never wait for b9s. An `issues.jsonl` beside the store is never read in its place, and b9s does not fall back to it when `bd` fails. See [ADR 0025](docs/adr/0025-read-embedded-dolt-through-bd-export.md).
 
 b9s takes the Dolt user and database from `metadata.json` and the password from `BEADS_DOLT_PASSWORD`. It finds the server's address the way bd does, so both always read the same server. The host comes from `BEADS_DOLT_SERVER_HOST`, then `metadata.json`, then `dolt.host` in `config.yaml`, else `127.0.0.1`. The port comes from `BEADS_DOLT_SERVER_PORT`, then `.beads/dolt-server.port` (the port of a server bd started), then `listener.port` in the Dolt data directory, then `dolt.port` in `config.yaml`, then `dolt_server_port` in `metadata.json`. For a remote host b9s ignores the port file and defaults to 3307, as bd does. In shared server mode (`BEADS_DOLT_SHARED_SERVER`) the port file is `~/.beads/shared-server/dolt-server.port`, with 3308 as the default. It sends that password only to a loopback address or to an exact `host:port` listed in `B9S_TRUSTED_DOLT_ENDPOINTS` (comma-separated), so a cloned repository cannot choose where your password goes. See [ADR 0013](docs/adr/0013-trust-dolt-endpoints-before-sending-environment-credentials.md).
+
+In proxied-server mode bd runs a loopback proxy in front of a private Dolt server for each store. b9s connects through that proxy as bd does: as `root`, without a password, on the port in `proxy.pid` under the proxy root. The proxy root is `BEADS_PROXIED_SERVER_ROOT_PATH`, else `root_path` in `.beads/proxied_server_client_info.json`, else the Dolt data directory. When no proxy is running, b9s tries `listener.port` in that directory's `config.yaml`. It never sends `BEADS_DOLT_PASSWORD` to a proxied store.
 
 b9s checks the Dolt database hash every 500 ms by default, so changes from `bd` or another agent appear by themselves, uncommitted ones included. For embedded Dolt it checks the store files at the same interval and reloads after each `bd` write. JSONL files reload when they change on disk. `Ctrl-R` or `F5` reloads at once.
 

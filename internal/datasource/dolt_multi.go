@@ -25,6 +25,8 @@ type DoltDBInfo struct {
 	Port     int    // e.g., 3306
 	User     string // e.g., "root"
 	Database string // e.g., "LP_Team"
+	// Passwordless marks a proxied-server store; see DataSource.Passwordless.
+	Passwordless bool
 }
 
 // DiscoverDoltDBs scans all project paths and returns Dolt database info for each
@@ -44,10 +46,11 @@ func DiscoverDoltDBs(projectPaths map[string]string) []DoltDBInfo {
 		}
 		s := sources[0]
 		dbs = append(dbs, DoltDBInfo{
-			Name:     name,
-			Host:     s.Path, // already "host:port"
-			User:     s.User,
-			Database: s.Database,
+			Name:         name,
+			Host:         s.Path, // already "host:port"
+			User:         s.User,
+			Database:     s.Database,
+			Passwordless: s.Passwordless,
 		})
 	}
 	return dbs
@@ -61,10 +64,11 @@ func NewMultiDoltReader(dbs []DoltDBInfo) (*MultiDoltReader, error) {
 
 	for _, db := range dbs {
 		source := DataSource{
-			Type:     SourceTypeDolt,
-			Path:     db.Host,
-			Database: db.Database,
-			User:     db.User,
+			Type:         SourceTypeDolt,
+			Path:         db.Host,
+			Database:     db.Database,
+			User:         db.User,
+			Passwordless: db.Passwordless,
 		}
 		reader, err := NewDoltReader(source)
 		if err != nil {

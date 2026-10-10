@@ -98,6 +98,7 @@ sequenceDiagram
 | Source | Found through | Reader |
 |--------|---------------|--------|
 | Dolt server | `metadata.json` with `"dolt_mode": "server"` | `DoltReader` over `go-sql-driver/mysql` |
+| Proxied Dolt server | `metadata.json` with `"dolt_mode": "proxied-server"` | `DoltReader` through bd's loopback proxy, as `root` without a password (`proxied_server.go`) |
 | Embedded Dolt | `metadata.json` with `"dolt_mode": "embedded"` | `bd export` through `bdrun.Output`, parsed by `pkg/loader` (`embedded.go`) |
 | SQLite | `beads.db` | `SQLiteReader` |
 | JSONL | `issues.jsonl`, also through a linked worktree's main checkout | `pkg/loader` |
