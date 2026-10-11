@@ -70,10 +70,11 @@ time. The operator approved the plan with the instruction to start the work.
   refetched row), live-update latency (a `bd` write to the row change on
   screen), and frame timing while scrolling and swiping. It runs against a
   local `b9s web` with 1000 and 5000 issues (a JSONL fixture made by a
-  generator in the same folder) and, read-only, against beads.osen.co when the
-  login proxy lets the worker in; when it does not, the report says so and
-  gives the operator the one command to run. Writes are measured only
-  against the local fixture with `fake-bd.mjs`, never against the shared
+  generator in the same folder) and, where useful, the local Gas City beads
+  stores (b9s opens proxied-server stores since `5994a7e4`). It measures only
+  local beads stores: beads.osen.co and the osenco Dolt setup on Hetzner are
+  out of this epic (operator, 2026-10-11). Writes are measured with
+  `fake-bd.mjs` against the local fixture, never against the shared
   server. Output: `docs/plans/2026-10-11-responsive-web/measurements.md` with
   the numbers, the method, the ranked slow paths and proposed budgets. No
   change to `web/src` or `pkg/web`.
@@ -172,11 +173,13 @@ classes it touches.
   sync rebases those commits onto b9s `main`.
 - **Production stays untouched:** no task deploys to beads.osen.co or
   changes its image, the Hetzner servers, the shared Dolt server or the
-  operator's working setup. beads.osen.co is read-only, and never through
-  the operator's browser sessions or sign-ins (operator, 2026-10-11).
+  operator's working setup. All work and every measurement use local beads
+  stores only: no task sends requests to beads.osen.co or touches the osenco
+  Dolt setup, and none uses the operator's browser sessions or sign-ins
+  (operator, 2026-10-11).
 - **Release:** none in this epic. The operator decides when b9s takes the
   work from b9s-alpha.
 
 ## Open Questions
 
-- beads.osen.co access for A1 behind the login proxy.
+- None.
