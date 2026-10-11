@@ -158,16 +158,15 @@ classes it touches.
 
 ## Rollout
 
-- **Workers:** half the tasks go to `b9s-alpha/claude`, half to
-  `b9s-alpha/codex`, alternating along the chain (label `worker:*`). Both
-  providers run without a sandbox (`codex
-  --dangerously-bypass-approvals-and-sandbox`), so either can install
-  `web/node_modules` and run Playwright. The default `mol-do-work` formula
+- **Workers:** every task runs on `b9s-alpha/codex` (operator, 2026-10-11
+  11:29: claude near capacity). Codex runs without a sandbox
+  (`--dangerously-bypass-approvals-and-sandbox`), so it installs
+  `web/node_modules` and runs Playwright. The default `mol-do-work` formula
   works in the shared checkout. `mol-polecat-commit` gives each worker its
   own worktree, which would let independent tasks run in parallel; the
   mayor decides per wave.
-- **Order:** A1 (claude) and B1 (codex) start at once. The mayor slings each
-  later task when the one before it closes, alternating providers.
+- **Order:** A1 and B1 started at once. The mayor slings each later task
+  when the one before it closes.
 - **Commits:** each worker commits only the files it names, with explicit
   `git add <path>`, on `b9s-alpha` `main`, with `Refs: <task id>`. The daily
   sync rebases those commits onto b9s `main`.
