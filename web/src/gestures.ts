@@ -3,15 +3,16 @@
 
 import { D, eff, get, laneOf } from "./data";
 import {
-  act, applySuggestion, chipTap, closeDetail, closeSheet, foldSubtree, moveCard, nextStatus, openDetail,
-  openSheet, reload, setStatus, sheetAction, swipeRightLabel, tabTap, toast, toggleMark, markRange, hideToast,
+  act, applySuggestion, chipTap, closeDetail, closeMenu, closeSheet, foldSubtree, menuAction, menuKey, menuOpen, moveCard,
+  nextStatus, openDetail, openMenu, openSheet, reload, setStatus, sheetAction, swipeRightLabel, tabTap, toast, toggleMark,
+  markRange, hideToast,
 } from "./actions";
 import { adoptCursor, onKey } from "./keys";
 import { memoryBack } from "./memory";
 import { canGoBack } from "./nav";
 import { ALL, appW, colOf, ensureVisible, fullH, halfH, openCols, phoneCols, render, renderBoard, renderSearch, scrollToLane, siblings } from "./render";
 import { S } from "./state";
-import { $, haptic, observeSize, split, store } from "./util";
+import { $, desktop, haptic, observeSize, split, store } from "./util";
 
 export const SHORT = 0.2, LONG = 0.55, LP_MS = 450, EDGE = 24;
 
@@ -531,6 +532,8 @@ function bindClicks(): void {
   const app = $("#app");
   app.addEventListener("click", e => {
     const t = e.target as HTMLElement;
+    const cm = t.closest<HTMLElement>("[data-cm]");
+    if (cm) { void menuAction(cm.dataset.cm!); return; }
     const sa = t.closest<HTMLElement>("[data-sa]");
     if (sa) { e.preventDefault(); void sheetAction(sa.dataset.sa!, sa.dataset.val); return; }
     const sg = t.closest<HTMLElement>("[data-seg] button");
@@ -561,11 +564,12 @@ function bindClicks(): void {
     const sgg = t.closest<HTMLElement>("[data-sugg]");
     if (sgg) applySuggestion(sgg.dataset.sugg!);
   });
-  app.addEventListener("contextmenu", e => { if (!(e.target as HTMLElement).closest("input, textarea, .md")) e.preventDefault(); });
   const sIn = $<HTMLInputElement>("#sIn");
   sIn.addEventListener("input", renderSearch);
   sIn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); void act("applysearch"); } });
   document.addEventListener("keydown", e => {
+    // An open context menu takes every key, as a native menu does.
+    if (menuKey(e)) { e.preventDefault(); return; }
     const t = e.target as HTMLElement;
     if (e.key === "Escape" && t.closest("input, textarea, select")) {
       if (S.sheet) { closeSheet(); e.preventDefault(); return; }
@@ -586,6 +590,7 @@ function bindClicks(): void {
       return;
     }
     adoptCursor(e);
+    if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) { if (menuAtCursor()) e.preventDefault(); return; }
     // Shift-Tab folds every lane, which keys.ts owns; e.key alone would read it as Tab.
     if (S.view === "board" && !S.sheet && split() && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.key === "Tab" && e.shiftKey) && boardKey(e.key)) { e.preventDefault(); return; }
     if (onKey(e)) { e.preventDefault(); return; }
@@ -595,6 +600,50 @@ function bindClicks(): void {
       if (id && get(id)) { e.preventDefault(); openDetail(id); }
     }
   });
+}
+
+/* ================= context menu ================= */
+
+/**
+ * A right click, or Ctrl-click on a Mac, opens the context menu on a desktop.
+ * The browser's own menu stays out everywhere but in a field or the text,
+ * where copy and spell-check belong to it. A touch long press raises
+ * contextmenu as well, and that press already marks the row.
+ */
+function bindMenu(): void {
+  const app = $("#app");
+  app.addEventListener("contextmenu", e => {
+    const t = e.target as HTMLElement;
+    if (t.closest("input, textarea, .md")) return;
+    e.preventDefault();
+    if (t.closest(".cmenu")) return;
+    closeMenu();
+    if (!desktop() || (e as PointerEvent).pointerType === "touch") return;
+    const el = t.closest<HTMLElement>(".row[data-id], [data-card], [data-epic]");
+    const id = el && (el.dataset.id || el.dataset.card || el.dataset.epic);
+    if (!id || id === "none" || !get(id)) return;
+    // The row joins the selection first, as a right click does in a file manager, and an open detail follows it as it follows the keys.
+    if (S.cursor !== id) { S.cursor = id; if (S.detail) S.detail.stack = [id]; render(); }
+    openMenu(id, e.clientX, e.clientY);
+  });
+  // The menu closes as a native one does: a press anywhere else, the wheel, a resize or leaving the window.
+  document.addEventListener("pointerdown", e => { if (menuOpen() && !(e.target as HTMLElement).closest(".cmenu")) closeMenu(); }, true);
+  document.addEventListener("wheel", () => closeMenu(), { passive: true, capture: true });
+  window.addEventListener("resize", closeMenu);
+  window.addEventListener("blur", closeMenu);
+}
+
+/** menuAtCursor opens the context menu beside the cursor's row, card or epic, for the Menu key and Shift-F10. */
+function menuAtCursor(): boolean {
+  if (!desktop() || !S.cursor || S.cursor === "none" || !get(S.cursor)) return false;
+  const id = CSS.escape(S.cursor);
+  const el = [...document.querySelectorAll<HTMLElement>(`#main .row[data-id="${id}"], #main [data-card="${id}"], #main [data-epic="${id}"]`)].find(x => x.offsetParent !== null);
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  // adoptCursor may have moved the cursor without a draw; the menu's row shows as selected.
+  if (!el.classList.contains("sel")) render();
+  openMenu(S.cursor, r.left + Math.min(r.width / 2, 120), r.top + r.height / 2);
+  return true;
 }
 
 const MOVES: Record<string, [number, number]> = {
@@ -674,8 +723,16 @@ function boardKey(key: string): boolean {
 function onSizeChange(): void {
   render();
   if (!S.cursor) return;
-  if (S.view === "tree") ensureVisible(S.cursor);
-  else if (S.view === "board") document.querySelector(`#vBoard [data-card="${CSS.escape(S.cursor)}"], #vBoard [data-epic="${CSS.escape(S.cursor)}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const show = () => {
+    if (!S.cursor) return;
+    if (S.view === "tree") ensureVisible(S.cursor);
+    else if (S.view === "board") document.querySelector(`#vBoard [data-card="${CSS.escape(S.cursor)}"], #vBoard [data-epic="${CSS.escape(S.cursor)}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+  show();
+  // Rows are content-visibility: auto, and the ones off screen in the old class keep that class's row
+  // height as their placeholder until a frame has laid the new class out, so the first pass measures the
+  // cursor's row a few px off where it ends up; the second pass, after that frame, puts it right.
+  requestAnimationFrame(() => requestAnimationFrame(show));
 }
 
 export function bindAll(): void {
@@ -689,4 +746,5 @@ export function bindAll(): void {
   bindSheet();
   bindBoard();
   bindClicks();
+  bindMenu();
 }

@@ -9,7 +9,7 @@ import { S, SORTS, matches, queryString, stOf, treeRows, type TreeRow } from "./
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
-import { $, $opt, age, esc, fmtDate, md, sizeClass, split, store } from "./util";
+import { $, $opt, age, desktop, esc, fmtDate, md, sizeClass, split, store } from "./util";
 
 const metaSep = '<span class="msep">-</span>';
 
@@ -124,13 +124,19 @@ function renderChips(): void {
 
 function renderBar(): void {
   const el = $("#bar");
+  // The sidebar of the desktop classes carries the project above the views and the connection
+  // below them, as the direction A mockup does (docs/mockups/responsive-web/shots/a-desktop.png).
+  const side = desktop();
+  const brand = side ? `<div class="sbrand"><b>b9s</b><small>${esc(D.project.all ? "all projects" : D.project.name)}${D.project.read_only ? " · ro" : ""}</small></div>` : "";
+  const live = S.live === "live" ? "connected" : S.live === "stale" ? "offline" : "connecting";
+  const foot = side ? `<div class="sfoot"><span class="slive ${S.live}"><span class="sdot" aria-hidden="true"></span>${live}</span>${D.public ? "" : `<button data-act="projects">project switcher</button>`}</div>` : "";
   if (S.marking) {
     el.className = "bar bulk";
-    el.innerHTML = `<button class="cnt" data-act="markall">${S.marks.size} marked<br><span style="font-weight:400;color:var(--muted)">tap: all</span></button>
+    el.innerHTML = brand + `<button class="cnt" data-act="markall">${S.marks.size} marked<br><span style="font-weight:400;color:var(--muted)">tap: all</span></button>
       <button data-act="bulkstatus"><span class="g">◐</span>Status</button>
       <button data-act="bulkclose"><span class="g">✓</span>Close</button>
       <button class="red" data-act="bulkdelete"><span class="g">⌫</span>Delete</button>
-      <button data-act="unmark"><span class="g">✕</span>Done</button>`;
+      <button data-act="unmark"><span class="g">✕</span>Done</button>` + foot;
     return;
   }
   el.className = "bar";
@@ -138,7 +144,7 @@ function renderBar(): void {
     const on = S.view === v || (v === "more" && S.view === "graph");
     return `<button class="${on ? "on" : ""}" data-view="${v}" aria-current="${on ? "page" : "false"}"><span class="g">${g}</span>${l}</button>`;
   };
-  el.innerHTML = tab("tree", "≣", "Tree") + tab("board", "▥", "Board") + tab("memory", "◇", "Memory") + tab("search", "⌕", "Search") + tab("more", "⋯", "More");
+  el.innerHTML = brand + tab("tree", "≣", "Tree") + tab("board", "▥", "Board") + tab("memory", "◇", "Memory") + tab("search", "⌕", "Search") + tab("more", "⋯", "More") + foot;
 }
 
 export function renderStale(): void {
@@ -803,9 +809,13 @@ export function renderDetail(was = detailPlace()): void {
   const back = S.detail.stack.length > 1
     ? `<button class="back" data-act="dback" aria-label="Back to previous issue">‹ ${esc(shortId(S.detail.stack[S.detail.stack.length - 2]))}</button>`
     : (!isSplit ? `<button class="back" data-act="dclose" aria-label="Back to issue list">‹ Tree</button>` : "");
+  // A finger swipes to the next sibling; a mouse has buttons for it.
+  const pager = desktop()
+    ? `<button data-act="dprev" aria-label="Previous sibling" title="Previous sibling (p)"${pos > 0 ? "" : " disabled"}>‹</button><span class="pager">${pos + 1}/${sib.length}</span><button data-act="dnext" aria-label="Next sibling" title="Next sibling (n)"${pos < sib.length - 1 ? "" : " disabled"}>›</button>`
+    : `<span class="pager">${pos + 1}/${sib.length} ‹ swipe ›</span>`;
   host.innerHTML = `<section class="detail ${existing ? "" : "enter"} ${full ? "full" : ""}" data-id="${esc(id)}" style="--h:${detailHeightPx()}px" aria-label="Issue ${esc(shortId(id))}" role="dialog">
     <div class="dhead" id="dhead"><div class="grab"></div>
-      <div class="dtop">${back}<span class="id">${esc(i.id)}</span><span class="sp"></span><span class="pager">${pos + 1}/${sib.length} ‹ swipe ›</span><button data-act="dsize" aria-label="${size[1]}" title="${size[1]} (\\)">${size[0]}</button><button data-act="dclose" aria-label="Close">✕</button></div>
+      <div class="dtop">${back}<span class="id">${esc(i.id)}</span><span class="sp"></span>${pager}<button data-act="dsize" aria-label="${size[1]}" title="${size[1]} (\\)">${size[0]}</button><button data-act="dclose" aria-label="Close">✕</button></div>
       <div class="dtitle">${esc(i.t)}</div>
       <div class="pills"><span class="pill status" style="--sc:${st.c}"><span class="sdot" aria-hidden="true"></span>${esc(i.status === eff(i) ? st.w : i.status + " - " + st.w)}</span><span class="pill">P${i.priority}</span><span class="pill">${esc(i.type)}</span>${i.labels.map(l => `<span class="pill">#${esc(l)}</span>`).join("")}</div>
     </div>

@@ -120,6 +120,13 @@ export function sizeClass(): SizeClass {
 export const split = (): boolean => sizeClass() !== "phone";
 
 /**
+ * desktop is the desktop and wide classes, laid out for a mouse and a
+ * keyboard: the rail is a sidebar, rows and cards light up under the
+ * pointer, a right click opens a menu, and a sheet is a dialog.
+ */
+export const desktop = (): boolean => { const c = sizeClass(); return c === "desktop" || c === "wide"; };
+
+/**
  * observeSize calls back once each time the app's width crosses into another
  * class, so a rotation or a resized window redraws at the breakpoint and not
  * on every pixel in between.

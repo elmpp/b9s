@@ -5,7 +5,7 @@
 import * as api from "./api";
 import type { ProjectEntry, WriteRequest, WriteResult } from "./api.gen";
 import { D, descendants, eff, get, kids, load, openBlockers, pool, shortId, type Item } from "./data";
-import { ALL, boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, treeList } from "./render";
+import { ALL, boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, siblings, treeList } from "./render";
 import { PC, S, SORTS, SORT_HELP, ST, TY, defaultDetailSize, queryString, saveChips, stOf, type Sheet, type SortKey } from "./state";
 import { syncSoon } from "./nav";
 import { $, $opt, copyText, esc, fmtDate, haptic, split, store } from "./util";
@@ -323,7 +323,8 @@ export const GESTURES: [string, string, string][] = [
   ["Swipe ← → on detail", "next / previous sibling", "n p"], ["Scroll the detail up / tap its head", "full height / switch", "\\"], ["Pull the detail down", "half height / close", ""], ["Drag handle up / down", "full height / close", "Esc"], ["Tap a relation", "go there; ‹ goes back", ""],
   ["Swipe ← → on board", "next column", "h l"], ["Tap the active column tab", "fold it into a rail", "z"], ["Tap Z unfold", "unfold all", "Z"],
   ["Tap an epic in the rail", "scroll to its lane", ""], ["Long-press an epic in the rail", "fold its lane", "Tab"],
-  ["Long-press a card, drag", "move to a column", ""], ["Tap project name", "project sheet", "1-9 0"], ["Tap the ● dot", "source health", "D"],
+  ["Long-press a card, drag", "move to a column", ""], ["Right-click a row, a card or an epic", "context menu with the swipe actions; Menu or Shift-F10 for the cursor row (desktop)", ""],
+  ["Tap project name", "project sheet", "1-9 0"], ["Tap the ● dot", "source health", "D"],
   ["Swipe down on header", "hide or show chips", "Ctrl-E"], ["Tap F", "follow live changes", "F"],
 ];
 
@@ -619,7 +620,7 @@ export function applyTextSize(): void {
   document.documentElement.style.fontSize = (13 * S.textSize) / 100 + "px";
 }
 
-async function openEdit(id: string): Promise<void> {
+export async function openEdit(id: string): Promise<void> {
   if (readOnly()) return;
   const cached = fullIssue(id);
   if (cached) { openSheet("edit", { id, full: cached }); return; }
@@ -650,6 +651,101 @@ async function loadProjects(): Promise<void> {
   projectList = null; projectError = "";
   try { projectList = (await api.projects()).projects; } catch (e) { projectError = e instanceof Error ? e.message : String(e); }
   if (S.sheet && S.sheet.kind === "projects") renderSheet();
+}
+
+/* ================= context menu ================= */
+
+/**
+ * The issue the context menu is open for. It travels with the menu rather
+ * than the cursor, so a live update that redraws the rows under the menu
+ * changes nothing, and an action lands on the issue the menu was opened on.
+ */
+let menuFor: string | null = null;
+
+export const menuOpen = (): boolean => !!menuFor;
+
+export function closeMenu(): void {
+  if (!menuFor) return;
+  menuFor = null;
+  $("#menuHost").innerHTML = "";
+}
+
+const mitem = (a: string, g: string, x: string, key = "", cls = "") =>
+  `<button role="menuitem" class="${cls}" data-cm="${a}"><span class="g" aria-hidden="true">${g}</span><span class="x">${x}</span>${key ? `<kbd>${esc(key)}</kbd>` : ""}</button>`;
+
+/**
+ * openMenu shows the context menu for an issue at a point in the viewport:
+ * the four swipe actions (start or stop, the status picker, close, the
+ * action sheet) and the ones a mouse user expects beside them. The menu
+ * stays inside #app: near an edge it moves up or left rather than off it.
+ */
+export function openMenu(id: string, x: number, y: number): void {
+  const i = get(id);
+  if (!i) return;
+  const ro = D.project.read_only, closed = eff(i) === "closed", stop = nextStatus(i) === "open";
+  const items = [
+    mitem("open", "›", "Open", "Enter"),
+    ro ? "" : mitem("toggle", closed || stop ? "○" : "◐", closed ? "Reopen" : stop ? "Stop" : "Start"),
+    ro ? "" : mitem("status", "◐", "Set status…", "S"),
+    ro || closed ? "" : mitem("close", "✓", "Close", "K"),
+    `<div class="csep"></div>`,
+    ro ? "" : mitem("edit", "✎", "Edit", "e"),
+    ro ? "" : mitem("comment", "✉", "Comment", "c"),
+    mitem("copy", "⧉", "Copy ID", "y"),
+    mitem("mark", "▪", S.marks.has(id) ? "Unmark" : "Mark", "Space"),
+    `<div class="csep"></div>`,
+    mitem("more", "⋯", "More…"),
+    ro ? "" : mitem("delete", "⌫", "Delete…", "Del", "red"),
+  ];
+  menuFor = id;
+  const host = $("#menuHost");
+  host.innerHTML = `<div class="cmenu" role="menu" tabindex="-1" aria-label="Actions for ${esc(shortId(id))}" data-id="${esc(id)}"><div class="cmh"><span class="id">${esc(shortId(id))}</span><span class="t">${esc(i.t)}</span></div>${items.join("")}</div>`;
+  const m = host.firstElementChild as HTMLElement;
+  const app = $("#app"), ar = app.getBoundingClientRect();
+  m.style.left = Math.max(4, Math.min(x - ar.left, app.clientWidth - m.offsetWidth - 4)) + "px";
+  m.style.top = Math.max(4, Math.min(y - ar.top, app.clientHeight - m.offsetHeight - 4)) + "px";
+  m.focus({ preventScroll: true });
+}
+
+/**
+ * menuKey gives the open menu the keyboard: the arrows, j and k and Tab walk
+ * the items, Enter and Space pick one, and any other key closes it, as a
+ * native menu does. It reports whether it took the key.
+ */
+export function menuKey(e: KeyboardEvent): boolean {
+  if (!menuFor) return false;
+  const k = e.key;
+  if (k === "Shift" || k === "Control" || k === "Alt" || k === "Meta") return true;
+  const items = [...document.querySelectorAll<HTMLButtonElement>("#menuHost .cmenu button")];
+  const at = items.indexOf(document.activeElement as HTMLButtonElement);
+  const go = (n: number) => items[(n + items.length) % items.length]?.focus();
+  if (k === "ArrowDown" || k === "j" || (k === "Tab" && !e.shiftKey)) go(at + 1);
+  else if (k === "ArrowUp" || k === "k" || (k === "Tab" && e.shiftKey)) go(at < 0 ? items.length - 1 : at - 1);
+  else if (k === "Home") go(0);
+  else if (k === "End") go(items.length - 1);
+  else if ((k === "Enter" || k === " ") && at >= 0) items[at].click();
+  else closeMenu();
+  return true;
+}
+
+/** menuAction runs the item picked from the menu, on the issue the menu was opened for. */
+export async function menuAction(a: string): Promise<void> {
+  const id = menuFor;
+  closeMenu();
+  const i = id ? get(id) : undefined;
+  if (!id || !i) return;
+  switch (a) {
+    case "open": openDetail(id); break;
+    case "toggle": await setStatus([id], nextStatus(i)); break;
+    case "status": if (!readOnly()) openSheet("status", { id }); break;
+    case "close": if (eff(i) !== "closed") await setStatus([id], "closed"); break;
+    case "edit": await openEdit(id); break;
+    case "comment": if (!readOnly()) openSheet("comment", { id }); break;
+    case "copy": toast(await copyText(id) ? "Copied " + id : "Clipboard refused. ID: " + id); break;
+    case "mark": toggleMark(id); break;
+    case "more": openSheet("actions", { id }); break;
+    case "delete": if (!readOnly()) openSheet("confirmdelete", { ids: [id] }); break;
+  }
 }
 
 /* ================= taps ================= */
@@ -688,6 +784,15 @@ export async function act(a: string): Promise<void> {
     case "unmark": endMarking(); render(); break;
     case "undo": if (undoFn) { const f = undoFn; undoFn = null; hideToast(); f(); } break;
     case "dback": if (S.detail) { S.detail.stack.pop(); S.cursor = S.detail.stack[S.detail.stack.length - 1]; render(); } break;
+    case "dprev": case "dnext": {
+      const sib = siblings(cur), next = sib[sib.indexOf(cur) + (a === "dnext" ? 1 : -1)];
+      if (!next) break;
+      S.cursor = next;
+      if (S.detail) S.detail.stack = [next];
+      render();
+      ensureVisible(next);
+      break;
+    }
     case "dclose": closeDetail(); break;
     case "dsize": if (S.detail) { S.detail.size = S.detail.size === "full" ? "half" : "full"; render(); } break;
     case "dfocus": setFocus(cur, "subtree"); break;

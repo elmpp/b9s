@@ -47,15 +47,16 @@ export default defineConfig({
   // budget.
   projects: [
     { name: "tokens", use: { ...devices["Desktop Chrome"] }, testMatch: /tokens\.spec/ },
-    { name: "pixel", use: { ...devices["Pixel 7"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell)\.spec/ },
-    { name: "iphone", use: { ...devices["iPhone 14"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell)\.spec/ },
+    { name: "pixel", use: { ...devices["Pixel 7"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell|desktop)\.spec/ },
+    { name: "iphone", use: { ...devices["iPhone 14"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell|desktop)\.spec/ },
     ...(["Desktop Chrome", "Desktop Safari", "Desktop Firefox"] as const).map((device) => ({
       name: device === "Desktop Chrome" ? "desktop" : device.toLowerCase().replace(" ", "-"),
       use: { ...devices[device], viewport: { width: 1440, height: 900 } },
-      testMatch: /(wide|keys|read|write|memory)\.spec/,
+      testMatch: /(wide|keys|read|write|memory|desktop)\.spec/,
     })),
     { name: "ipad", use: { ...devices["iPad Pro 11"] }, testMatch: /(wide|keys)\.spec/ },
-    ...sizes.map(size => ({ ...size, testMatch: /shell\.spec/ })),
+    // desktop.spec.ts covers the desktop and wide classes; at 1440 px the three desktop browsers run it already.
+    ...sizes.map(size => ({ ...size, testMatch: size.name === "desktop-1920" || size.name === "wide-2560" ? /(shell|desktop)\.spec/ : /shell\.spec/ })),
     ...(["Pixel 7", "iPhone 14"] as const).map((device) => ({
       name: device === "Pixel 7" ? "pixel-perf" : "iphone-perf",
       use: { ...devices[device] },

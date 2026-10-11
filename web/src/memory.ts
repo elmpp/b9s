@@ -6,7 +6,7 @@ import { openDetail, refresh, toast } from "./actions";
 import { renderMermaidBlocks } from "./mermaid";
 import { fullH, halfH } from "./render";
 import { S } from "./state";
-import { copyText, esc, md, split } from "./util";
+import { copyText, esc, md, sizeClass, split } from "./util";
 
 let key = "", project = "", selected = "", filter = "all";
 let graph: MemoryGraph | null = null;
@@ -413,6 +413,9 @@ function draw(host: HTMLElement): void {
   host.querySelector("#memoryRecord")!.addEventListener("change", e => {
     const id = (e.target as HTMLSelectElement).value, point = positions.get(id);
     if (!point) return;
+    // The pan is in canvas px, so the canvas must already have the size of the app's current
+    // class: a pick in the frame after a resize would otherwise centre on the old width.
+    sizeClass(); fitViewBox(host);
     scale = 1; panX = (host.clientWidth - cardWidth) / 2 - point.x; panY = 35 - point.y;
     transform(); choose(id);
   });
@@ -534,7 +537,11 @@ export function renderMemoryDetail(): void {
   const node = selected ? nodeOf(selected) : undefined;
   const open = S.view === "memory" && !!graph && !!(node || openEdge);
   app.classList.toggle("hasdetail", open);
-  if (!open) { host.innerHTML = ""; return; }
+  // On a desktop the detail is a column beside the canvas, so opening or closing it resizes the
+  // canvas, and the viewBox follows it as it follows a window resize.
+  const view = document.getElementById("vMemory");
+  const refit = () => { if (view && graph && !view.hidden) fitViewBox(view); };
+  if (!open) { host.innerHTML = ""; refit(); return; }
   const did = openEdge ? "link:" + openEdge.id : node!.id;
   const existing = host.querySelector<HTMLElement>("#memoryDetail");
   const scrollTop = existing && existing.dataset.id === did ? existing.querySelector(".dbody")!.scrollTop : 0;
@@ -569,6 +576,7 @@ export function renderMemoryDetail(): void {
     <div class="dbody">${body}</div>${inTree}
   </section>`;
   const sec = host.querySelector<HTMLElement>("#memoryDetail")!;
+  refit();
   renderMermaidBlocks(sec);
   sec.querySelector(".dbody")!.scrollTop = scrollTop;
   sec.addEventListener("click", ev => {

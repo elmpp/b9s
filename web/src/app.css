@@ -10,7 +10,7 @@
   }
   button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
   input, textarea, select { font: var(--font-input); color: var(--text); }
-  .hd .proj, .chip .k, .chip .n, .id, .st, .mk, .chev, .cmd, code, pre, kbd, .memoryCardID, .memoryLane { font-family: var(--mono); }
+  .hd .proj, .chip .k, .chip .n, .id, .st, .mk, .chev, .cmd, .cmenu, code, pre, kbd, .memoryCardID, .memoryLane { font-family: var(--mono); }
 
   /* ---------- app shell ---------- */
   .app {
@@ -65,7 +65,7 @@
      The detail host sits between them, out of the flow: its sheet or panel is placed against .body, so a side panel starts
      below the header and the chips while a phone sheet still rises from the bottom edge. */
   .body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
-  #detailHost { display: contents; }
+  #detailHost, #menuHost { display: contents; }
   main { flex: 1; min-height: 0; min-width: 0; position: relative; }
   .view { position: absolute; inset: 0; display: flex; flex-direction: column; }
   .view[hidden] { display: none !important; }
@@ -171,7 +171,7 @@
   .wboard { flex: 1; min-width: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-auto-rows: min-content; align-content: start; column-gap: 12px; padding: 0 16px 24px; touch-action: pan-x pan-y; }
   .whead { position: sticky; top: 0; z-index: 3; display: flex; align-items: baseline; gap: 8px; padding: 10px 6px 8px; background: var(--bg); border-bottom: 2px solid var(--hc, var(--line)); color: var(--text); font-weight: 700; text-align: left; }
   .whead b { font-weight: 400; color: var(--muted); }
-  .whead:hover span { color: var(--hi); }
+  .whead:hover span { color: var(--text); }
   .whead.rail { writing-mode: vertical-rl; align-items: center; padding: 10px 0; font-weight: 400; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; height: 120px; }
   .wboard .lane { grid-column: 1 / -1; padding: 12px 6px 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .lane .lf { display: flex; gap: 0 6px; color: var(--muted); font-size: 0.885rem; }
@@ -179,9 +179,8 @@
   .lane.lfacts .t { color: var(--text); }
   .lane .ls { flex-basis: 100%; padding-left: 18px; color: var(--muted); font-size: 0.885rem; overflow: hidden; text-overflow: ellipsis; }
   .wcell { min-height: 44px; padding: 8px 0 4px; border-radius: 6px; }
-  .wcell.drop, .whead.drop { background: var(--priority-faint); outline: 1px dashed var(--yellow); outline-offset: -1px; }
+  .wcell.drop, .whead.drop { background: var(--hover); outline: 1px dashed var(--accent); outline-offset: -1px; }
   .wboard .card { cursor: pointer; }
-  .wboard .card:hover:not(.sel) { border-color: var(--muted); border-left-color: var(--line); }
   .wempty { grid-column: 1 / -1; }
   .whint { margin-left: auto; align-self: center; color: var(--muted); font-size: 0.846rem; white-space: nowrap; }
   .whead.epich { color: var(--text); border-bottom-color: var(--line); cursor: default; }
@@ -253,6 +252,7 @@
   .dtop { display: flex; align-items: center; gap: 6px; font-size: 0.923rem; color: var(--muted); }
   .dtop .sp { flex: 1; }
   .dtop button { padding: 4px 6px; color: var(--dim); }
+  .dtop button[disabled] { color: var(--ghost); cursor: default; }
   .dtop .back { color: var(--hi); }
   .dtitle { font-size: 1.154rem; line-height: 21px; font-weight: 700; margin: 4px 0 2px; text-wrap: balance; }
   .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 0.923rem; }
@@ -413,11 +413,80 @@
   .app.tablet .detail { left: calc(var(--rail-w) + var(--list-w)); width: auto; background: var(--bg); box-shadow: none; }
   .app.tablet .detail .dhead { padding: 12px 16px 10px 20px; }
   .app.tablet .dbody { padding: 10px 20px 24px; }
-  /* Desktop and wide: the rail widens into a sidebar with the glyph beside each label. */
-  .app.desktop, .app.wide { --rail-w: 160px; }
-  .app.desktop nav.bar button, .app.wide nav.bar button { flex-direction: row; justify-content: flex-start; gap: 10px; height: 40px; padding: 0 14px; font-size: 0.923rem; }
-  .app.desktop nav.bar button .g, .app.wide nav.bar button .g { width: 18px; text-align: center; font-size: 1.077rem; }
-  .app.desktop nav.bulk .cnt, .app.wide nav.bulk .cnt { text-align: left; }
+  /* ---------- desktop and wide: the sidebar shell of the direction A mockup ----------
+     (docs/mockups/responsive-web/shots/a-desktop.png). #app is a grid: the sidebar spans the whole height at
+     the left with the project above the views and the connection below them, the header and the chips sit
+     to its right, and the detail is a third column beside the views rather than a panel over them, so the
+     tree or the board and an issue read together. The body and the sheet host hand their children to the
+     grid; a sheet and its backdrop are placed against #app, as everywhere. */
+  .app:is(.desktop, .wide) {
+    --rail-w: 220px; --dw: 430px;
+    display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+  }
+  .app:is(.desktop, .wide) .sat { grid-column: 1 / -1; grid-row: 1; }
+  .app:is(.desktop, .wide) nav.bar { grid-column: 1; grid-row: 2 / -1; }
+  .app:is(.desktop, .wide) header.hd { grid-column: 2 / -1; grid-row: 2; min-width: 0; height: 40px; padding: 0 10px 0 16px; }
+  .app:is(.desktop, .wide) .hd .ib { width: 34px; height: 34px; border-radius: 8px; }
+  .app:is(.desktop, .wide) .hd .proj, .app:is(.desktop, .wide) .hd .dot { height: 34px; border-radius: 8px; }
+  .app:is(.desktop, .wide) .hd .proj { margin-left: -4px; padding: 0 6px 0 4px; }
+  .app:is(.desktop, .wide) .banner { grid-column: 2 / -1; grid-row: 3; min-width: 0; }
+  .app:is(.desktop, .wide) .chips { grid-column: 2 / -1; grid-row: 4; min-width: 0; }
+  .app:is(.desktop, .wide) .stale { grid-column: 2 / -1; grid-row: 5; min-width: 0; }
+  .app:is(.desktop, .wide) .body, .app:is(.desktop, .wide) #sheetHost { display: contents; }
+  .app:is(.desktop, .wide) main { grid-column: 2; grid-row: 6; }
+  .app:is(.desktop, .wide).hasdetail .view { right: 0; }
+  .app:is(.desktop, .wide) .detail { position: relative; inset: auto; grid-column: 3; grid-row: 6; min-height: 0; background: var(--bg); box-shadow: none; }
+  .app:is(.desktop, .wide) .detail.full { grid-column: 2 / -1; left: auto; }
+  /* The sidebar: the brand, one row per view with its glyph, and the connection at the foot. */
+  .app:is(.desktop, .wide) nav.bar { padding: 0 0 var(--sab); }
+  .sbrand { display: grid; gap: 2px; align-content: center; min-height: 62px; margin-bottom: 8px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+  .sbrand b { font-size: 1.385rem; line-height: 1.2; color: var(--text); }
+  .sbrand small { color: var(--muted); font-size: 0.923rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app:is(.desktop, .wide) nav.bar button { flex-direction: row; justify-content: flex-start; gap: 10px; height: 38px; margin: 0 12px 4px; padding: 0 10px; border-radius: 8px; font-size: 1rem; line-height: 18px; color: var(--text-soft); text-align: left; }
+  .app:is(.desktop, .wide) nav.bar button .g { width: 18px; text-align: center; font-size: 1rem; line-height: 18px; color: var(--muted); }
+  .app:is(.desktop, .wide) nav.bar button.on { background: var(--selected); color: var(--text); }
+  .app:is(.desktop, .wide) nav.bar button.on .g { color: var(--text); }
+  .app:is(.desktop, .wide) nav.bulk .cnt { height: auto; padding: 8px 10px; font-size: 1rem; }
+  .sfoot { margin-top: auto; display: grid; gap: 6px; padding: 12px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.923rem; }
+  .sfoot .slive { display: inline-flex; align-items: center; gap: 6px; --sc: var(--muted); }
+  .sfoot .slive.live { --sc: var(--open); }
+  .sfoot .slive.stale { --sc: var(--danger); }
+  .app:is(.desktop, .wide) nav.bar .sfoot button { height: auto; margin: 0; padding: 0; border-radius: 0; font-size: inherit; line-height: inherit; color: var(--muted); }
+  /* Rows at the mockup's density, and an opaque base under the selection's tint: the swipe labels lie beneath .rc. */
+  .app:is(.desktop, .wide) .row .rc { min-height: 40px; padding-top: 3px; padding-bottom: 3px; }
+  .app:is(.desktop, .wide) .row.sel .rc { background: linear-gradient(var(--selected), var(--selected)) var(--bg); }
+  .app:is(.desktop, .wide) .row.marked .rc { background: linear-gradient(var(--row-marked), var(--row-marked)) var(--bg); }
+  .app:is(.desktop, .wide) :is(.row, .card, .wepic, .rel, .lane, .ph, .item, .opt) { cursor: pointer; }
+  .app:is(.desktop, .wide) .bbody.dragging, .app:is(.desktop, .wide) .bbody.dragging * { cursor: grabbing; }
+  /* Hover: one wash on everything a mouse can press, only where a pointer can hover. */
+  @media (hover: hover) {
+    .app:is(.desktop, .wide) .row:hover:not(.sel, .marked) .rc { background: linear-gradient(var(--hover), var(--hover)) var(--bg); }
+    .app:is(.desktop, .wide) .card:hover:not(.sel), .app:is(.desktop, .wide) .wepic:hover:not(.sel) { background: var(--hover); }
+    .app:is(.desktop, .wide) nav.bar button:hover { background: var(--hover); color: var(--text); }
+    .app:is(.desktop, .wide) :is(.hd .ib, .hd .proj, .hd .dot, .chip, .tab, .rel, .item, .opt, .lane, .ph, .crumbs button, .dtop button:not([disabled]), .dacts button, .dsec button, .fbar button, .shead button, .whead, .memoryTools button):hover { background: var(--hover); color: var(--text); }
+    .app:is(.desktop, .wide) :is(.dtop button:not([disabled]), .dacts button, .dsec button, .fbar button, .shead button):hover { border-radius: 4px; }
+  }
+  /* The context menu: the swipe actions for a mouse, at the pointer and inside #app. */
+  .cmenu { position: absolute; z-index: 50; min-width: 210px; max-width: 300px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-3); box-shadow: var(--lifted-shadow); outline: none; }
+  .cmenu .cmh { display: flex; gap: 6px; align-items: baseline; margin-bottom: 4px; padding: 6px 8px 7px; border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: 0.885rem; white-space: nowrap; overflow: hidden; }
+  .cmenu .cmh .t { overflow: hidden; text-overflow: ellipsis; font-family: var(--ui); }
+  .cmenu button { width: 100%; min-height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 6px; text-align: left; color: var(--text-soft); white-space: nowrap; }
+  .cmenu button .g { width: 16px; text-align: center; color: var(--muted); }
+  .cmenu button .x { flex: 1; }
+  .cmenu button kbd { font-size: 0.846rem; color: var(--ghost); }
+  .cmenu button:hover, .cmenu button:focus-visible { background: var(--hover); color: var(--text); }
+  .cmenu button.red { color: var(--danger); }
+  .cmenu .csep { height: 1px; margin: 4px 6px; background: var(--line-soft); }
+  /* A sheet is a dialog in the middle of the window, not a phone's bottom sheet. */
+  .app:is(.desktop, .wide) .msheet {
+    top: 10vh; bottom: auto; left: 0; right: 0; width: min(560px, calc(100% - 48px)); margin: 0 auto; max-height: 80vh; padding-bottom: 0;
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--lifted-shadow);
+    transform: translateY(16px); opacity: 0; transition: transform .18s ease-out, opacity .18s ease-out;
+  }
+  .app:is(.desktop, .wide) .msheet.on { transform: none; opacity: 1; }
+  .app:is(.desktop, .wide) .msheet .grab { display: none; }
+  .app:is(.desktop, .wide) .msheet .mh { padding-top: 14px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }
 [hidden] { display: none !important; }
 
