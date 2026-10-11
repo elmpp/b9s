@@ -817,6 +817,7 @@ export async function act(a: string): Promise<void> {
     case "actions": openSheet("actions", { id: cur }); break;
     case "unfoldall": S.board.folded.clear(); saveBoardFolded(); render(); toast("Unfolded all columns"); break;
     case "boardopts": openSheet("boardopts"); break;
+    case "closedmore": S.board.closedLimit += 50; renderBoard(); break;
     case "treeopts": openSheet("treeopts"); break;
     case "graph": S.graph = []; S.view = "graph"; render(); break;
     case "togglechips": S.chips = !S.chips; store.set("chipRow", S.chips); render(); break;
@@ -858,6 +859,7 @@ export function tabTap(k: string): void {
   }
   if (wide && openCols().length < 2) { toast("The last open column cannot fold"); return; }
   S.board.folded.add(k);
+  if (k === "closed") S.board.closedLimit = 50;
   saveBoardFolded();
   renderBoard();
   if (wide) toast("Folded " + name + " · Z unfolds");

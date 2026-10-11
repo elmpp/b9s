@@ -457,10 +457,10 @@ function bindClicks(): void {
     if (sg) { sg.parentElement!.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === sg)); return; }
     const nav = t.closest<HTMLElement>("[data-nav]");
     if (nav) { openDetail(nav.dataset.nav!, true); return; }
-    // Rows, cards and column tabs act on pointerup; toolbar buttons in #tabs are plain actions.
-    if (t.closest(".row, .card, .bcol, .wboard") || (t.closest("#tabs") && !t.closest("[data-act]"))) return;
     const a = t.closest<HTMLElement>("[data-act]");
     if (a) { void act(a.dataset.act!); return; }
+    // Rows, cards and column tabs act on pointerup; toolbar buttons in #tabs are plain actions.
+    if (t.closest(".row, .card, .bcol, .wboard") || (t.closest("#tabs") && !t.closest("[data-act]"))) return;
     const v = t.closest<HTMLElement>("[data-view]");
     if (v) {
       S.view = v.dataset.view as typeof S.view;

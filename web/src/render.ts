@@ -186,6 +186,8 @@ function renderTree(): void {
 
 /* ================= board ================= */
 
+const CLOSED_BATCH = 50;
+
 export const GROUPS: Record<string, [string, string][]> = {
   status: [["open", "Open"], ["in_progress", "In prog"], ["blocked", "Blocked"], ["closed", "Closed"]],
   priority: [["0", "P0"], ["1", "P1"], ["2", "P2"], ["3", "P3"], ["4", "P4"]],
@@ -208,6 +210,12 @@ export function boardCols(): [string, string][] {
   return cols;
 }
 
+function phoneBoardCols(): [string, string][] {
+  const cols = boardCols();
+  if (S.board.group === "status" && !S.st.size && !cols.some(([k]) => k === "closed")) return [...cols, ["closed", "Closed"]];
+  return cols;
+}
+
 /** focusSet is the focused issue and its subtree, the only issues the board shows while a focus is on. */
 const focusSet = (): Set<string> | null => (S.focus ? new Set([S.focus.id, ...descendants(S.focus.id)]) : null);
 
@@ -226,6 +234,12 @@ const inBoard = (i: Item, keep: Set<string> | null): boolean => boardCard(i, kee
 function boardItems(key: string): Item[] {
   const keep = focusSet();
   return pool().filter(i => colOf(i) === key && inBoard(i, keep)).sort(SORTS[S.sort]);
+}
+
+function phoneBoardItems(key: string): Item[] {
+  const items = boardItems(key);
+  if (key !== "closed") return items;
+  return [...items].sort((a, b) => (b.cls || b.upd) - (a.cls || a.upd));
 }
 
 export function openCols(): [string, string][] { return boardCols().filter(([k]) => !S.board.folded.has(k)); }
@@ -473,16 +487,24 @@ function renderWideBoard(v: HTMLElement): void {
  * dragged card (data-dcol), as a wide column's cells are.
  */
 function renderPhoneBoard(v: HTMLElement): void {
-  const cols = boardCols().filter(([k]) => !S.board.hideEmpty || boardItems(k).length > 0);
+  const cols = phoneBoardCols().filter(([k]) => !S.board.hideEmpty || boardItems(k).length > 0);
+  if (cols.some(([k]) => k === "closed") && !store.get("phoneClosedFolded", false)) {
+    S.board.folded.add("closed");
+    store.set("phoneClosedFolded", true);
+    store.set("boardFolded", [...S.board.folded]);
+  }
   const boxes = cols.map(([k, l]) => {
-    const items = boardItems(k), f = S.board.folded.has(k);
+    const items = phoneBoardItems(k), f = S.board.folded.has(k);
+    const shown = k === "closed" ? items.slice(0, S.board.closedLimit) : items;
+    const remaining = k === "closed" ? items.length - shown.length : 0;
     const head = `<button class="bhead" data-tab="${esc(k)}" aria-expanded="${!f}"><span class="st" style="--sc:${colColor(k)}" aria-hidden="true"></span><span class="t">${esc(l)}</span><b>${items.length}</b><span class="ch" aria-hidden="true">${f ? "▸" : "▾"}</span></button>`;
     if (f) return `<div class="bbox folded" data-dcol="${esc(k)}">${head}</div>`;
     let inner = "";
-    const lanes = lanesShown() ? laneKeys(items) : [];
+    const lanes = lanesShown() ? laneKeys(shown) : [];
     if (!items.length) inner = `<div class="empty">No cards in ${esc(l)}.</div>`;
     else if (lanes.length) inner = lanes.map(([ln, arr]) => `<div class="lgrp" data-lgrp="${esc(ln)}">${laneHTML(ln, arr.length)}${S.board.laneFold.has(ln) ? "" : cellCards(arr)}</div>`).join("");
-    else inner = cellCards(items);
+    else inner = cellCards(shown);
+    if (remaining > 0) inner += `<button class="bmore" data-act="closedmore">show ${Math.min(CLOSED_BATCH, remaining)} more</button>`;
     return `<div class="bbox" data-dcol="${esc(k)}">${head}<div class="bcards">${inner}</div></div>`;
   }).join("");
   const old = document.getElementById("bcol");

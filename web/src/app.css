@@ -142,6 +142,7 @@
   .bbox.drop { background: var(--hover); outline: 1px dashed var(--accent); outline-offset: -1px; }
   .bcards { padding: 10px 10px 4px; }
   .bcards .empty { padding: 12px 8px 16px; }
+  .bmore { width: 100%; min-height: 44px; margin: 4px 0 6px; border: 1px solid var(--line-soft); border-radius: 6px; color: var(--muted); font-weight: 600; }
   .card { position: relative; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--surface-raised); padding: 6px 8px 6px calc(8px + min(var(--d, 0), 4) * 14px); margin-bottom: 6px; }
   .card .l1 { align-items: center; }
   .card .l1 .t { font-weight: 600; }

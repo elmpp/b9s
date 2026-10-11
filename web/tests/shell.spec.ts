@@ -62,6 +62,12 @@ test("#app carries the class of its width, with the bar at the bottom on a phone
 
 const LONG = Array.from({ length: 60 }, (_, n) => `Paragraph ${n + 1} of a description long enough that the detail scrolls in every class.`).join("\n\n");
 const MANY: FixtureIssue[] = [...SAMPLE, ...Array.from({ length: 60 }, (_, n) => ({ id: `m-${n + 1}`, title: `[m${n + 1}] Row ${n + 1}`, priority: 3, description: LONG }))];
+const MANY_CLOSED: FixtureIssue[] = [
+  { id: "c-open", title: "[open] Open work", priority: 2 },
+  { id: "c-progress", title: "[progress] Current work", status: "in_progress", priority: 2 },
+  { id: "c-blocked", title: "[blocked] Blocked work", blockedBy: ["c-progress"], priority: 2 },
+  ...Array.from({ length: 55 }, (_, n) => ({ id: `closed-${n + 1}`, title: `[closed-${n + 1}] Closed work ${n + 1}`, status: "closed", priority: 2, updatedMinutesAgo: n })),
+];
 
 test.describe("a long tree and a long detail", () => {
   test.use({ fixture: { issues: MANY } });
@@ -163,6 +169,35 @@ test.describe("phone native layout", () => {
     await expect(page.locator("#tabs")).toHaveCount(0);
     expect(await page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["0", "1", "2", "3", "4"]);
     await expect(page.locator('#bcol .bbox[data-dcol="1"] [data-card="t-1"]')).toBeVisible();
+  });
+
+  test.describe("closed box", () => {
+    test.use({ fixture: { issues: MANY_CLOSED } });
+
+    test("is last, folded by default at 412 px, and renders closed cards in batches of 50", async ({ page, project }) => {
+      const vp = page.viewportSize()!;
+      test.skip(vp.width !== 412 || sizeClassOf(vp.width) !== "phone", "phone 412 only");
+      await page.addInitScript(() => localStorage.setItem("b9s.chips", JSON.stringify([])));
+      await open(page, project);
+      await classOn(page);
+      await page.locator('#bar [data-view="board"]').click();
+
+      const boxes = page.locator("#bcol .bbox");
+      expect(await boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
+      const closed = page.locator('#bcol .bbox[data-dcol="closed"]');
+      await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "false");
+      await expect(closed.locator(".bhead b")).toHaveText("55");
+      await expect(closed.locator("[data-card]")).toHaveCount(0);
+
+      await closed.locator(".bhead").click();
+      await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "true");
+      await expect(closed.locator("[data-card]")).toHaveCount(50);
+      await expect(closed.locator("[data-card]").first()).toHaveAttribute("data-card", "closed-1");
+      await expect(closed.locator('[data-act="closedmore"]')).toHaveText("show 5 more");
+      await closed.locator('[data-act="closedmore"]').click();
+      await expect(closed.locator("[data-card]")).toHaveCount(55);
+      await expect(closed.locator('[data-act="closedmore"]')).toHaveCount(0);
+    });
   });
 
   test("draws active status chips differently from inactive ones", async ({ page, project }) => {

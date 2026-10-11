@@ -42,6 +42,7 @@ export const S = {
     // The side-by-side board opens on the TUI's epic rail; a phone's boxes read better with rows.
     lanes: store.get<"off" | "rows" | "rail">("boardLanes", split() ? "rail" : "rows"),
     laneFold: new Set<string>(),
+    closedLimit: 50,
     hideEmpty: false,
   },
   graph: [] as string[],
