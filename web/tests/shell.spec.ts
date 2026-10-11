@@ -58,6 +58,14 @@ test.describe("a long tree and a long detail", () => {
     // The full issue arrives after the sheet opens; its text makes the detail scroll.
     await expect.poll(() => page.locator("#dbody").evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(400);
     await page.locator("#dbody").evaluate(el => { el.scrollTop = 300; });
+    // The paragraph at the top of the text is what a rotation keeps: the text reflows at the other
+    // pane's width and the browser holds that paragraph in place, so its offset in px moves with it.
+    const topPara = () => page.locator("#dbody").evaluate(el => {
+      const top = el.getBoundingClientRect().top;
+      return [...el.querySelectorAll(".md p")].findIndex(p => p.getBoundingClientRect().bottom > top);
+    });
+    let para = await topPara();
+    expect(para).toBeGreaterThan(1);
 
     const place = async (vp: { width: number; height: number }) => {
       await page.setViewportSize(vp);
@@ -66,7 +74,8 @@ test.describe("a long tree and a long detail", () => {
       await expect(d).toBeVisible();
       await expect(page.locator("#treeRows .row.sel")).toHaveAttribute("data-id", "m-30");
       await expect(r).toBeInViewport();
-      await expect.poll(() => page.locator("#dbody").evaluate(el => el.scrollTop)).toBeGreaterThanOrEqual(280);
+      await expect.poll(async () => Math.abs((await topPara()) - para) <= 1).toBe(true);
+      para = await topPara();
       const db = await box(page, ".detail"), app = await box(page, "#app");
       // A phone's sheet spans the width; every other class shows a side panel beside the list.
       if (cls === "phone") expect(db.width).toBeGreaterThanOrEqual(app.width - 1);
@@ -124,5 +133,76 @@ test.describe("phone native layout", () => {
 
     await expect(page.locator(".detail")).toHaveCount(0);
     expect(project.issues().find(i => i.id === "m-1")?.status).toBe("open");
+  });
+});
+
+test.describe("tablet split view", () => {
+  test.use({ fixture: { issues: MANY } });
+
+  test("keeps a list pane at the left and gives the detail the rest below the chips, upright and on its side", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "tablet", "tablet only");
+    await open(page, project);
+    await row(page, "t-1").click();
+    const d = page.locator(".detail");
+    await expect(d).toHaveAttribute("data-id", "t-1");
+    const split = async () => {
+      expect(await classOn(page)).toBe("tablet");
+      const app = await box(page, "#app"), bar = await box(page, "#bar"), chips = await box(page, "#chips"), list = await box(page, "#treeList"), db = await box(page, ".detail");
+      // The list keeps 300 to 420 px from the rail's edge; the detail starts where the list ends and reaches the right edge.
+      expect(list.x).toBeGreaterThanOrEqual(bar.x + bar.width - 1);
+      expect(list.width).toBeGreaterThanOrEqual(299);
+      expect(list.width).toBeLessThanOrEqual(421);
+      expect(Math.abs(db.x - (list.x + list.width))).toBeLessThanOrEqual(1);
+      expect(db.x + db.width).toBeGreaterThanOrEqual(app.x + app.width - 1);
+      // Both panes start below the chips, which keep the whole width, and the detail runs to the bottom edge.
+      expect(chips.x + chips.width).toBeGreaterThanOrEqual(app.x + app.width - 1);
+      expect(db.y).toBeGreaterThanOrEqual(chips.y + chips.height - 1);
+      expect(Math.abs(db.y - list.y)).toBeLessThanOrEqual(1);
+      expect(db.y + db.height).toBeGreaterThanOrEqual(app.y + app.height - 1);
+      expect(await page.locator("#app").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    };
+    await split();
+    // The pane's head buttons and relations are finger targets.
+    await expect.poll(() => d.locator(".dtop button, .rel").evaluateAll(els => els.length > 1 && els.every(el => el.getBoundingClientRect().height >= 44))).toBe(true);
+    // The other orientation is the same class, so nothing redraws: the detail stays and the panes refit.
+    const vp = page.viewportSize()!;
+    await page.setViewportSize({ width: vp.height, height: vp.width });
+    await expect(d).toHaveAttribute("data-id", "t-1");
+    await split();
+    // Closing the detail gives the list the whole width back.
+    await d.locator('[data-act="dclose"]').click();
+    await expect(d).toHaveCount(0);
+    const app = await box(page, "#app"), list = await box(page, "#treeList");
+    expect(list.x + list.width).toBeGreaterThanOrEqual(app.x + app.width - 1);
+  });
+
+  test("a hardware keyboard works the split: j and Enter open the panel beside the list, \\ widens it, Esc closes it", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "tablet", "tablet only");
+    await open(page, project);
+    await page.keyboard.press("j");
+    await page.keyboard.press("j");
+    await expect(page.locator("#treeRows .row.sel")).toHaveAttribute("data-id", "t-1");
+    await page.keyboard.press("Enter");
+    const d = page.locator(".detail");
+    await expect(d).toHaveAttribute("data-id", "t-1");
+    const app = await box(page, "#app"), bar = await box(page, "#bar");
+    const railEdge = bar.x + bar.width;
+    // The panel settles beside the list once it has slid in.
+    const beside = async () => {
+      const list = await box(page, "#treeList"), p = await box(page, ".detail");
+      return Math.abs(p.x - (list.x + list.width)) <= 1 && p.x + p.width >= app.x + app.width - 1;
+    };
+    await expect.poll(beside).toBe(true);
+    await page.keyboard.press("\\");
+    await expect.poll(async () => Math.abs((await box(page, ".detail")).x - railEdge) <= 1).toBe(true);
+    await page.keyboard.press("\\");
+    await expect.poll(beside).toBe(true);
+    // The cursor keys move the panel with the selection, as the TUI's detail pane follows the cursor.
+    await page.keyboard.press("j");
+    await expect(d).toHaveAttribute("data-id", "t-2");
+    await expect(page.locator("#treeRows .row.sel")).toHaveAttribute("data-id", "t-2");
+    await page.keyboard.press("Escape");
+    await expect(d).toHaveCount(0);
+    expect((await box(page, "#treeList")).width).toBeGreaterThanOrEqual(app.width - railEdge - 1);
   });
 });

@@ -59,8 +59,11 @@
   .chip.fx { color: var(--accent); border-color: var(--accent); }
   .chips .sep { flex: none; width: 1px; height: 18px; background: var(--line); }
 
-  /* The views and the bar: a column with the bar at the bottom on a phone, a row with the bar as a rail at the left in every other class. */
-  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* The views and the bar: a column with the bar at the bottom on a phone, a row with the bar as a rail at the left in every other class.
+     The detail host sits between them, out of the flow: its sheet or panel is placed against .body, so a side panel starts
+     below the header and the chips while a phone sheet still rises from the bottom edge. */
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+  #detailHost { display: contents; }
   main { flex: 1; min-height: 0; min-width: 0; position: relative; }
   .view { position: absolute; inset: 0; display: flex; flex-direction: column; }
   .view[hidden] { display: none !important; }
@@ -345,21 +348,31 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .err { color: var(--red); }
 
+  /* ---------- touch classes: phone and tablet ----------
+     The calm rows of the direction A mockups, a status dot where the TUI has a glyph and a
+     neutral ID, and 44 px targets on the rows, the detail's head and relations, and the sheets. */
+  .app:is(.phone, .tablet) .row .rc { min-height: 44px; padding-top: 5px; padding-bottom: 4px; background: var(--bg); }
+  .app:is(.phone, .tablet) .row .l1 .t { font-weight: 600; }
+  .app:is(.phone, .tablet) .row .id { color: var(--text-soft); }
+  .app:is(.phone, .tablet) .row.sel .id { color: var(--text); }
+  .app:is(.phone, .tablet) .row .st {
+    width: 8px; height: 8px; border-radius: 50%; align-self: center; background: currentColor;
+    color: inherit; font-size: 0; line-height: 0; box-shadow: 0 0 0 3px var(--bg);
+  }
+  .app:is(.phone, .tablet) .ph { min-height: 44px; align-items: center; padding-top: 0; padding-bottom: 0; }
+  .app:is(.phone, .tablet) .dtop { min-height: 44px; align-items: center; }
+  .app:is(.phone, .tablet) .dtop button { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 4px; }
+  .app:is(.phone, .tablet) .dtop .back { min-width: 56px; text-align: left; }
+  .app:is(.phone, .tablet) .rel { min-height: 44px; padding: 10px 0; }
+  .app:is(.phone, .tablet) .dacts button { min-height: 48px; }
+  .app:is(.phone, .tablet) .opt { min-height: 48px; }
+  .app:is(.phone, .tablet) .fbtns button { min-height: 44px; }
   /* ---------- phone native layer ---------- */
   .app.phone header.hd { height: 38px; padding: 0 6px 0 12px; background: var(--surface-0); }
   .app.phone .hd .proj, .app.phone .hd .dot, .app.phone .hd .ib { height: 38px; min-width: 38px; }
   .app.phone .hd .proj { padding-right: 4px; }
   .app.phone .chips { height: 34px; padding: 0 10px; background: var(--bg); }
   .app.phone .chip { height: 26px; border-radius: 3px; padding: 0 8px; }
-  .app.phone .row .rc { min-height: 44px; padding-top: 5px; padding-bottom: 4px; background: var(--bg); }
-  .app.phone .row .l1 .t { font-weight: 600; }
-  .app.phone .row .id { color: var(--text-soft); }
-  .app.phone .row.sel .id { color: var(--text); }
-  .app.phone .row .st {
-    width: 8px; height: 8px; border-radius: 50%; align-self: center; background: currentColor;
-    color: inherit; font-size: 0; line-height: 0; box-shadow: 0 0 0 3px var(--bg);
-  }
-  .app.phone .ph { min-height: 44px; align-items: center; padding-top: 0; padding-bottom: 0; }
   .app.phone nav.bar {
     min-height: calc(50px + var(--sab)); height: calc(50px + var(--sab));
     background: var(--surface-0); border-top-style: dashed;
@@ -371,19 +384,12 @@
   .app.phone .detail, .app.phone .msheet { border-radius: 8px 8px 0 0; background: var(--surface-2); }
   .app.phone .detail.full { border-radius: 0; }
   .app.phone .dhead { padding: 0 12px 8px 16px; }
-  .app.phone .dtop { min-height: 44px; align-items: center; }
-  .app.phone .dtop button { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 4px; }
-  .app.phone .dtop .back { min-width: 56px; text-align: left; }
   .app.phone .dtitle { font-size: 1.077rem; line-height: 20px; }
-  .app.phone .rel { min-height: 44px; padding: 10px 0; }
-  .app.phone .dacts button { min-height: 48px; }
   .app.phone .msheet .mh { padding: 0 16px 10px; }
-  .app.phone .opt { min-height: 48px; }
-  .app.phone .fbtns button { min-height: 44px; }
   /* ---------- size classes ----------
      util.ts puts phone, tablet, desktop or wide on #app from its width (docs/adr/0052).
      In every class but phone the views sit beside a rail, and the detail is a side
-     panel from the header to the bottom edge that the views make room for. */
+     panel below the header and the chips, down to the bottom edge, that the views make room for. */
   .app:not(.phone) { --dw: min(460px, 42vw); --rail-w: 64px; }
   .app:not(.phone) .body { flex-direction: row; }
   .app:not(.phone) nav.bar { order: -1; flex-direction: column; width: var(--rail-w); height: auto; padding: 8px 0 var(--sab); border-top: 0; border-right: 1px solid var(--line); font-family: var(--mono); }
@@ -391,16 +397,24 @@
   .app:not(.phone) nav.bulk .cnt { height: auto; padding: 8px 4px; }
   .app:not(.phone) .toast { left: calc(var(--sal) + var(--rail-w) + 12px); right: auto; width: min(420px, calc(100% - var(--rail-w) - 24px)); bottom: calc(12px + var(--sab)); }
   .app:not(.phone) .detail {
-    left: auto; top: calc(var(--sat) + 32px); bottom: var(--sab); width: var(--dw); height: auto;
+    left: auto; top: 0; bottom: var(--sab); width: var(--dw); height: auto;
     border-top: 0; border-left: 1px solid var(--line); border-radius: 0; box-shadow: var(--side-panel-shadow);
   }
   .app:not(.phone) .detail.enter { transform: translateX(100%); }
   /* Full width covers the views but not the rail, and narrows nothing, so the board keeps its layout for when the panel shrinks back. */
-  .app:not(.phone) .detail.full { left: calc(var(--sal) + var(--rail-w)); width: auto; border-left: 0; box-shadow: none; }
+  .app:not(.phone) .detail.full { left: var(--rail-w); width: auto; border-left: 0; box-shadow: none; }
   .app:not(.phone) .detail .grab { display: none; }
   .app:not(.phone) .detail .dhead { padding-top: 10px; touch-action: auto; }
   .app:not(.phone) .detail .dacts { padding-bottom: 0; }
   .app.hasdetail:not(.phone) .view { right: var(--dw); }
+  /* Tablet: the split view of the direction A mockups (docs/mockups/responsive-web/shots/a-tablet-*.png).
+     The list keeps a pane of 300 to 420 px at the left, upright or on its side, and the detail takes
+     the rest as a flat pane behind a divider rather than a sheet over the list, so both read as one surface. */
+  .app.tablet { --list-w: clamp(300px, 38vw, 420px); }
+  .app.tablet.hasdetail .view { right: auto; width: var(--list-w); }
+  .app.tablet .detail { left: calc(var(--rail-w) + var(--list-w)); width: auto; background: var(--bg); box-shadow: none; }
+  .app.tablet .detail .dhead { padding: 12px 16px 10px 20px; }
+  .app.tablet .dbody { padding: 10px 20px 24px; }
   /* Desktop and wide: the rail widens into a sidebar with the glyph beside each label. */
   .app.desktop, .app.wide { --rail-w: 160px; }
   .app.desktop nav.bar button, .app.wide nav.bar button { flex-direction: row; justify-content: flex-start; gap: 10px; height: 40px; padding: 0 14px; font-size: 0.923rem; }

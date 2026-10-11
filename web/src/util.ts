@@ -126,8 +126,10 @@ export const split = (): boolean => sizeClass() !== "phone";
  */
 export function observeSize(onChange: (now: SizeClass, was: SizeClass) => void): void {
   let seen = sizeClass();
-  new ResizeObserver(() => {
-    const now = sizeClass();
+  new ResizeObserver(entries => {
+    // The class stays off #app here: the render the callback runs reads first what the layout
+    // for the old class still holds (render.ts detailPlace), then moves the class itself.
+    const now = sizeClassOf((entries[0].target as HTMLElement).clientWidth);
     if (now === seen) return;
     const was = seen;
     seen = now;

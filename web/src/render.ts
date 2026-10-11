@@ -9,7 +9,7 @@ import { PC, S, SORTS, matches, queryString, stOf, treeRows, tyOf, type TreeRow 
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
-import { $, age, esc, fmtDate, md, sizeClass, split, store } from "./util";
+import { $, $opt, age, esc, fmtDate, md, sizeClass, split, store } from "./util";
 
 export function l2HTML(i: Item, opts: { proj?: boolean; status?: boolean } = {}): string {
   const bits: string[] = [];
@@ -47,7 +47,9 @@ export function rowHTML(r: TreeRow, flat = false): string {
 
 export function render(): void {
   if (!D.loaded) return;
-  // The size class is read while the layout is still clean, so the reads inside the views below force none.
+  // Both reads come while the layout is still clean, so the reads inside the views below force none,
+  // and the detail's place comes first: once the size class moves, the layout no longer holds it (textPlace).
+  const was = detailPlace();
   sizeClass();
   renderHeader(); renderChips(); renderBar(); renderStale();
   (["tree", "board", "search", "more", "graph", "memory"] as const).forEach(v => { $("#v" + v[0].toUpperCase() + v.slice(1)).hidden = S.view !== v; });
@@ -57,7 +59,7 @@ export function render(): void {
   if (S.view === "more") renderMore();
   if (S.view === "graph") renderGraph();
   if (S.view === "memory") renderMemory();
-  renderDetail();
+  renderDetail(was);
   syncQuery();
   syncHistory();
 }
@@ -737,7 +739,42 @@ function memoryLinks(issue: Issue | null): string {
   return `<div class="dsec">Memory Links · ${links.length}</div>${links.length ? links.map(({ link, memory, outgoing }) => `<details class="issueMemoryLink"><summary><span>${outgoing ? `This Issue → ${esc(link.kind)} → Memory` : `Memory → ${esc(link.kind)} → this Issue`}</span><br><b>${esc(memory.title)}</b></summary><p>${esc(memory.id)}</p><small>${esc(link.type)}</small>${link.note ? `<p>${esc(link.note)}</p>` : ""}<div class="md">${md(memory.body || "No body.")}</div></details>`).join("") : '<p>No Memory Links recorded.</p>'}`;
 }
 
-export function renderDetail(): void {
+/**
+ * A place in the detail's text: the block at the top of the scrollport and
+ * that block's offset from it. The scroll offset in px alone does not survive
+ * a change of size class. The browser lays the old pane out at the new size
+ * before any render and holds the block at the top in place through that
+ * reflow, so the px value the old pane ends with belongs to a pane that no
+ * longer exists, while the block it kept at the top is still the right one.
+ * The place is read from that layout, before the class moves: once it has,
+ * the old pane lays out for the new class as well, and that reflow does not
+ * keep the block.
+ */
+interface TextPlace { block: number; offset: number }
+
+/** textBlocks are the parts of the text in document order: the fields, headings, relations, and each paragraph of the Markdown. */
+const textBlocks = (body: Element) => [...body.querySelectorAll<HTMLElement>(":scope > *:not(.md), .md > *")];
+
+function textPlace(body: HTMLElement): TextPlace {
+  const top = body.getBoundingClientRect().top;
+  const blocks = textBlocks(body);
+  const block = blocks.findIndex(b => b.getBoundingClientRect().bottom > top);
+  return block < 0 ? { block, offset: body.scrollTop } : { block, offset: blocks[block].getBoundingClientRect().top - top };
+}
+
+function scrollToPlace(body: HTMLElement, p: TextPlace): void {
+  const b = textBlocks(body)[p.block];
+  if (!b) { body.scrollTop = p.block < 0 ? p.offset : 0; return; }
+  body.scrollTop += b.getBoundingClientRect().top - body.getBoundingClientRect().top - p.offset;
+}
+
+/** detailPlace is the issue the detail shows and the place in its text, or null while no detail is on screen. */
+export function detailPlace(): { id: string; place: TextPlace } | null {
+  const sec = $opt<HTMLElement>("#detailHost .detail"), body = sec?.querySelector<HTMLElement>(".dbody");
+  return sec && body && sec.dataset.id ? { id: sec.dataset.id, place: textPlace(body) } : null;
+}
+
+export function renderDetail(was = detailPlace()): void {
   if (S.view === "memory") { renderMemoryDetail(); return; }
   const host = $("#detailHost");
   $("#app").classList.toggle("hasdetail", !!S.detail);
@@ -750,7 +787,7 @@ export function renderDetail(): void {
   const pr = progress(id);
   const ob = i.blocked_by.filter(x => get(x)), bl = blocksOf(i).map(x => x.id);
   const existing = host.querySelector<HTMLElement>(".detail");
-  const scrollTop = existing && existing.dataset.id === id ? existing.querySelector(".dbody")!.scrollTop : 0;
+  const kept = was && was.id === id ? was.place : null;
   const cms = f ? f.comments : [];
   const ro = D.project.read_only;
   const full = S.detail.size === "full";
@@ -782,7 +819,7 @@ export function renderDetail(): void {
     <div class="dacts">${ro ? "" : `<button data-act="status"><span class="g">◐</span>Status</button><button data-act="edit"><span class="g">✎</span>Edit</button><button data-act="comment"><span class="g">✉</span>Comment</button>`}<button data-act="dbranch"><span class="g">⎇</span>Branch</button><button data-act="actions"><span class="g">⋯</span>More</button></div>
   </section>`;
   const sec = host.querySelector<HTMLElement>(".detail")!;
-  sec.querySelector(".dbody")!.scrollTop = scrollTop;
+  if (kept) scrollToPlace(sec.querySelector<HTMLElement>(".dbody")!, kept);
   renderMermaidBlocks(sec);
   if (!existing) requestAnimationFrame(() => requestAnimationFrame(() => sec.classList.remove("enter")));
 }
