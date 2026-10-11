@@ -198,6 +198,33 @@ test.describe("phone native layout", () => {
       await expect(closed.locator("[data-card]")).toHaveCount(55);
       await expect(closed.locator('[data-act="closedmore"]')).toHaveCount(0);
     });
+
+    test("shows under the default chips, last and folded with its count, and goes with a narrower filter until its chip is on", async ({ page, project }) => {
+      const vp = page.viewportSize()!;
+      test.skip(vp.width !== 412 || sizeClassOf(vp.width) !== "phone", "phone 412 only");
+      await open(page, project);
+      await classOn(page);
+      await page.locator('#bar [data-view="board"]').click();
+
+      const order = () => page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol));
+      const closed = page.locator('#bcol .bbox[data-dcol="closed"]');
+      const closedChip = page.locator('#chips [data-chip="closed"]');
+      expect(await order()).toEqual(["open", "in_progress", "blocked", "closed"]);
+      await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "false");
+      await expect(closed.locator(".bhead b")).toHaveText("55");
+      await expect(closed.locator("[data-card]")).toHaveCount(0);
+      // The chip stays off, and its count is the box header's.
+      await expect(closedChip).toHaveAttribute("aria-pressed", "false");
+      await expect(closedChip.locator(".n")).toHaveText("55");
+
+      await page.locator('#chips [data-chip="open"]').click();
+      await expect(closed).toHaveCount(0);
+      expect(await order()).toEqual(["in_progress", "blocked"]);
+      await closedChip.click();
+      await expect(closed.locator(".bhead b")).toHaveText("55");
+      expect(await order()).toEqual(["in_progress", "blocked", "closed"]);
+      await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "false");
+    });
   });
 
   test("draws active status chips differently from inactive ones", async ({ page, project }) => {

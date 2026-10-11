@@ -5,7 +5,7 @@
 import * as api from "./api";
 import type { Issue } from "./api.gen";
 import { D, ancestors, blocksOf, descendants, eff, get, isReady, kids, laneOf, openBlockers, pool, progress, projectOf, shortId, type Item } from "./data";
-import { PC, S, SORTS, chipRowVisible, matches, queryString, stOf, textMatches, treeRows, tyOf, type TreeRow } from "./state";
+import { DEFAULT_CHIPS, PC, S, SORTS, chipRowVisible, matches, queryString, stOf, textMatches, treeRows, tyOf, type TreeRow } from "./state";
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
@@ -109,7 +109,7 @@ function renderChips(): void {
   const P = pool();
   const onBoard = S.view === "board";
   const keep = onBoard ? focusSet() : null;
-  const counted = onBoard ? P.filter(i => boardCard(i, keep) && textMatches(i) && (!S.ready || isReady(i))) : P;
+  const counted = onBoard ? P.filter(i => boardCounted(i, keep)) : P;
   const cnt = (s: string) => counted.filter(i => eff(i) === s).length;
   const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n));
   const chip = (k: string, key: string, label: string, color: string, on: boolean, n: number | null) =>
@@ -210,9 +210,18 @@ export function boardCols(): [string, string][] {
   return cols;
 }
 
+/** defaultChips says whether the status chips are a first visit's set, or none: anything narrower is a filter the user chose. */
+const defaultChips = (): boolean => !S.st.size || DEFAULT_CHIPS.every(k => S.st.has(k));
+
+/**
+ * phoneBoardCols adds the Closed box to the status board under the default
+ * chips, which leave closed out, and under none: a phone has no bar that
+ * counts the closed work, so the box, folded by default, is where it is. A
+ * narrower filter shows Closed only with its chip on, as the wide board does.
+ */
 function phoneBoardCols(): [string, string][] {
   const cols = boardCols();
-  if (S.board.group === "status" && !S.st.size && !cols.some(([k]) => k === "closed")) return [...cols, ["closed", "Closed"]];
+  if (S.board.group === "status" && defaultChips() && !cols.some(([k]) => k === "closed")) return [...cols, ["closed", "Closed"]];
   return cols;
 }
 
@@ -231,9 +240,20 @@ function boardCard(i: Item, keep: Set<string> | null): boolean {
 
 const inBoard = (i: Item, keep: Set<string> | null): boolean => boardCard(i, keep) && matches(i);
 
+/**
+ * boardCounted is the board's filter without the status chips. The chip row
+ * counts cards with it, so a chip's number is what its box holds, and the
+ * Closed column fills with it: the chips choose that column (boardCols,
+ * phoneBoardCols), and every card in it is closed, so they have nothing left
+ * to say about its cards. The default chips, which leave closed out, would
+ * otherwise empty the Closed box a phone shows under them.
+ */
+const boardCounted = (i: Item, keep: Set<string> | null): boolean => boardCard(i, keep) && textMatches(i) && (!S.ready || isReady(i));
+
 function boardItems(key: string): Item[] {
   const keep = focusSet();
-  return pool().filter(i => colOf(i) === key && inBoard(i, keep)).sort(SORTS[S.sort]);
+  const ok = key === "closed" ? (i: Item) => boardCounted(i, keep) : (i: Item) => inBoard(i, keep);
+  return pool().filter(i => colOf(i) === key && ok(i)).sort(SORTS[S.sort]);
 }
 
 function phoneBoardItems(key: string): Item[] {

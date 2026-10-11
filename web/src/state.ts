@@ -9,10 +9,13 @@ export type SortKey = "priority" | "updated" | "created" | "id" | "status";
 
 export interface Sheet { kind: string; id?: string; ids?: string[]; parent?: string | null; [k: string]: unknown }
 
+/** DEFAULT_CHIPS is the status filter of a first visit: open, in progress and blocked, so closed and deferred work stays out of the way. */
+export const DEFAULT_CHIPS = ["open", "in_progress", "blocked"];
+
 export const S = {
   view: "tree" as View,
   /** status chips: a row shows when its effective status is in the set, or the set is empty */
-  st: new Set<string>(store.get<string[]>("chips", ["open", "in_progress", "blocked"])),
+  st: new Set<string>(store.get<string[]>("chips", DEFAULT_CHIPS)),
   ready: false,
   /** the TUI query the tree applies, evaluated by GET api/query */
   text: "",
