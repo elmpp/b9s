@@ -225,6 +225,23 @@ test("h from the first column selects the epic; Enter opens it and Tab folds its
   await expect(card(page, "t-2")).toBeVisible();
 });
 
+test("Enter opens the selected epic when the board DOM redraws under it", async ({ page, project }) => {
+  await board(page, project);
+  await card(page, "t-2").click();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("h");
+  await expect(epic(page, "t-epic")).toHaveClass(/sel/);
+  await card(page, "t-2").evaluate((el: HTMLElement) => el.focus());
+  await page.evaluate(() => {
+    const remove = () => document.querySelector('#wboard .wepic[data-epic="t-epic"]')?.remove();
+    new MutationObserver(remove).observe(document.querySelector("#wboard")!, { childList: true, subtree: true });
+    remove();
+  });
+  await expect(epic(page, "t-epic")).toHaveCount(0);
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".detail")).toHaveAttribute("data-id", "t-epic");
+});
+
 test("\\ or the panel's button switches the detail between a side panel and the full width", async ({ page, project }) => {
   await board(page, project);
   await card(page, "t-1").click();

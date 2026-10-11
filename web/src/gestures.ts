@@ -599,7 +599,11 @@ function boardKey(key: string): boolean {
     tabTap(colOf(i));
     return true;
   }
-  if (key === "Enter") { if (!cur || S.cursor === "none") return false; openDetail(S.cursor!); return true; }
+  if (key === "Enter") {
+    if (!S.cursor || S.cursor === "none" || !get(S.cursor)) return false;
+    openDetail(S.cursor);
+    return true;
+  }
   const d = MOVES[key];
   if (!d) return false;
   const grid = openCols()
