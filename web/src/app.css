@@ -424,6 +424,13 @@
     display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr) auto;
     grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
   }
+  .app.wide {
+    --dw: clamp(560px, 24vw, 680px);
+    --wide-prose-w: 72ch;
+  }
+  .app.wide .dbody > :is(.meta, .dsec, .md, .rel, .bar2, .cm, .issueMemoryLink) {
+    max-width: min(100%, var(--wide-prose-w));
+  }
   .app:is(.desktop, .wide) .sat { grid-column: 1 / -1; grid-row: 1; }
   .app:is(.desktop, .wide) nav.bar { grid-column: 1; grid-row: 2 / -1; }
   .app:is(.desktop, .wide) header.hd { grid-column: 2 / -1; grid-row: 2; min-width: 0; height: 40px; padding: 0 10px 0 16px; }

@@ -7,7 +7,7 @@
 
 import type { Page } from "@playwright/test";
 import { sizeClassOf } from "../src/util";
-import { expect, open, row, test } from "./harness";
+import { expect, open, row, SAMPLE, test } from "./harness";
 
 const box = async (page: Page, sel: string) => (await page.locator(sel).boundingBox())!;
 const menu = (page: Page) => page.locator("#menuHost .cmenu");
@@ -60,10 +60,13 @@ test("the detail is a pane beside the tree and the board, below the chips, and \
   const d = page.locator(".detail");
   await expect(d).toHaveAttribute("data-id", "t-1");
   const app = await box(page, "#app"), bar = await box(page, "#bar"), chips = await box(page, "#chips");
+  const cls = sizeClassOf(page.viewportSize()!.width);
+  const minPane = cls === "wide" ? 520 : 400;
+  const maxPane = cls === "wide" ? 700 : 460;
   const beside = async (view: string) => {
     const v = await box(page, view), p = await box(page, ".detail");
     return Math.abs(p.x - (v.x + v.width)) <= 1 && p.x + p.width >= app.x + app.width - 1
-      && p.y >= chips.y + chips.height - 1 && p.height >= app.height * 0.8 && p.width >= 400 && p.width <= 460;
+      && p.y >= chips.y + chips.height - 1 && p.height >= app.height * 0.8 && p.width >= minPane && p.width <= maxPane;
   };
   await expect.poll(() => beside("#treeList")).toBe(true);
   await expect(row(page, "t-2")).toBeInViewport();
@@ -183,4 +186,43 @@ test("the cursor row and keyboard focus are visible", async ({ page, project }) 
   await expect(focused).toHaveCount(1);
   await expect(focused).toHaveCSS("outline-style", "solid");
   await expect(focused).toHaveCSS("outline-width", "2px");
+});
+
+const WIDE_DESCRIPTION = Array.from({ length: 8 }, (_, n) =>
+  `Paragraph ${n + 1} keeps the detail text readable on a very wide monitor while the surrounding panes use the extra room.`,
+).join("\n\n");
+
+test.describe("wide monitor layout", () => {
+  test.use({ fixture: { issues: [...SAMPLE, { id: "w-long", title: "[wide] Readable description", priority: 1, description: WIDE_DESCRIPTION }] } });
+
+  test("uses the extra width while prose keeps a readable measure", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "wide", "wide only");
+    await open(page, project);
+    await row(page, "w-long").click();
+    const d = page.locator(".detail");
+    await expect(d).toHaveAttribute("data-id", "w-long");
+    await expect(d.locator(".md p").first()).toContainText("Paragraph 1");
+
+    const app = await box(page, "#app");
+    const pane = await box(page, ".detail");
+    const prose = await box(page, '#dbody > .md:has-text("Paragraph 1")');
+    expect(pane.width).toBeGreaterThanOrEqual(520);
+    expect(pane.width).toBeLessThan(app.width * 0.35);
+    expect(prose.width).toBeLessThanOrEqual(720);
+
+    await page.keyboard.press("\\");
+    const fullPane = await box(page, ".detail");
+    const fullProse = await box(page, '#dbody > .md:has-text("Paragraph 1")');
+    expect(fullPane.width).toBeGreaterThan(app.width * 0.85);
+    expect(fullProse.width).toBeLessThanOrEqual(720);
+
+    await page.keyboard.press("\\");
+    await page.locator('#bar [data-view="board"]').click();
+    const board = await box(page, "#wboard");
+    const openHead = await box(page, '#wboard .whead[data-tab="open"]');
+    const inProgressHead = await box(page, '#wboard .whead[data-tab="in_progress"]');
+    expect(board.width).toBeGreaterThan(app.width * 0.6);
+    expect(openHead.width).toBeGreaterThan(360);
+    expect(inProgressHead.x).toBeGreaterThan(openHead.x + openHead.width - 1);
+  });
 });
