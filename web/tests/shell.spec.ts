@@ -9,6 +9,24 @@ import { sizeClassOf } from "../src/util";
 import { expect, open, row, SAMPLE, test, type FixtureIssue } from "./harness";
 
 const box = async (page: Page, sel: string) => (await page.locator(sel).boundingBox())!;
+type FakeVisualViewport = { offsetLeft: number; offsetTop: number; width: number; height: number; scale: number };
+
+async function fakeVisualViewport(page: Page, vv: FakeVisualViewport): Promise<void> {
+  await page.addInitScript((initial) => {
+    const target = new EventTarget();
+    const fake = target as VisualViewport;
+    Object.defineProperties(fake, {
+      offsetLeft: { get: () => initial.offsetLeft },
+      offsetTop: { get: () => initial.offsetTop },
+      pageLeft: { get: () => initial.offsetLeft },
+      pageTop: { get: () => initial.offsetTop },
+      width: { get: () => initial.width },
+      height: { get: () => initial.height },
+      scale: { get: () => initial.scale },
+    });
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: fake });
+  }, vv);
+}
 
 /** classOn waits for #app to carry the class of the viewport's width, and returns it. */
 async function classOn(page: Page): Promise<string> {
@@ -20,6 +38,8 @@ async function classOn(page: Page): Promise<string> {
 test("#app carries the class of its width, with the bar at the bottom on a phone and a rail elsewhere", async ({ page, project }) => {
   await open(page, project);
   const cls = await classOn(page);
+  const rootTouchAction = await page.locator("#app").evaluate(el => getComputedStyle(el).touchAction);
+  expect(rootTouchAction.split(" ").sort().join(" ")).toBe("pan-x pan-y");
   const app = await box(page, "#app"), bar = await box(page, "#bar"), tree = await box(page, "#treeList");
   if (cls === "phone") {
     expect(bar.width).toBeGreaterThanOrEqual(app.width - 1);
@@ -133,6 +153,34 @@ test.describe("phone native layout", () => {
 
     await expect(page.locator(".detail")).toHaveCount(0);
     expect(project.issues().find(i => i.id === "m-1")?.status).toBe("open");
+  });
+
+  test("keeps the shell controls inside a zoomed visual viewport", async ({ page, project }) => {
+    const viewport = page.viewportSize()!;
+    test.skip(sizeClassOf(viewport.width) !== "phone", "phone only");
+    const vv = {
+      offsetLeft: 16,
+      offsetTop: Math.round(viewport.height * 0.16),
+      width: viewport.width - 40,
+      height: Math.round(viewport.height * 0.68),
+      scale: 1.18,
+    };
+    await fakeVisualViewport(page, vv);
+    await open(page, project);
+    await classOn(page);
+    await expect(page.locator("#app")).toHaveClass(/vzoom/);
+
+    for (const view of ["tree", "board", "search"] as const) {
+      if (view !== "tree") await page.locator(`#bar [data-view="${view}"]`).click();
+      const header = await box(page, "#hd"), bar = await box(page, "#bar");
+      const right = vv.offsetLeft + vv.width, bottom = vv.offsetTop + vv.height;
+      for (const control of [header, bar]) {
+        expect(control.x).toBeGreaterThanOrEqual(vv.offsetLeft - 1);
+        expect(control.x + control.width).toBeLessThanOrEqual(right + 1);
+        expect(control.y).toBeGreaterThanOrEqual(vv.offsetTop - 1);
+        expect(control.y + control.height).toBeLessThanOrEqual(bottom + 1);
+      }
+    }
   });
 });
 

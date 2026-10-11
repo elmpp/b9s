@@ -18,6 +18,43 @@ function pulse(): void {
   dot.classList.add("pulse");
 }
 
+let visualViewportFrame = 0;
+
+function syncVisualViewport(): void {
+  const app = document.getElementById("app");
+  if (!app) return;
+  const vv = window.visualViewport;
+  const active = !!vv && vv.scale > 1.01;
+  app.classList.toggle("vzoom", active);
+  if (!active || !vv) {
+    app.style.removeProperty("--vv-left");
+    app.style.removeProperty("--vv-top");
+    app.style.removeProperty("--vv-width");
+    app.style.removeProperty("--vv-bar-y");
+    return;
+  }
+  const px = (n: number) => `${Math.round(n * 100) / 100}px`;
+  const layoutHeight = app.clientHeight || document.documentElement.clientHeight || vv.height;
+  app.style.setProperty("--vv-left", px(vv.offsetLeft));
+  app.style.setProperty("--vv-top", px(vv.offsetTop));
+  app.style.setProperty("--vv-width", px(vv.width));
+  app.style.setProperty("--vv-bar-y", px(vv.offsetTop + vv.height - layoutHeight));
+}
+
+function bindVisualViewport(): void {
+  const schedule = () => {
+    if (visualViewportFrame) return;
+    visualViewportFrame = requestAnimationFrame(() => {
+      visualViewportFrame = 0;
+      syncVisualViewport();
+    });
+  };
+  syncVisualViewport();
+  window.addEventListener("resize", schedule);
+  window.visualViewport?.addEventListener("resize", schedule);
+  window.visualViewport?.addEventListener("scroll", schedule);
+}
+
 /**
  * A change that arrives mid-gesture waits: a re-render would replace the
  * row under the finger. The next poll after the gesture applies it.
@@ -74,6 +111,7 @@ async function boot(): Promise<void> {
     D.build = { version: s.version, commit: s.commit, commit_url: s.commit_url, modified: s.modified };
     renderBanner(s.banner, s.banner_link);
     bindAll();
+    bindVisualViewport();
     bindHistory(render, closeSheet);
     // The view first, so the list does not flash the tree; the issue once loaded.
     const link = parseHash();
