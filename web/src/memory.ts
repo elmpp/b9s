@@ -6,7 +6,7 @@ import { openDetail, refresh, toast } from "./actions";
 import { renderMermaidBlocks } from "./mermaid";
 import { fullH, halfH } from "./render";
 import { S } from "./state";
-import { copyText, esc, md, wide } from "./util";
+import { copyText, esc, md, split } from "./util";
 
 let key = "", project = "", selected = "", filter = "all";
 let graph: MemoryGraph | null = null;
@@ -49,7 +49,8 @@ function canvasSize(host: HTMLElement): { width: number; height: number } {
 }
 function fitViewBox(host: HTMLElement): void {
   const { width, height } = canvasSize(host);
-  host.querySelector(".memoryCanvas svg")?.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const svg = host.querySelector(".memoryCanvas svg"), box = `0 0 ${width} ${height}`;
+  if (svg && svg.getAttribute("viewBox") !== box) svg.setAttribute("viewBox", box);
 }
 
 window.addEventListener("resize", () => {
@@ -60,7 +61,8 @@ window.addEventListener("resize", () => {
 export function renderMemory(): void {
   const host = document.getElementById("vMemory")!;
   const want = `${D.project.key}:${D.version}`, version = D.version;
-  if (key === want) return;
+  // A render for another size class changes the canvas's room without a window resize, so the viewBox follows it here too.
+  if (key === want) { fitViewBox(host); return; }
   if (project !== D.project.key) {
     project = D.project.key;
     positions.clear(); selected = ""; stack = []; openEdge = null; filter = "all"; scale = 1; panX = panY = 0;
@@ -537,7 +539,7 @@ export function renderMemoryDetail(): void {
   const existing = host.querySelector<HTMLElement>("#memoryDetail");
   const scrollTop = existing && existing.dataset.id === did ? existing.querySelector(".dbody")!.scrollTop : 0;
   const full = size === "full";
-  const glyph = wide() ? (full ? ["⤡", "Side panel"] : ["⤢", "Full width"]) : (full ? ["⌄", "Half height"] : ["⌃", "Full height"]);
+  const glyph = split() ? (full ? ["⤡", "Side panel"] : ["⤢", "Full width"]) : (full ? ["⌄", "Half height"] : ["⌃", "Full height"]);
   const ids = graph!.nodes.map(n => n.id), pos = ids.indexOf(selected);
   const back = stack.length > 1 ? `<button class="back" data-mact="back">‹ ${esc(stack[stack.length - 2])}</button>` : "";
   const pager = node ? `<button data-mact="prev" aria-label="Previous record">‹</button><span class="pager">${pos + 1}/${ids.length}</span><button data-mact="next" aria-label="Next record">›</button>` : "";
@@ -559,7 +561,7 @@ export function renderMemoryDetail(): void {
       ${e.kind === "blocks" ? '<div class="md"><p>The source depends on the target: the target blocks the source.</p></div>' : ""}`;
   }
   const inTree = node && node.kind === "issue" && get(node.id) ? `<div class="dacts"><button data-mact="tree"><span class="g">≣</span>Show in tree</button></div>` : "";
-  host.innerHTML = `<section class="detail ${existing ? "" : "enter"} ${full ? "full" : ""}" id="memoryDetail" data-id="${esc(did)}" style="--h:${wide() ? 0 : full ? fullH() : halfH()}px" aria-label="Memory detail" role="dialog">
+  host.innerHTML = `<section class="detail ${existing ? "" : "enter"} ${full ? "full" : ""}" id="memoryDetail" data-id="${esc(did)}" style="--h:${split() ? 0 : full ? fullH() : halfH()}px" aria-label="Memory detail" role="dialog">
     <div class="dhead"><div class="grab"></div>
       <div class="dtop">${back}<span class="id">${esc(openEdge ? openEdge.id : node!.id)}</span><span class="sp"></span>${pager}<button data-mact="size" aria-label="${glyph[1]}" title="${glyph[1]} (\\)">${glyph[0]}</button><button id="memoryClose" data-mact="close" aria-label="Close Memory details">✕</button></div>
       ${head}

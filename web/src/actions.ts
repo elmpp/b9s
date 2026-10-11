@@ -5,10 +5,10 @@
 import * as api from "./api";
 import type { ProjectEntry, WriteRequest, WriteResult } from "./api.gen";
 import { D, descendants, eff, get, kids, load, openBlockers, pool, shortId, type Item } from "./data";
-import { ALL, boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, treeList, wide } from "./render";
+import { ALL, boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, treeList } from "./render";
 import { PC, S, SORTS, SORT_HELP, ST, TY, defaultDetailSize, queryString, saveChips, stOf, type Sheet, type SortKey } from "./state";
 import { syncSoon } from "./nav";
-import { $, $opt, copyText, esc, fmtDate, haptic, store } from "./util";
+import { $, $opt, copyText, esc, fmtDate, haptic, split, store } from "./util";
 
 /* ================= toast ================= */
 
@@ -189,7 +189,7 @@ export function openDetail(id: string, push = false): void {
 
 export function closeDetail(): void {
   const sec = $opt(".detail");
-  if (sec) { sec.style.transform = wide() ? "translateX(100%)" : "translateY(100%)"; setTimeout(() => { S.detail = null; render(); }, 220); }
+  if (sec) { sec.style.transform = split() ? "translateX(100%)" : "translateY(100%)"; setTimeout(() => { S.detail = null; render(); }, 220); }
   else { S.detail = null; render(); }
 }
 

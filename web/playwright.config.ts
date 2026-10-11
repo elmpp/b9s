@@ -9,6 +9,20 @@ import { defineConfig, devices } from "@playwright/test";
 const measureAsked = process.env.B9S_MEASURE === "1" || process.argv.some((a, n, all) => a === "--project=measure" || (a === "--project" && all[n + 1] === "measure"));
 if (measureAsked) process.env.B9S_MEASURE = "1";
 
+// One project per viewport the responsive plan names, across the size classes
+// of docs/adr/0052 (web/src/util.ts BREAKPOINTS): two phones, a tablet upright
+// and on its side, two desktops and a wide monitor. shell.spec.ts runs in each
+// of them; a later spec joins by adding itself to their testMatch.
+const sizes = [
+  { name: "phone-360", use: { ...devices["Pixel 7"], viewport: { width: 360, height: 780 } } },
+  { name: "phone-412", use: { ...devices["Pixel 7"] } },
+  { name: "tablet-768", use: { ...devices["iPad Mini"] } },
+  { name: "tablet-1024", use: { ...devices["iPad Mini landscape"] } },
+  { name: "desktop-1440", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+  { name: "desktop-1920", use: { ...devices["Desktop Chrome"], viewport: { width: 1920, height: 1080 } } },
+  { name: "wide-2560", use: { ...devices["Desktop Chrome"], viewport: { width: 2560, height: 1440 } } },
+];
+
 // Each test starts its own `b9s web` on a free port (tests/harness.ts), so
 // there is no shared webServer. globalSetup builds the binary under test.
 export default defineConfig({
@@ -33,19 +47,20 @@ export default defineConfig({
   // budget.
   projects: [
     { name: "tokens", use: { ...devices["Desktop Chrome"] }, testMatch: /tokens\.spec/ },
-    { name: "pixel", use: { ...devices["Pixel 7"] }, testIgnore: /(wide|keys|perf|measure|tokens)\.spec/ },
-    { name: "iphone", use: { ...devices["iPhone 14"] }, testIgnore: /(wide|keys|perf|measure|tokens)\.spec/ },
+    { name: "pixel", use: { ...devices["Pixel 7"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell)\.spec/ },
+    { name: "iphone", use: { ...devices["iPhone 14"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell)\.spec/ },
     ...(["Desktop Chrome", "Desktop Safari", "Desktop Firefox"] as const).map((device) => ({
       name: device === "Desktop Chrome" ? "desktop" : device.toLowerCase().replace(" ", "-"),
       use: { ...devices[device], viewport: { width: 1440, height: 900 } },
       testMatch: /(wide|keys|read|write|memory)\.spec/,
     })),
     { name: "ipad", use: { ...devices["iPad Pro 11"] }, testMatch: /(wide|keys)\.spec/ },
+    ...sizes.map(size => ({ ...size, testMatch: /shell\.spec/ })),
     ...(["Pixel 7", "iPhone 14"] as const).map((device) => ({
       name: device === "Pixel 7" ? "pixel-perf" : "iphone-perf",
       use: { ...devices[device] },
       testMatch: /perf\.spec/,
-      dependencies: ["pixel", "iphone", "desktop", "desktop-safari", "desktop-firefox", "ipad"],
+      dependencies: ["pixel", "iphone", "desktop", "desktop-safari", "desktop-firefox", "ipad", ...sizes.map(size => size.name)],
     })),
     // The spec launches the browsers and devices it measures itself; one
     // worker at a time keeps the timings from sharing the CPU. Its output

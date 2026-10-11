@@ -24,22 +24,24 @@
   <div class="banner" id="banner" role="note" hidden></div>
   <div class="chips" id="chips" role="toolbar" aria-label="Filters"></div>
   <div class="stale" id="stale" role="status" hidden></div>
-  <main id="main">
-    <section class="view" id="vTree" aria-label="Issue tree">
-      <div id="fbar"></div>
-      <div class="scroll" id="treeList"><div class="ptr" id="ptr">↓ pull to reload</div><div id="treeRows" role="list"></div></div>
-    </section>
-    <section class="view" id="vBoard" aria-label="Board" hidden></section>
-    <section class="view" id="vSearch" aria-label="Search" hidden>
-      <div class="sbox"><input id="sIn" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="status:open type:bug words…" aria-label="Query"><button id="sApply" data-act="applysearch">Apply</button></div>
-      <div class="sugg" id="sSugg" aria-label="Completions"></div>
-      <div class="scroll" id="sList"></div>
-    </section>
-    <section class="view" id="vMore" aria-label="More" hidden><div class="scroll" id="moreList"></div></section>
-    <section class="view" id="vGraph" aria-label="Dependency graph" hidden></section>
-    <section class="view" id="vMemory" aria-label="Memory constellation" hidden></section>
-  </main>
-  <nav class="bar" id="bar" aria-label="Views"></nav>
+  <div class="body" id="body">
+    <main id="main">
+      <section class="view" id="vTree" aria-label="Issue tree">
+        <div id="fbar"></div>
+        <div class="scroll" id="treeList"><div class="ptr" id="ptr">↓ pull to reload</div><div id="treeRows" role="list"></div></div>
+      </section>
+      <section class="view" id="vBoard" aria-label="Board" hidden></section>
+      <section class="view" id="vSearch" aria-label="Search" hidden>
+        <div class="sbox"><input id="sIn" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="status:open type:bug words…" aria-label="Query"><button id="sApply" data-act="applysearch">Apply</button></div>
+        <div class="sugg" id="sSugg" aria-label="Completions"></div>
+        <div class="scroll" id="sList"></div>
+      </section>
+      <section class="view" id="vMore" aria-label="More" hidden><div class="scroll" id="moreList"></div></section>
+      <section class="view" id="vGraph" aria-label="Dependency graph" hidden></section>
+      <section class="view" id="vMemory" aria-label="Memory constellation" hidden></section>
+    </main>
+    <nav class="bar" id="bar" aria-label="Views"></nav>
+  </div>
   <div id="detailHost"></div>
   <div id="sheetHost"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

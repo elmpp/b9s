@@ -74,14 +74,68 @@ export function md(src: string): string {
   return out.join("");
 }
 
-/** store keeps per-browser conveniences. Storage may be absent or refuse. */
 /**
- * WIDE matches a laptop, desktop browser or tablet: room for every column
- * side by side. A phone on its side is wide but too short for it.
+ * The size classes of ADR 0052, from the app's width alone. A phone on its
+ * side is as wide as a tablet, and the split layout serves it better than a
+ * half-height sheet on a short screen.
  */
-export const WIDE = "(min-width: 720px) and (min-height: 500px)";
-export const wide = (): boolean => window.matchMedia(WIDE).matches;
+export type SizeClass = "phone" | "tablet" | "desktop" | "wide";
+export const SIZE_CLASSES: readonly SizeClass[] = ["phone", "tablet", "desktop", "wide"];
+/** BREAKPOINTS are the app widths, in CSS px, at which each class above phone starts. app.css keys off the class on #app. */
+export const BREAKPOINTS: Record<Exclude<SizeClass, "phone">, number> = { tablet: 768, desktop: 1280, wide: 2560 };
+export const sizeClassOf = (width: number): SizeClass =>
+  width >= BREAKPOINTS.wide ? "wide" : width >= BREAKPOINTS.desktop ? "desktop" : width >= BREAKPOINTS.tablet ? "tablet" : "phone";
 
+/** The class on #app, so a read that finds the width in another class can change it. */
+let current: SizeClass | null = null;
+/** The app's width for the rest of this task. A task cannot see the viewport change, so one layout read serves every call in it. */
+let width = -1;
+
+/**
+ * sizeClass is the class of the app's width right now, and puts it on #app.
+ * It reads the width rather than remembering the observer's last answer:
+ * a resize notifies a frame later, and a render in between must already
+ * lay out for the new class, as a media query would have.
+ */
+export function sizeClass(): SizeClass {
+  const app = $opt("#app");
+  if (width < 0) {
+    width = (app || document.documentElement).clientWidth;
+    queueMicrotask(() => { width = -1; });
+  }
+  const now = sizeClassOf(width);
+  if (app && now !== current) {
+    app.classList.remove(...SIZE_CLASSES);
+    app.classList.add(now);
+    current = now;
+  }
+  return now;
+}
+
+/**
+ * split is every class but phone: the detail is a side panel beside the list
+ * rather than a sheet over it, the board lays its columns side by side, and a
+ * rail at the left replaces the bottom bar.
+ */
+export const split = (): boolean => sizeClass() !== "phone";
+
+/**
+ * observeSize calls back once each time the app's width crosses into another
+ * class, so a rotation or a resized window redraws at the breakpoint and not
+ * on every pixel in between.
+ */
+export function observeSize(onChange: (now: SizeClass, was: SizeClass) => void): void {
+  let seen = sizeClass();
+  new ResizeObserver(() => {
+    const now = sizeClass();
+    if (now === seen) return;
+    const was = seen;
+    seen = now;
+    onChange(now, was);
+  }).observe($("#app"));
+}
+
+/** store keeps per-browser conveniences. Storage may be absent or refuse. */
 export const store = {
   get<T>(k: string, d: T): T {
     try { const v = localStorage.getItem("b9s." + k); return v == null ? d : (JSON.parse(v) as T); } catch { return d; }

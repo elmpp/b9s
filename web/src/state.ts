@@ -2,7 +2,7 @@
 // which rows show. The text query itself is evaluated on the server.
 
 import { D, ancestors, descendants, eff, get, isReady, kids, pool, projectOf, type Item } from "./data";
-import { store, wide } from "./util";
+import { split, store } from "./util";
 
 export type View = "tree" | "board" | "search" | "more" | "graph" | "memory";
 export type SortKey = "priority" | "updated" | "created" | "id" | "status";
@@ -39,8 +39,8 @@ export const S = {
     group: store.get<"status" | "priority" | "type">("boardGroup", "status"),
     col: null as string | null,
     folded: new Set<string>(),
-    // The wide board opens on the TUI's epic rail; a phone's one column reads better with rows.
-    lanes: store.get<"off" | "rows" | "rail">("boardLanes", wide() ? "rail" : "rows"),
+    // The side-by-side board opens on the TUI's epic rail; a phone's one column reads better with rows.
+    lanes: store.get<"off" | "rows" | "rail">("boardLanes", split() ? "rail" : "rows"),
     /** the lane at the top of the phone column, which the rail marks as on */
     lane: null as string | null,
     laneFold: new Set<string>(),
@@ -169,7 +169,7 @@ export function saveChips(): void { store.set("chips", [...S.st]); }
 
 /**
  * defaultDetailSize is the half detent on a phone, which keeps the list in
- * view, and the side panel on a wide screen. Scrolling the text raises a phone
- * sheet to full height.
+ * view, and the side panel in a split layout. Scrolling the text raises a
+ * phone sheet to full height.
  */
 export const defaultDetailSize = (): "half" | "full" => "half";

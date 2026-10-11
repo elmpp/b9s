@@ -59,7 +59,9 @@
   .chip.fx { color: var(--accent); border-color: var(--accent); }
   .chips .sep { flex: none; width: 1px; height: 18px; background: var(--line); }
 
-  main { flex: 1; min-height: 0; position: relative; }
+  /* The views and the bar: a column with the bar at the bottom on a phone, a row with the bar as a rail at the left in every other class. */
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  main { flex: 1; min-height: 0; min-width: 0; position: relative; }
   .view { position: absolute; inset: 0; display: flex; flex-direction: column; }
   .view[hidden] { display: none !important; }
   .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
@@ -342,21 +344,32 @@
   :focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .err { color: var(--red); }
-  /* Wide screens: the detail is a side panel between header and bar, and the views make room for it. */
-  @media (min-width: 720px) and (min-height: 500px) {
-    :root { --dw: min(460px, 42vw); }
-    .detail {
-      left: auto; top: calc(var(--sat) + 32px); bottom: calc(48px + var(--sab)); width: var(--dw); height: auto;
-      border-top: 0; border-left: 1px solid var(--line); border-radius: 0; box-shadow: var(--side-panel-shadow);
-    }
-    .detail.enter { transform: translateX(100%); }
-    /* Full width covers the view instead of narrowing it, so the board keeps its layout for when the panel shrinks back. */
-    .detail.full { left: 0; width: auto; border-left: 0; box-shadow: none; }
-    .detail .grab { display: none; }
-    .detail .dhead { padding-top: 10px; touch-action: auto; }
-    .detail .dacts { padding-bottom: 0; }
-    .app.hasdetail .view { right: var(--dw); }
+  /* ---------- size classes ----------
+     util.ts puts phone, tablet, desktop or wide on #app from its width (docs/adr/0052).
+     In every class but phone the views sit beside a rail, and the detail is a side
+     panel from the header to the bottom edge that the views make room for. */
+  .app:not(.phone) { --dw: min(460px, 42vw); --rail-w: 64px; }
+  .app:not(.phone) .body { flex-direction: row; }
+  .app:not(.phone) nav.bar { order: -1; flex-direction: column; width: var(--rail-w); height: auto; padding: 8px 0 var(--sab); border-top: 0; border-right: 1px solid var(--line); font-family: var(--mono); }
+  .app:not(.phone) nav.bar button { flex: none; height: 52px; }
+  .app:not(.phone) nav.bulk .cnt { height: auto; padding: 8px 4px; }
+  .app:not(.phone) .toast { left: calc(var(--sal) + var(--rail-w) + 12px); right: auto; width: min(420px, calc(100% - var(--rail-w) - 24px)); bottom: calc(12px + var(--sab)); }
+  .app:not(.phone) .detail {
+    left: auto; top: calc(var(--sat) + 32px); bottom: var(--sab); width: var(--dw); height: auto;
+    border-top: 0; border-left: 1px solid var(--line); border-radius: 0; box-shadow: var(--side-panel-shadow);
   }
+  .app:not(.phone) .detail.enter { transform: translateX(100%); }
+  /* Full width covers the views but not the rail, and narrows nothing, so the board keeps its layout for when the panel shrinks back. */
+  .app:not(.phone) .detail.full { left: calc(var(--sal) + var(--rail-w)); width: auto; border-left: 0; box-shadow: none; }
+  .app:not(.phone) .detail .grab { display: none; }
+  .app:not(.phone) .detail .dhead { padding-top: 10px; touch-action: auto; }
+  .app:not(.phone) .detail .dacts { padding-bottom: 0; }
+  .app.hasdetail:not(.phone) .view { right: var(--dw); }
+  /* Desktop and wide: the rail widens into a sidebar with the glyph beside each label. */
+  .app.desktop, .app.wide { --rail-w: 160px; }
+  .app.desktop nav.bar button, .app.wide nav.bar button { flex-direction: row; justify-content: flex-start; gap: 10px; height: 40px; padding: 0 14px; font-size: 0.923rem; }
+  .app.desktop nav.bar button .g, .app.wide nav.bar button .g { width: 18px; text-align: center; font-size: 1.077rem; }
+  .app.desktop nav.bulk .cnt, .app.wide nav.bulk .cnt { text-align: left; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }
 [hidden] { display: none !important; }
 

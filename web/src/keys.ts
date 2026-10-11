@@ -19,9 +19,9 @@ import {
 import * as api from "./api";
 import { memoryKey } from "./memory";
 import { D, eff, get, kids, laneOf, pool } from "./data";
-import { detailKids, ensureVisible, render, renderBoard, siblings, wide } from "./render";
+import { detailKids, ensureVisible, render, renderBoard, siblings } from "./render";
 import { S, saveChips, treeRows } from "./state";
-import { $, copyText, store } from "./util";
+import { $, copyText, split, store } from "./util";
 
 /**
  * keyName spells a key the way the README does: "j", "C-a", "S-Tab", or
@@ -343,7 +343,7 @@ function boardKey(k: string): boolean {
       return true;
     }
   }
-  if (!wide() && (k === "h" || k === "l")) {
+  if (!split() && (k === "h" || k === "l")) {
     const cols = [...document.querySelectorAll<HTMLElement>("#tabs [data-tab]")].map(t => t.dataset.tab!);
     const at = cols.indexOf(S.board.col || "");
     const to = cols[at + (k === "l" ? 1 : -1)];

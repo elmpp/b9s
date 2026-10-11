@@ -9,9 +9,9 @@ import {
 import { adoptCursor, onKey } from "./keys";
 import { memoryBack } from "./memory";
 import { canGoBack } from "./nav";
-import { ALL, WIDE, appW, colOf, ensureVisible, fullH, halfH, openCols, phoneCols, render, renderBoard, renderSearch, scrollToLane, siblings, wide } from "./render";
+import { ALL, appW, colOf, ensureVisible, fullH, halfH, openCols, phoneCols, render, renderBoard, renderSearch, scrollToLane, siblings } from "./render";
 import { S } from "./state";
-import { $, haptic, store } from "./util";
+import { $, haptic, observeSize, split, store } from "./util";
 
 export const SHORT = 0.2, LONG = 0.55, LP_MS = 450, EDGE = 24;
 
@@ -198,7 +198,7 @@ function bindDetents(host: HTMLElement): void {
   let t: { y0: number; top: number; body: HTMLElement; done: boolean } | null = null;
   host.addEventListener("touchstart", e => {
     const body = (e.target as HTMLElement).closest<HTMLElement>("#dbody");
-    t = body && S.detail && !wide() ? { y0: e.touches[0].clientY, top: body.scrollTop, body, done: false } : null;
+    t = body && S.detail && !split() ? { y0: e.touches[0].clientY, top: body.scrollTop, body, done: false } : null;
   }, { passive: true });
   host.addEventListener("touchmove", e => {
     if (!t || t.done || !S.detail) return;
@@ -212,7 +212,7 @@ function bindDetents(host: HTMLElement): void {
   host.addEventListener("touchend", () => { t = null; }, { passive: true });
   host.addEventListener("wheel", e => {
     const body = (e.target as HTMLElement).closest<HTMLElement>("#dbody");
-    if (!body || !S.detail || wide()) return;
+    if (!body || !S.detail || split()) return;
     if (S.detail.size === "half" && e.deltaY > 6) setDetent("full");
     else if (S.detail.size === "full" && body.scrollTop <= 0 && e.deltaY < -30) setDetent("half");
   }, { passive: true });
@@ -226,7 +226,7 @@ function bindDetail(): void {
   host.addEventListener("pointerdown", e => {
     const t = e.target as HTMLElement;
     const head = t.closest<HTMLElement>("#dhead");
-    if (head && !t.closest("button") && !wide()) {
+    if (head && !t.closest("button") && !split()) {
       const sec = head.closest<HTMLElement>(".detail")!;
       detailDrag = { y0: e.clientY, h0: sec.getBoundingClientRect().height, moved: false, sec };
       try { head.setPointerCapture(e.pointerId); } catch { /* best effort */ }
@@ -385,8 +385,8 @@ function bindBoard(): void {
     if (e.type === "pointercancel") { if (b.col) { b.col.classList.add("snap"); b.col.style.transform = ""; } return; }
     if (b.tab) {
       if (Math.abs(e.clientX - b.x0) >= 10) return;
-      // A wide header folds its own column; a phone tab first selects it.
-      if (wide() && !S.board.folded.has(b.tab)) S.board.col = b.tab;
+      // A side-by-side board's header folds its own column; a phone tab first selects it.
+      if (split() && !S.board.folded.has(b.tab)) S.board.col = b.tab;
       tabTap(b.tab);
       return;
     }
@@ -587,7 +587,7 @@ function bindClicks(): void {
     }
     adoptCursor(e);
     // Shift-Tab folds every lane, which keys.ts owns; e.key alone would read it as Tab.
-    if (S.view === "board" && !S.sheet && wide() && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.key === "Tab" && e.shiftKey) && boardKey(e.key)) { e.preventDefault(); return; }
+    if (S.view === "board" && !S.sheet && split() && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.key === "Tab" && e.shiftKey) && boardKey(e.key)) { e.preventDefault(); return; }
     if (onKey(e)) { e.preventDefault(); return; }
     if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
       const row = t.closest<HTMLElement>("[data-id], [data-card]");
@@ -666,8 +666,20 @@ function boardKey(key: string): boolean {
   return true;
 }
 
+/**
+ * onSizeChange redraws for the new class and keeps the place: the same view,
+ * cursor and detail stack, with the cursor's row or card brought back into
+ * view where the other layout left it off screen.
+ */
+function onSizeChange(): void {
+  render();
+  if (!S.cursor) return;
+  if (S.view === "tree") ensureVisible(S.cursor);
+  else if (S.view === "board") document.querySelector(`#vBoard [data-card="${CSS.escape(S.cursor)}"], #vBoard [data-epic="${CSS.escape(S.cursor)}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
 export function bindAll(): void {
-  window.matchMedia(WIDE).addEventListener("change", () => render());
+  observeSize(onSizeChange);
   bindRows($("#treeRows"));
   bindRows($("#sList"));
   bindRows($("#vGraph"));

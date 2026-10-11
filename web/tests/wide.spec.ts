@@ -232,7 +232,9 @@ test("\\ or the panel's button switches the detail between a side panel and the 
   // The panel slides in, so its box settles a moment after it appears.
   const box = async () => (await d.boundingBox()) || { x: -1, width: -1 };
   const panel = async () => { const b = await box(); return b.width > 0 && b.width < vp.width * 0.6; };
-  const full = async () => { const b = await box(); return b.x <= 1 && b.width >= vp.width - 2; };
+  // The full panel covers the views from the rail's edge to the right edge; the rail stays in reach.
+  const rail = (await page.locator("#bar").boundingBox())!;
+  const full = async () => { const b = await box(); return Math.abs(b.x - (rail.x + rail.width)) <= 1 && b.x + b.width >= vp.width - 2; };
   await expect.poll(panel).toBe(true);
   await page.keyboard.press("\\");
   await expect.poll(full).toBe(true);

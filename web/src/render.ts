@@ -9,7 +9,7 @@ import { PC, S, SORTS, matches, queryString, stOf, treeRows, tyOf, type TreeRow 
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
-import { $, WIDE, age, esc, fmtDate, md, store, wide } from "./util";
+import { $, age, esc, fmtDate, md, sizeClass, split, store } from "./util";
 
 export function l2HTML(i: Item, opts: { proj?: boolean; status?: boolean } = {}): string {
   const bits: string[] = [];
@@ -47,6 +47,8 @@ export function rowHTML(r: TreeRow, flat = false): string {
 
 export function render(): void {
   if (!D.loaded) return;
+  // The size class is read while the layout is still clean, so the reads inside the views below force none.
+  sizeClass();
   renderHeader(); renderChips(); renderBar(); renderStale();
   (["tree", "board", "search", "more", "graph", "memory"] as const).forEach(v => { $("#v" + v[0].toUpperCase() + v.slice(1)).hidden = S.view !== v; });
   if (S.view === "tree") renderTree();
@@ -173,8 +175,6 @@ export function boardCols(): [string, string][] {
   }
   return cols;
 }
-
-export { WIDE, wide };
 
 /**
  * ALL is the phone board's first tab: every unfolded column in one list, so
@@ -487,7 +487,7 @@ function renderWideBoard(v: HTMLElement): void {
 
 export function renderBoard(): void {
   const v = $("#vBoard");
-  if (wide()) { renderWideBoard(v); return; }
+  if (split()) { renderWideBoard(v); return; }
   const cols = boardCols();
   const cur = activeCol();
   const folded = cols.filter(([k]) => S.board.folded.has(k));
@@ -682,8 +682,8 @@ export const appH = () => $("#app").clientHeight;
 export const appW = () => $("#app").clientWidth;
 export const halfH = () => Math.round(appH() * 0.52);
 export const fullH = () => appH();
-/** detailHeightPx is what the sheet covers of a list; the wide side panel covers none. */
-export const detailHeightPx = () => (wide() ? 0 : S.detail && S.detail.size === "full" ? fullH() : halfH());
+/** detailHeightPx is what the sheet covers of a list; the side panel of a split layout covers none. */
+export const detailHeightPx = () => (split() ? 0 : S.detail && S.detail.size === "full" ? fullH() : halfH());
 
 /** siblings are the rows next to an issue in the current tree, which the detail pages through. */
 export function siblings(id: string): string[] {
@@ -754,8 +754,8 @@ export function renderDetail(): void {
   const cms = f ? f.comments : [];
   const ro = D.project.read_only;
   const full = S.detail.size === "full";
-  // On a phone the size is the sheet's height, on a wide screen the panel's width; the glyph says which.
-  const size = wide() ? (full ? ["⤡", "Side panel"] : ["⤢", "Full width"]) : (full ? ["⌄", "Half height"] : ["⌃", "Full height"]);
+  // On a phone the size is the sheet's height, in a split layout the panel's width; the glyph says which.
+  const size = split() ? (full ? ["⤡", "Side panel"] : ["⤢", "Full width"]) : (full ? ["⌄", "Half height"] : ["⌃", "Full height"]);
   host.innerHTML = `<section class="detail ${existing ? "" : "enter"} ${full ? "full" : ""}" data-id="${esc(id)}" style="--h:${detailHeightPx()}px" aria-label="Issue ${esc(shortId(id))}" role="dialog">
     <div class="dhead" id="dhead"><div class="grab"></div>
       <div class="dtop">${S.detail.stack.length > 1 ? `<button class="back" data-act="dback">‹ ${esc(shortId(S.detail.stack[S.detail.stack.length - 2]))}</button>` : ""}<span class="id">${esc(i.id)}</span><span class="sp"></span><span class="pager">${pos + 1}/${sib.length} ‹ swipe ›</span><button data-act="dsize" aria-label="${size[1]}" title="${size[1]} (\\)">${size[0]}</button><button data-act="dclose" aria-label="Close">✕</button></div>

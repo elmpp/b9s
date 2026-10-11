@@ -12,10 +12,16 @@ const sheetShare = (page: Page) => page.evaluate(() => {
   return d.height / a.height;
 });
 
-/** boxOf waits for a box, because the sheet re-renders once the full issue arrives and a read in between finds no element. */
+/**
+ * boxOf waits for a box inside the viewport: the sheet re-renders once the
+ * full issue arrives and a read in between finds no element, and it enters
+ * from below the screen, where a read before it settles finds a box a tap
+ * cannot reach.
+ */
 async function boxOf(page: Page, selector: string) {
+  const vh = page.viewportSize()!.height;
   let b: Awaited<ReturnType<ReturnType<Page["locator"]>["boundingBox"]>> = null;
-  await expect.poll(async () => (b = await page.locator(selector).boundingBox())).not.toBeNull();
+  await expect.poll(async () => { b = await page.locator(selector).boundingBox(); return !!b && b.y + b.height <= vh; }).toBe(true);
   return b!;
 }
 
