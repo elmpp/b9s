@@ -8,7 +8,7 @@ requirements_file: /Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/plans/2
 epic: b9m-vdp
 status: approved
 created_at: 2026-10-11T08:18:14Z
-updated_at: 2026-10-11T08:18:14Z
+updated_at: 2026-10-11T08:21:40Z
 ---
 
 # Implementation Plan: Responsive, native-feeling b9s web for every screen size
@@ -158,10 +158,13 @@ classes it touches.
 ## Rollout
 
 - **Workers:** half the tasks go to `b9s-alpha/claude`, half to
-  `b9s-alpha/codex`. Codex runs in `workspace-write` with no network, so it
-  cannot install `web/node_modules` or Playwright browsers. Until the city
-  gives it that, codex takes the tasks that need neither (B1, B3), and the
-  mayor holds codex web tasks.
+  `b9s-alpha/codex`, alternating along the chain (label `worker:*`). Both
+  providers run without a sandbox (`codex
+  --dangerously-bypass-approvals-and-sandbox`), so either can install
+  `web/node_modules` and run Playwright. The default `mol-do-work` formula
+  works in the shared checkout. `mol-polecat-commit` gives each worker its
+  own worktree, which would let independent tasks run in parallel; the
+  mayor decides per wave.
 - **Order:** A1 (claude) and B1 (codex) start at once. The mayor slings each
   later task when the one before it closes, alternating providers.
 - **Commits:** each worker commits only the files it names, with explicit
@@ -172,5 +175,4 @@ classes it touches.
 
 ## Open Questions
 
-- Codex network access for web tasks (Rollout). The mayor asks the operator.
 - beads.osen.co access for A1 behind the login proxy.
