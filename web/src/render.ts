@@ -5,7 +5,7 @@
 import * as api from "./api";
 import type { Issue } from "./api.gen";
 import { D, ancestors, blocksOf, descendants, eff, get, isReady, kids, laneOf, openBlockers, pool, progress, projectOf, shortId, type Item } from "./data";
-import { S, SORTS, matches, queryString, stOf, treeRows, type TreeRow } from "./state";
+import { S, SORTS, chipRowVisible, matches, phoneStatusBoardMode, queryString, stOf, treeRows, type TreeRow } from "./state";
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
@@ -100,7 +100,7 @@ function renderHeader(): void {
 
 function renderChips(): void {
   const el = $("#chips");
-  el.hidden = !S.chips;
+  el.hidden = !chipRowVisible();
   const P = pool();
   const cnt = (s: string) => P.filter(i => eff(i) === s).length;
   const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n));
@@ -457,6 +457,19 @@ function optsTab(): string {
   return `<button class="tab" data-act="boardopts" style="color:var(--muted)">⚙ ${S.board.group}${S.board.lanes !== "off" ? " · lanes " + S.board.lanes : ""}</button>`;
 }
 
+const STATUS_TAB_LABELS: Record<string, string> = { open: "open", in_progress: "in prog", blocked: "blocked", deferred: "deferred", closed: "closed" };
+
+function statusFilterTab(): string {
+  if (S.board.group !== "status" || (!S.st.size && !S.ready)) return "";
+  const known = Object.keys(STATUS_TAB_LABELS);
+  const labels = [
+    ...known.filter(k => S.st.has(k)).map(k => STATUS_TAB_LABELS[k]),
+    ...[...S.st].filter(k => !known.includes(k)).map(k => stOf(k).w),
+    S.ready ? "ready" : "",
+  ].filter(Boolean);
+  return `<button class="tab filter" data-act="clearstatusfilter">filter: ${esc(labels.join(", "))} ✕</button>`;
+}
+
 /**
  * renderWideBoard lays every column out side by side in one grid, so an
  * epic lane is a row across all of them and the columns scroll together.
@@ -516,6 +529,7 @@ export function renderBoard(): void {
   }).join("");
   if (phoneCols()[0]?.[0] === ALL) tabs = `<button class="tab ${cur && cur[0] === ALL ? "on" : ""}" data-tab="${ALL}">All <b>${boardItems(ALL).length}</b></button>` + tabs;
   if (folded.length) tabs += `<button class="tab unf" data-act="unfoldall">Z unfold</button>`;
+  tabs += statusFilterTab();
   tabs += optsTab();
   let body: string;
   if (!cur) body = `<div class="bcol"><div class="empty">Every column is folded.<br><br><button data-act="unfoldall">Unfold all</button></div></div>`;
@@ -627,6 +641,7 @@ function renderMore(): void {
   const it = (a: string, g: string, x: string, sub: string, v?: string | null, on?: boolean) =>
     `<button class="item" data-act="${a}"><span class="g" aria-hidden="true">${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${v != null ? `<span class="v ${on ? "on" : ""}">${esc(v)}</span>` : ""}</button>`;
   const h = D.health;
+  const chipState = !S.chips ? "hidden" : phoneStatusBoardMode() ? "hidden on status board" : "shown";
   $("#moreList").innerHTML =
     `<div class="sec">Project</div>`
     + (D.public ? "" : it("projects", "▤", "Projects", "slots 1-9 · all projects", D.project.all ? "all" : D.project.name))
@@ -637,7 +652,7 @@ function renderMore(): void {
     + it("treeopts", "≣", "Tree options", "sort, columns, wrap, text size, expand and collapse all", null)
     + it("boardopts", "▥", "Board options", "group, epic lanes, folded columns", S.board.group)
     + it("follow", "F", "Follow mode", "jump to each issue a live change touches", S.follow ? "on" : "off", S.follow)
-    + it("togglechips", "⌄", "Filter chip row", "also: swipe down on the header", S.chips ? "shown" : "hidden", S.chips)
+    + it("togglechips", "⌄", "Filter chip row", "also: swipe down on the header", chipState, chipRowVisible())
     + `<div class="sec">Connection</div>`
     + it("pairing", "⌁", "Pairing", "b9s web · tailscale serve · pairing link", null)
     + it("log", "$", "Write log", "every bd command this browser asked for", String(S.log.length))

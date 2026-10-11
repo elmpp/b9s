@@ -54,6 +54,18 @@ export const S = {
   retryIn: 0,
 };
 
+export function phoneStatusBoardMode(): boolean {
+  return S.board.group === "status" && !split();
+}
+
+export function phoneStatusBoardHidesChips(): boolean {
+  return S.chips && S.view === "board" && phoneStatusBoardMode();
+}
+
+export function chipRowVisible(): boolean {
+  return S.chips && !phoneStatusBoardHidesChips();
+}
+
 /** initialCols reads the second-line columns. A choice saved before the
  *  status column existed never had the chance to include it, so it gains
  *  status once; turning it off afterwards sticks. */

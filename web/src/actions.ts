@@ -781,6 +781,7 @@ export async function act(a: string): Promise<void> {
     case "follow": S.follow = !S.follow; store.set("follow", S.follow); render(); toast(S.follow ? "Follow on: live changes move the cursor" : "Follow off"); break;
     case "search": S.view = "search"; $<HTMLInputElement>("#sIn").value = S.text; render(); setTimeout(() => $("#sIn").focus(), 50); break;
     case "clearq": setText(""); render(); break;
+    case "clearstatusfilter": S.st.clear(); S.ready = false; saveChips(); render(); break;
     case "allq": S.st.clear(); S.ready = false; saveChips(); setText(""); S.focus = null; render(); break;
     case "sort": openSheet("sort"); break;
     case "unfocus": S.focus = null; render(); break;

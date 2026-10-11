@@ -11,7 +11,7 @@ import { adoptCursor, onKey } from "./keys";
 import { memoryBack } from "./memory";
 import { canGoBack } from "./nav";
 import { ALL, appW, colOf, ensureVisible, fullH, halfH, openCols, phoneCols, render, renderBoard, renderSearch, scrollToLane, siblings } from "./render";
-import { S } from "./state";
+import { S, chipRowVisible, phoneStatusBoardHidesChips } from "./state";
 import { $, desktop, haptic, observeSize, split, store } from "./util";
 
 export const SHORT = 0.2, LONG = 0.55, LP_MS = 450, EDGE = 24;
@@ -168,7 +168,7 @@ function bindHeader(): void {
   hd.addEventListener("pointermove", e => {
     if (h && e.clientY - h.y0 > 26) {
       h = null;
-      void act("togglechips").then(() => toast(S.chips ? "Chips shown" : "Chips hidden · swipe down again"));
+      void act("togglechips").then(() => toast(chipRowVisible() ? "Chips shown" : phoneStatusBoardHidesChips() ? "Chips hidden on status board" : "Chips hidden · swipe down again"));
     }
   });
   hd.addEventListener("pointerup", () => { h = null; });

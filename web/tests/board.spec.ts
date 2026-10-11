@@ -38,7 +38,10 @@ test("the All tab shows open, in-progress and blocked cards together", async ({ 
   for (const id of ["t-1", "t-2", "t-3", "t-5"]) await expect(page.locator(`[data-card="${id}"]`)).toBeVisible();
   await expect(page.locator('[data-card="t-4"]')).toHaveCount(0);
   // The chips still decide which statuses the All tab merges.
+  await page.locator('#bar [data-view="tree"]').click();
   await page.locator('#chips [data-chip="blocked"]').click();
+  await page.locator('#bar [data-view="board"]').click();
+  await page.locator('[data-tab="*"]').click();
   await expect(page.locator('[data-card="t-3"]')).toHaveCount(0);
   await expect(page.locator('[data-card="t-1"]')).toBeVisible();
 });

@@ -112,6 +112,55 @@ test.describe("a long tree and a long detail", () => {
 test.describe("phone native layout", () => {
   test.use({ fixture: { issues: MANY } });
 
+  test("shows one status row on the status board and restores chips on the tree", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
+    await page.addInitScript(() => localStorage.setItem("b9s.chips", JSON.stringify(["open"])));
+    await open(page, project);
+    await classOn(page);
+    await expect(page.locator("#chips")).toBeVisible();
+
+    await page.locator('#bar [data-view="board"]').click();
+    await expect(page.locator("#tabs")).toBeVisible();
+    await expect(page.locator("#chips")).toBeHidden();
+    await expect(page.locator('#tabs [data-tab="in_progress"]')).toHaveCount(0);
+    const visibleRows = await page.locator("#chips, #tabs").evaluateAll(rows => rows.filter(row => {
+      const r = row.getBoundingClientRect(), s = getComputedStyle(row);
+      return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden";
+    }).map(row => row.id));
+    expect(visibleRows).toEqual(["tabs"]);
+
+    const filter = page.locator('#tabs [data-act="clearstatusfilter"]');
+    await expect(filter).toContainText(/filter: open/i);
+    await filter.click();
+    await expect(page.locator('#tabs [data-tab="in_progress"]')).toBeVisible();
+    await expect(filter).toHaveCount(0);
+
+    await page.locator('#bar [data-view="tree"]').click();
+    await expect(page.locator("#chips")).toBeVisible();
+  });
+
+  test("keeps status chips visible when the phone board groups by priority", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
+    await page.addInitScript(() => localStorage.setItem("b9s.boardGroup", JSON.stringify("priority")));
+    await open(page, project);
+    await classOn(page);
+    await page.locator('#bar [data-view="board"]').click();
+    await expect(page.locator('#tabs [data-tab="1"]')).toBeVisible();
+    await expect(page.locator("#chips")).toBeVisible();
+  });
+
+  test("draws active status chips differently from inactive ones", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
+    await open(page, project);
+    await classOn(page);
+    const styles = await page.locator('#chips [data-chip="open"], #chips [data-chip="closed"]').evaluateAll(buttons => buttons.map(button => {
+      const s = getComputedStyle(button);
+      return { border: s.borderTopColor, color: s.color };
+    }));
+    expect(styles).toHaveLength(2);
+    expect(styles[0].border !== styles[1].border || styles[0].color !== styles[1].color).toBe(true);
+  });
+
   test("keeps dense 44 px rows, bottom navigation targets and sheet actions", async ({ page, project }) => {
     test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
     await open(page, project);
