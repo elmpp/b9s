@@ -754,11 +754,15 @@ export function renderDetail(): void {
   const cms = f ? f.comments : [];
   const ro = D.project.read_only;
   const full = S.detail.size === "full";
+  const isSplit = split();
   // On a phone the size is the sheet's height, in a split layout the panel's width; the glyph says which.
-  const size = split() ? (full ? ["⤡", "Side panel"] : ["⤢", "Full width"]) : (full ? ["⌄", "Half height"] : ["⌃", "Full height"]);
+  const size = isSplit ? (full ? ["⤡", "Side panel"] : ["⤢", "Full width"]) : (full ? ["⌄", "Half height"] : ["⌃", "Full height"]);
+  const back = S.detail.stack.length > 1
+    ? `<button class="back" data-act="dback" aria-label="Back to previous issue">‹ ${esc(shortId(S.detail.stack[S.detail.stack.length - 2]))}</button>`
+    : (!isSplit ? `<button class="back" data-act="dclose" aria-label="Back to issue list">‹ Tree</button>` : "");
   host.innerHTML = `<section class="detail ${existing ? "" : "enter"} ${full ? "full" : ""}" data-id="${esc(id)}" style="--h:${detailHeightPx()}px" aria-label="Issue ${esc(shortId(id))}" role="dialog">
     <div class="dhead" id="dhead"><div class="grab"></div>
-      <div class="dtop">${S.detail.stack.length > 1 ? `<button class="back" data-act="dback">‹ ${esc(shortId(S.detail.stack[S.detail.stack.length - 2]))}</button>` : ""}<span class="id">${esc(i.id)}</span><span class="sp"></span><span class="pager">${pos + 1}/${sib.length} ‹ swipe ›</span><button data-act="dsize" aria-label="${size[1]}" title="${size[1]} (\\)">${size[0]}</button><button data-act="dclose" aria-label="Close">✕</button></div>
+      <div class="dtop">${back}<span class="id">${esc(i.id)}</span><span class="sp"></span><span class="pager">${pos + 1}/${sib.length} ‹ swipe ›</span><button data-act="dsize" aria-label="${size[1]}" title="${size[1]} (\\)">${size[0]}</button><button data-act="dclose" aria-label="Close">✕</button></div>
       <div class="dtitle">${esc(i.t)}</div>
       <div class="pills"><span class="pill" style="color:${st.c}">${st.g} ${esc(i.status === eff(i) ? st.w : i.status + " · " + st.w)}</span><span class="pill" style="color:${PC[i.priority] || "var(--muted)"}">P${i.priority}</span><span class="pill" style="color:${tc}">${tg} ${esc(i.type)}</span>${i.labels.map(l => `<span class="pill" style="color:var(--cyan)">#${esc(l)}</span>`).join("")}</div>
     </div>

@@ -79,3 +79,50 @@ test.describe("a long tree and a long detail", () => {
     expect(await place(start)).toBe(sizeClassOf(start.width));
   });
 });
+
+test.describe("phone native layout", () => {
+  test.use({ fixture: { issues: MANY } });
+
+  test("keeps dense 44 px rows, bottom navigation targets and sheet actions", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
+    await open(page, project);
+    await classOn(page);
+
+    const appFits = await page.locator("#app").evaluate(el => el.scrollWidth <= el.clientWidth + 1);
+    expect(appFits).toBe(true);
+    for (const b of await page.locator("#bar button").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+    const rowBoxes = await page.locator("#treeRows .row").evaluateAll(rows => rows.map(row => {
+      const r = row.getBoundingClientRect(), bar = document.getElementById("bar")!.getBoundingClientRect();
+      return { height: r.height, visible: r.top >= 0 && r.bottom <= bar.top + 1 };
+    }));
+    expect(rowBoxes[0].height).toBeGreaterThanOrEqual(44);
+    expect(rowBoxes[0].height).toBeLessThanOrEqual(46);
+    expect(rowBoxes.filter(r => r.visible).length).toBeGreaterThanOrEqual(12);
+
+    await row(page, "m-1").click();
+    const d = page.locator(".detail");
+    await expect(d).toHaveAttribute("data-id", "m-1");
+    await expect(d.locator('.back[data-act="dclose"]')).toHaveText(/Tree/);
+    await expect.poll(() => d.locator(".dacts button, .dtop button").evaluateAll(buttons =>
+      buttons.length > 0 && buttons.every(button => button.getBoundingClientRect().height >= 44)
+    )).toBe(true);
+    await d.locator('.back[data-act="dclose"]').click();
+    await expect(d).toHaveCount(0);
+  });
+
+  test("leaves the outer 24 px edge to the operating system", async ({ page, project }) => {
+    test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
+    await open(page, project);
+    const r = row(page, "m-1");
+    const b = (await r.boundingBox())!;
+    const y = b.y + b.height / 2;
+    await page.mouse.move(12, y);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) await page.mouse.move(12 + s * 24, y);
+    await page.mouse.up();
+
+    await expect(page.locator(".detail")).toHaveCount(0);
+    expect(project.issues().find(i => i.id === "m-1")?.status).toBe("open");
+  });
+});
