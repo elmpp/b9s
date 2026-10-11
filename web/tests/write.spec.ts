@@ -100,7 +100,7 @@ test.describe("a failing bd", () => {
     await open(page, project);
     await swipe(page, "t-2", 0.35);
     await expect(page.locator("#toast")).toContainText(/fail|refused/i);
-    await expect(row(page, "t-2").locator(".st")).not.toHaveText("◐");
+    await expect(row(page, "t-2").locator(".stw")).toHaveText("open");
     expect(statusOf(project, "t-2")).toBe("open");
   });
 });

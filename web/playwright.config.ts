@@ -56,7 +56,7 @@ export default defineConfig({
     })),
     { name: "ipad", use: { ...devices["iPad Pro 11"] }, testMatch: /(wide|keys)\.spec/ },
     // desktop.spec.ts covers the desktop and wide classes; at 1440 px the three desktop browsers run it already.
-    ...sizes.map(size => ({ ...size, testMatch: size.name === "desktop-1920" || size.name === "wide-2560" ? /(shell|desktop)\.spec/ : /shell\.spec/ })),
+    ...sizes.map(size => ({ ...size, testMatch: size.name === "desktop-1920" || size.name === "wide-2560" ? /(shell|desktop|board-detail)\.spec/ : /(shell|board-detail)\.spec/ })),
     ...(["Pixel 7", "iPhone 14"] as const).map((device) => ({
       name: device === "Pixel 7" ? "pixel-perf" : "iphone-perf",
       use: { ...devices[device] },
