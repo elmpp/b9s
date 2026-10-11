@@ -567,7 +567,7 @@ export function renderMemoryDetail(): void {
       <div class="dsec">From</div>${relRow(e.source, 1, "", undefined)}<div class="dsec">To</div>${relRow(e.target, 2, "", undefined)}
       ${e.kind === "blocks" ? '<div class="md"><p>The source depends on the target: the target blocks the source.</p></div>' : ""}`;
   }
-  const inTree = node && node.kind === "issue" && get(node.id) ? `<div class="dacts"><button data-mact="tree"><span class="g">≣</span>Show in tree</button></div>` : "";
+  const inTree = node && node.kind === "issue" && get(node.id) ? `<div class="dacts"><button data-mact="tree"><span class="g" aria-hidden="true">≣</span>Show in tree</button></div>` : "";
   host.innerHTML = `<section class="detail ${existing ? "" : "enter"} ${full ? "full" : ""}" id="memoryDetail" data-id="${esc(did)}" style="--h:${split() ? 0 : full ? fullH() : halfH()}px" aria-label="Memory detail" role="dialog">
     <div class="dhead"><div class="grab"></div>
       <div class="dtop">${back}<span class="id">${esc(openEdge ? openEdge.id : node!.id)}</span><span class="sp"></span>${pager}<button data-mact="size" aria-label="${glyph[1]}" title="${glyph[1]} (\\)">${glyph[0]}</button><button id="memoryClose" data-mact="close" aria-label="Close Memory details">✕</button></div>

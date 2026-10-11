@@ -124,6 +124,9 @@ function renderChips(): void {
 
 function renderBar(): void {
   const el = $("#bar");
+  const covered = !!S.detail && !split();
+  el.toggleAttribute("aria-hidden", covered);
+  el.toggleAttribute("inert", covered);
   // The sidebar of the desktop classes carries the project above the views and the connection
   // below them, as the direction A mockup does (docs/mockups/responsive-web/shots/a-desktop.png).
   const side = desktop();
@@ -133,16 +136,16 @@ function renderBar(): void {
   if (S.marking) {
     el.className = "bar bulk";
     el.innerHTML = brand + `<button class="cnt" data-act="markall">${S.marks.size} marked<br><span style="font-weight:400;color:var(--muted)">tap: all</span></button>
-      <button data-act="bulkstatus"><span class="g">◐</span>Status</button>
-      <button data-act="bulkclose"><span class="g">✓</span>Close</button>
-      <button class="red" data-act="bulkdelete"><span class="g">⌫</span>Delete</button>
-      <button data-act="unmark"><span class="g">✕</span>Done</button>` + foot;
+      <button data-act="bulkstatus"><span class="g" aria-hidden="true">◐</span>Status</button>
+      <button data-act="bulkclose"><span class="g" aria-hidden="true">✓</span>Close</button>
+      <button class="red" data-act="bulkdelete"><span class="g" aria-hidden="true">⌫</span>Delete</button>
+      <button data-act="unmark"><span class="g" aria-hidden="true">✕</span>Done</button>` + foot;
     return;
   }
   el.className = "bar";
   const tab = (v: string, g: string, l: string) => {
     const on = S.view === v || (v === "more" && S.view === "graph");
-    return `<button class="${on ? "on" : ""}" data-view="${v}" aria-current="${on ? "page" : "false"}"><span class="g">${g}</span>${l}</button>`;
+    return `<button class="${on ? "on" : ""}" data-view="${v}" aria-current="${on ? "page" : "false"}"><span class="g" aria-hidden="true">${g}</span>${l}</button>`;
   };
   el.innerHTML = brand + tab("tree", "≣", "Tree") + tab("board", "▥", "Board") + tab("memory", "◇", "Memory") + tab("search", "⌕", "Search") + tab("more", "⋯", "More") + foot;
 }
@@ -272,7 +275,7 @@ function cardHTML(i: Item, depth = 0): string {
   const st = stOf(eff(i));
   const sel = S.cursor === i.id;
   const open = sel ? `${l2HTML(i, { proj: true, status: S.board.group !== "status" })}` : "";
-  return `<div class="card ${sel ? "sel" : ""} ${S.flash.has(i.id) ? "flash" : ""}" data-card="${esc(i.id)}" tabindex="0" role="listitem" aria-label="${esc(shortId(i.id) + " " + i.t + ", " + st.w)}" style="--d:${depth}"><div class="l1">${statusDotHTML(eff(i))}<span class="id">${esc(shortId(i.id))}</span><span class="t">${esc(i.t)}</span>${cardTagsHTML(i)}</div>${open}${parentLineHTML(i)}</div>`;
+  return `<div class="card ${sel ? "sel" : ""} ${S.flash.has(i.id) ? "flash" : ""}" data-card="${esc(i.id)}" tabindex="0" role="button" aria-label="${esc(shortId(i.id) + " " + i.t + ", " + st.w)}" style="--d:${depth}"><div class="l1">${statusDotHTML(eff(i))}<span class="id">${esc(shortId(i.id))}</span><span class="t">${esc(i.t)}</span>${cardTagsHTML(i)}</div>${open}${parentLineHTML(i)}</div>`;
 }
 
 /**
@@ -472,7 +475,7 @@ function renderWideBoard(v: HTMLElement): void {
   }).join("");
   const cell = (k: string, arr: Item[]) => folded(k)
     ? `<div class="wcell rail" data-dcol="${esc(k)}"></div>`
-    : `<div class="wcell" data-dcol="${esc(k)}" role="list">${cellCards(arr)}</div>`;
+    : `<div class="wcell" data-dcol="${esc(k)}">${cellCards(arr)}</div>`;
   const rail = S.board.lanes === "rail" && lanes;
   let rows = "";
   if (rail) {
@@ -524,7 +527,7 @@ export function renderBoard(): void {
     else if (lanes.length) inner = lanes.map(([l, arr]) => `<div class="lgrp" data-lgrp="${esc(l)}">${laneHTML(l, arr.length)}${S.board.laneFold.has(l) ? "" : cellCards(arr)}</div>`).join("");
     else inner = cellCards(items);
     const rail = S.board.lanes === "rail" && lanes.length ? railHTML(lanes) : "";
-    body = `${rail}<div class="bcol${rail ? " indexed" : ""}" id="bcol" role="list">${inner}</div><div class="edgehint l">‹</div><div class="edgehint r">›</div>`;
+    body = `${rail}<div class="bcol${rail ? " indexed" : ""}" id="bcol">${inner}</div><div class="edgehint l">‹</div><div class="edgehint r">›</div>`;
   }
   const old = document.getElementById("bcol");
   const keepScroll = old ? old.scrollTop : 0;
@@ -571,7 +574,7 @@ export function renderSearch(): void {
   renderSuggestions();
   if (!q) {
     const rec = store.get<string[]>("recent", []);
-    $("#sList").innerHTML = (rec.length ? `<div class="sec">Recent queries</div>` + rec.map(r => `<button class="item" data-recent="${esc(r)}"><span class="g">↺</span><span class="x">${esc(r)}</span></button>`).join("") : "")
+    $("#sList").innerHTML = (rec.length ? `<div class="sec">Recent queries</div>` + rec.map(r => `<button class="item" data-recent="${esc(r)}"><span class="g" aria-hidden="true">↺</span><span class="x">${esc(r)}</span></button>`).join("") : "")
       + `<div class="sec">Syntax</div><div class="md syntax"><p><code>status:open</code> <code>type:bug</code> <code>priority:1</code> <code>assignee:alice</code> <code>label:mobile</code> <code>project:b9s</code> <code>id:foit</code> <code>title:graph</code>. The same field twice means either value. <code>!</code> negates, and a bare <code>!closed</code> means not that status. Plain words match ID and title, fuzzily. It is the TUI's query language, evaluated by b9s.</p></div>`;
     return;
   }
@@ -622,7 +625,7 @@ export function buildLabel(): string {
 
 function renderMore(): void {
   const it = (a: string, g: string, x: string, sub: string, v?: string | null, on?: boolean) =>
-    `<button class="item" data-act="${a}"><span class="g">${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${v != null ? `<span class="v ${on ? "on" : ""}">${esc(v)}</span>` : ""}</button>`;
+    `<button class="item" data-act="${a}"><span class="g" aria-hidden="true">${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${v != null ? `<span class="v ${on ? "on" : ""}">${esc(v)}</span>` : ""}</button>`;
   const h = D.health;
   $("#moreList").innerHTML =
     `<div class="sec">Project</div>`
@@ -832,7 +835,7 @@ export function renderDetail(was = detailPlace()): void {
       <div class="dsec"><span>Comments ${f ? cms.length : i.comment_count}</span>${ro ? "" : `<button data-act="comment">+ add</button>`}</div>
       ${cms.map(c => `<div class="cm"><div class="who"><b>${esc(c.author || "unknown")}</b> · ${age(Date.parse(c.created_at) || 0)}</div><div class="md">${md(c.text)}</div></div>`).join("") || `<div class="md"><p style="color:var(--muted)">${f || !i.comment_count ? "No comments." : "Loading…"}</p></div>`}
     </div>
-    <div class="dacts">${ro ? "" : `<button data-act="status"><span class="g">◐</span>Status</button><button data-act="edit"><span class="g">✎</span>Edit</button><button data-act="comment"><span class="g">✉</span>Comment</button>`}<button data-act="dbranch"><span class="g">⎇</span>Branch</button><button data-act="actions"><span class="g">⋯</span>More</button></div>
+    <div class="dacts">${ro ? "" : `<button data-act="status"><span class="g" aria-hidden="true">◐</span>Status</button><button data-act="edit"><span class="g" aria-hidden="true">✎</span>Edit</button><button data-act="comment"><span class="g" aria-hidden="true">✉</span>Comment</button>`}<button data-act="dbranch"><span class="g" aria-hidden="true">⎇</span>Branch</button><button data-act="actions"><span class="g" aria-hidden="true">⋯</span>More</button></div>
   </section>`;
   const sec = host.querySelector<HTMLElement>(".detail")!;
   if (kept) scrollToPlace(sec.querySelector<HTMLElement>(".dbody")!, kept);
