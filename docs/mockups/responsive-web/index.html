@@ -18,43 +18,45 @@
   }
 
   body[data-direction="a"] {
-    --surface-0: #0b0c0f;
-    --surface-1: #14161d;
-    --surface-2: #1a1d26;
-    --surface-3: #232737;
-    --surface-raised: #202433;
-    --line: #303648;
-    --line-soft: #252b3a;
-    --text: #f4f6f8;
-    --text-soft: #c6ccd6;
-    --muted: #8793aa;
-    --ghost: #626e82;
-    --open: #58d987;
-    --progress: #6fcdf2;
-    --priority: #d7b66b;
-    --danger: #ff6f74;
-    --focus: rgba(111, 205, 242, 0.25);
-    --hover: rgba(255, 255, 255, 0.045);
-    --selected: rgba(111, 205, 242, 0.11);
-    --shadow: rgba(0, 0, 0, 0.48);
+    --surface-0: #070809;
+    --surface-1: #0d1012;
+    --surface-2: #111619;
+    --surface-3: #171e22;
+    --surface-raised: #12181b;
+    --line: #293238;
+    --line-soft: #1b2327;
+    --text: #f3f4ef;
+    --text-soft: #c4c8c2;
+    --muted: #828a83;
+    --ghost: #5f665f;
+    --open: #7bd88f;
+    --progress: #7cc7d8;
+    --priority: #d2b25c;
+    --danger: #dc7a75;
+    --accent: #7cc7d8;
+    --focus: rgba(124, 199, 216, 0.24);
+    --hover: rgba(124, 199, 216, 0.07);
+    --selected: rgba(124, 199, 216, 0.12);
+    --shadow: rgba(0, 0, 0, 0.60);
   }
 
   body[data-direction="b"] {
-    --surface-0: #0c0f12;
-    --surface-1: #15191d;
-    --surface-2: #1d2328;
-    --surface-3: #262d34;
-    --surface-raised: #222930;
-    --line: #34404a;
-    --line-soft: #28323a;
+    --surface-0: #0e1114;
+    --surface-1: #161b1f;
+    --surface-2: #1f262b;
+    --surface-3: #293238;
+    --surface-raised: #20272d;
+    --line: #35414a;
+    --line-soft: #2a343b;
     --text: #f1f4f2;
-    --text-soft: #c2cbc5;
-    --muted: #8d9a91;
+    --text-soft: #c7cfca;
+    --muted: #8f9b94;
     --ghost: #667368;
     --open: #69d18f;
     --progress: #79b8ff;
     --priority: #cdbb78;
     --danger: #ee776f;
+    --accent: #79b8ff;
     --focus: rgba(121, 184, 255, 0.24);
     --hover: rgba(234, 241, 238, 0.045);
     --selected: rgba(105, 209, 143, 0.10);
@@ -62,25 +64,26 @@
   }
 
   body[data-direction="c"] {
-    --surface-0: #090b11;
-    --surface-1: #121520;
-    --surface-2: #191d2a;
-    --surface-3: #222838;
-    --surface-raised: #1d2330;
-    --line: #31394d;
-    --line-soft: #252c3c;
-    --text: #f3f5fb;
-    --text-soft: #c4cad8;
-    --muted: #8f99ae;
-    --ghost: #667084;
-    --open: #72d7a0;
-    --progress: #8ab4f8;
-    --priority: #d6a96d;
-    --danger: #f47c7c;
-    --focus: rgba(138, 180, 248, 0.25);
-    --hover: rgba(255, 255, 255, 0.05);
-    --selected: rgba(138, 180, 248, 0.10);
-    --shadow: rgba(0, 0, 0, 0.5);
+    --surface-0: #111214;
+    --surface-1: #17191c;
+    --surface-2: #1f2226;
+    --surface-3: #282c31;
+    --surface-raised: #1c1f23;
+    --line: #353940;
+    --line-soft: #262a2f;
+    --text: #ebedf0;
+    --text-soft: #bdc2c8;
+    --muted: #818891;
+    --ghost: #666d76;
+    --open: #a2c9aa;
+    --progress: #a8b5c8;
+    --priority: #c7b587;
+    --danger: #c99792;
+    --accent: #d2d6dc;
+    --focus: rgba(210, 214, 220, 0.20);
+    --hover: rgba(255, 255, 255, 0.035);
+    --selected: rgba(210, 214, 220, 0.09);
+    --shadow: rgba(0, 0, 0, 0.30);
   }
 
   * { box-sizing: border-box; }
@@ -263,7 +266,7 @@
     text-overflow: ellipsis;
   }
   .countline b {
-    color: var(--open);
+    color: var(--text);
     font-weight: 650;
   }
   .top-actions {
@@ -301,12 +304,27 @@
     border: 1px solid var(--line);
     border-radius: 999px;
     color: var(--text-soft);
+    background: color-mix(in oklab, var(--surface-2) 62%, transparent);
     white-space: nowrap;
   }
-  .chip.open { color: var(--open); border-color: color-mix(in oklab, var(--open) 70%, var(--line)); }
-  .chip.progress { color: var(--progress); border-color: color-mix(in oklab, var(--progress) 70%, var(--line)); }
-  .chip.blocked { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 70%, var(--line)); }
-  .chip.priority { color: var(--priority); }
+  .chip::before,
+  .status-open::before,
+  .status-progress::before,
+  .status-blocked::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--status-color, var(--accent));
+    flex: 0 0 auto;
+  }
+  .chip.open,
+  .status-open { --status-color: var(--open); }
+  .chip.progress,
+  .status-progress { --status-color: var(--progress); }
+  .chip.blocked,
+  .status-blocked { --status-color: var(--danger); }
+  .chip.priority { --status-color: var(--priority); }
   .phone-nav {
     min-height: 58px;
     display: grid;
@@ -413,16 +431,23 @@
     font-size: 12px;
   }
   .id {
-    color: var(--progress);
+    color: var(--text-soft);
     font-weight: 650;
   }
-  .status-open { color: var(--open); }
-  .status-progress { color: var(--progress); }
-  .status-blocked { color: var(--danger); }
-  .priority-high { color: var(--priority); }
-  .type-bug { color: var(--danger); }
-  .type-feature { color: var(--open); }
-  .type-task { color: var(--progress); }
+  .status-open,
+  .status-progress,
+  .status-blocked {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-soft);
+  }
+  .priority-high,
+  .type-bug,
+  .type-feature,
+  .type-task {
+    color: var(--text-soft);
+  }
   .badge {
     display: inline-flex;
     align-items: center;
@@ -434,10 +459,12 @@
     color: var(--text-soft);
     font-size: 12px;
   }
-  .badge.open { color: var(--open); }
-  .badge.progress { color: var(--progress); }
-  .badge.blocked { color: var(--danger); }
-  .badge.priority { color: var(--priority); }
+  .badge.open,
+  .badge.progress,
+  .badge.blocked,
+  .badge.priority {
+    color: var(--text-soft);
+  }
 
   .sheet-backdrop {
     position: absolute;
@@ -631,9 +658,16 @@
     align-items: center;
     gap: 8px;
     padding: 0 12px;
-    border-bottom: 2px solid var(--column-color, var(--line));
+    border-bottom: 1px solid var(--line);
     color: var(--text);
     font-weight: 700;
+  }
+  .column-head::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--column-color, var(--accent));
   }
   .column-head span {
     color: var(--muted);
@@ -675,13 +709,23 @@
     width: 100%;
     display: grid;
     gap: 4px;
-    padding: 9px 10px;
+    padding: 9px 10px 9px 22px;
     border: 1px solid var(--line);
-    border-left: 3px solid var(--card-color, var(--line));
     border-radius: 8px;
     background: var(--surface-raised);
     color: var(--text);
     text-align: left;
+    position: relative;
+  }
+  .issue-card::before {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 14px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--card-color, var(--accent));
   }
   .issue-card .card-title {
     display: flex;
@@ -860,6 +904,290 @@
     color: var(--text);
   }
 
+  body[data-direction="a"] .device {
+    border-width: 1px;
+    border-radius: 6px;
+    font: 13px/1.35 var(--mono);
+  }
+  body[data-direction="a"] .device.phone {
+    border-width: 4px;
+    border-radius: 20px;
+  }
+  body[data-direction="a"] .app {
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px) 0 0 / 100% 22px,
+      var(--surface-1);
+  }
+  body[data-direction="a"] .topbar {
+    min-height: 38px;
+    padding: 0 12px;
+    background: var(--surface-0);
+  }
+  body[data-direction="a"] .brand::before {
+    content: "$ ";
+    color: var(--accent);
+  }
+  body[data-direction="a"] .project::before {
+    content: "/";
+    color: var(--muted);
+    margin-right: 4px;
+  }
+  body[data-direction="a"] .chipbar {
+    padding: 6px 10px;
+    background: var(--surface-1);
+  }
+  body[data-direction="a"] .chip,
+  body[data-direction="a"] .badge,
+  body[data-direction="a"] .action,
+  body[data-direction="a"] .field input,
+  body[data-direction="a"] .field textarea,
+  body[data-direction="a"] .field select {
+    border-radius: 3px;
+  }
+  body[data-direction="a"] .issue-row {
+    min-height: 38px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    border-bottom-style: dashed;
+  }
+  body[data-direction="a"] .row-title .title,
+  body[data-direction="a"] .issue-card .card-title strong,
+  body[data-direction="a"] .detail-copy,
+  body[data-direction="a"] .field label {
+    font-family: var(--ui);
+  }
+  body[data-direction="a"] .phone-nav {
+    min-height: 48px;
+    border-top-style: dashed;
+    background: var(--surface-0);
+  }
+  body[data-direction="a"] .phone-nav button {
+    min-height: 46px;
+    font-size: 11px;
+  }
+  body[data-direction="a"] .phone-nav b,
+  body[data-direction="a"] .side-nav .mono {
+    color: var(--accent);
+  }
+  body[data-direction="a"] .sheet,
+  body[data-direction="a"] .column,
+  body[data-direction="a"] .issue-card,
+  body[data-direction="a"] .suggestion {
+    border-radius: 4px;
+  }
+  body[data-direction="a"] .side {
+    background: var(--surface-0);
+  }
+  body[data-direction="a"] .side-nav button {
+    border-radius: 3px;
+    font-family: var(--mono);
+  }
+
+  body[data-direction="b"] .device {
+    border-radius: 12px;
+  }
+  body[data-direction="b"] .device.phone {
+    border-radius: 30px;
+  }
+  body[data-direction="b"] .app {
+    background: var(--surface-1);
+  }
+  body[data-direction="b"] .topbar {
+    min-height: 54px;
+    padding: 0 16px;
+    background: color-mix(in oklab, var(--surface-2) 74%, var(--surface-1));
+  }
+  body[data-direction="b"] .brand {
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: var(--surface-3);
+  }
+  body[data-direction="b"] .chipbar {
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface-1);
+  }
+  body[data-direction="b"] .chip {
+    min-height: 32px;
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+  body[data-direction="b"] .tree {
+    padding: 8px 0 18px;
+  }
+  body[data-direction="b"] .issue-row {
+    width: calc(100% - 20px);
+    margin: 8px 10px 0;
+    padding: 10px 12px 10px calc(12px + var(--depth, 0) * 18px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--surface-1) 88%, var(--surface-0));
+  }
+  body[data-direction="b"] .issue-row.selected,
+  body[data-direction="b"] .issue-card.selected {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 42%, var(--line));
+  }
+  body[data-direction="b"] .phone-nav {
+    min-height: 64px;
+    margin: 0 12px 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--surface-raised) 92%, transparent);
+    box-shadow: 0 12px 34px var(--shadow);
+  }
+  body[data-direction="b"] .phone-nav button {
+    min-height: 60px;
+  }
+  body[data-direction="b"] .split {
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface-0);
+  }
+  body[data-direction="b"] .list-pane,
+  body[data-direction="b"] .detail-pane,
+  body[data-direction="b"] .column,
+  body[data-direction="b"] .desktop-detail {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  body[data-direction="b"] .board {
+    gap: 14px;
+    padding: 14px;
+  }
+  body[data-direction="b"] .side-nav .active {
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  body[data-direction="c"] .device {
+    border-radius: 2px;
+    box-shadow: 0 10px 38px var(--shadow);
+  }
+  body[data-direction="c"] .device.phone {
+    border-width: 3px;
+    border-radius: 16px;
+  }
+  body[data-direction="c"] .app {
+    background: var(--surface-1);
+  }
+  body[data-direction="c"] .app.phone {
+    grid-template-columns: 54px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  body[data-direction="c"] .app.phone > div:first-child,
+  body[data-direction="c"] .app.phone > .phone-head {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  body[data-direction="c"] .app.phone > .scroll {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  body[data-direction="c"] .app.phone > .phone-nav {
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+  body[data-direction="c"] .topbar {
+    min-height: 40px;
+    background: var(--surface-1);
+  }
+  body[data-direction="c"] .chipbar {
+    display: none;
+  }
+  body[data-direction="c"] .phone-nav {
+    min-height: 100%;
+    grid-template-columns: 1fr;
+    align-content: start;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    background: var(--surface-0);
+    padding: 8px 0;
+  }
+  body[data-direction="c"] .phone-nav button {
+    min-height: 58px;
+    font-size: 10px;
+  }
+  body[data-direction="c"] .phone-nav b {
+    font-size: 14px;
+  }
+  body[data-direction="c"] .issue-row {
+    min-height: 36px;
+    margin: 1px 8px;
+    padding: 6px 8px 6px calc(8px + var(--depth, 0) * 14px);
+    border-bottom: 0;
+    border-radius: 4px;
+  }
+  body[data-direction="c"] .row-title {
+    gap: 9px;
+  }
+  body[data-direction="c"] .row-meta {
+    color: var(--ghost);
+    font-size: 11px;
+  }
+  body[data-direction="c"] .badge {
+    min-height: 20px;
+    padding: 0 4px;
+    border-color: transparent;
+    background: transparent;
+  }
+  body[data-direction="c"] .sheet {
+    border-radius: 0;
+    background: var(--surface-1);
+  }
+  body[data-direction="c"] .grabber,
+  body[data-direction="c"] .status-dot,
+  body[data-direction="c"] .lane-head .bar {
+    display: none;
+  }
+  body[data-direction="c"] .split {
+    grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+  }
+  body[data-direction="c"] .app.desktop,
+  body[data-direction="c"] .app.wide {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  body[data-direction="c"] .side {
+    background: var(--surface-0);
+  }
+  body[data-direction="c"] .side-brand {
+    min-height: 54px;
+    padding: 0;
+    justify-items: center;
+  }
+  body[data-direction="c"] .side-brand span,
+  body[data-direction="c"] .side-foot {
+    display: none;
+  }
+  body[data-direction="c"] .side-nav {
+    padding: 8px;
+  }
+  body[data-direction="c"] .side-nav button {
+    min-height: 48px;
+    justify-content: center;
+    padding: 0;
+    font-size: 0;
+  }
+  body[data-direction="c"] .side-nav .mono {
+    font-size: 13px;
+  }
+  body[data-direction="c"] .work.desktop-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+  body[data-direction="c"] .work.wide-grid {
+    grid-template-columns: minmax(0, 1fr) 460px;
+  }
+  body[data-direction="c"] .column,
+  body[data-direction="c"] .issue-card,
+  body[data-direction="c"] .suggestion,
+  body[data-direction="c"] .field input,
+  body[data-direction="c"] .field textarea,
+  body[data-direction="c"] .field select {
+    border-radius: 2px;
+  }
+  body[data-direction="c"] .column {
+    background: var(--surface-1);
+  }
+
   @media (max-width: 900px) {
     .lab {
       position: static;
@@ -918,15 +1246,15 @@
   const directions = {
     a: {
       name: "A calm terminal",
-      note: "Closest to today's b9s: the dark terminal base remains, but colour is reserved for state and priority."
+      note: "Closest to today's b9s: compact command chrome, monospace rails, and colour reduced to small state marks."
     },
     b: {
       name: "B workbench",
-      note: "Recommended: it keeps b9s dense and dark, adds native web structure, and feels least like a terminal skin."
+      note: "Recommended: dense native web structure with cards, segmented filters, and a comfortable work surface."
     },
     c: {
       name: "C graphite",
-      note: "The quietest option: more neutral surfaces, soft focus, and colour that appears only at decision points."
+      note: "The quietest option: graphite surfaces, a narrow rail, and colour only where a decision needs attention."
     }
   };
 
@@ -979,14 +1307,15 @@
   const statusClass = status => status === "open" ? "status-open" : status === "blocked" ? "status-blocked" : "status-progress";
   const shortStatus = status => status === "in progress" ? "in prog" : status;
   const typeClass = type => type === "bug" ? "type-bug" : type === "feature" ? "type-feature" : "type-task";
-  const cardColor = issue => issue.status === "blocked" ? "var(--danger)" : issue.status === "in progress" ? "var(--progress)" : "var(--open)";
+  const statusColor = status => status === "blocked" ? "var(--danger)" : status === "in progress" ? "var(--progress)" : "var(--open)";
+  const cardColor = issue => statusColor(issue.status);
   const escapeAttr = value => String(value).replace(/"/g, "&quot;");
 
   function issueRow(issue) {
     const selected = issue.id === state.selected ? " selected" : "";
     const kids = issue.kids ? `<span class="badge ${issue.status === "blocked" ? "blocked" : issue.status === "open" ? "open" : "progress"}">${issue.kids}</span>` : "";
     const twisty = issue.type === "epic" || issue.type === "feature" ? "v" : "";
-    return `<button class="issue-row js-open js-context${selected}" data-id="${issue.id}" style="--depth:${issue.depth}">
+    return `<button class="issue-row js-open js-context${selected}" data-id="${issue.id}" data-status="${issue.status}" style="--depth:${issue.depth}">
       <span class="twisty mono">${twisty}</span>
       <span class="row-main">
         <span class="row-title"><span class="id">${issue.id}</span><span class="title">${issue.title}</span></span>
@@ -998,7 +1327,7 @@
 
   function issueCard(issue) {
     const selected = issue.id === state.selected ? " selected" : "";
-    return `<button class="issue-card js-open js-context${selected}" data-id="${issue.id}" style="--card-color:${cardColor(issue)}">
+    return `<button class="issue-card js-open js-context${selected}" data-id="${issue.id}" data-status="${issue.status}" style="--card-color:${cardColor(issue)}">
       <span class="card-title"><span class="id">${issue.id}</span><strong>${issue.title}</strong></span>
       <span class="row-meta"><span class="${statusClass(issue.status)}">${shortStatus(issue.status)}</span> - <span class="priority-high">${issue.priority}</span> - <span class="${typeClass(issue.type)}">${issue.type}</span> - @${issue.owner} - ${issue.age}</span>
       ${issue.parent ? `<span class="parent">${issue.parent}</span>` : ""}
@@ -1015,10 +1344,10 @@
 
   function chips() {
     return `<div class="chipbar">
-      <span class="chip open">o Open 25</span>
-      <span class="chip progress">i In prog 9</span>
-      <span class="chip blocked">b Blocked 10</span>
-      <span class="chip priority">d Deferred 2</span>
+      <span class="chip open">Open 25</span>
+      <span class="chip progress">In prog 9</span>
+      <span class="chip blocked">Blocked 10</span>
+      <span class="chip priority">Deferred 2</span>
     </div>`;
   }
 
