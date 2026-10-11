@@ -170,6 +170,10 @@ classes it touches.
 - **Commits:** each worker commits only the files it names, with explicit
   `git add <path>`, on `b9s-alpha` `main`, with `Refs: <task id>`. The daily
   sync rebases those commits onto b9s `main`.
+- **Production stays untouched:** no task deploys to beads.osen.co or
+  changes its image, the Hetzner servers, the shared Dolt server or the
+  operator's working setup. beads.osen.co is read-only, and never through
+  the operator's browser sessions or sign-ins (operator, 2026-10-11).
 - **Release:** none in this epic. The operator decides when b9s takes the
   work from b9s-alpha.
 
