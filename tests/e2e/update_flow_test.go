@@ -1,33 +1,110 @@
 package main_test
 
 import (
+	"debug/buildinfo"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
 
-func TestVersionFlag_OutputsVersion(t *testing.T) {
-	bv := buildBvBinary(t)
+// releaseCommit stands in for the commit GoReleaser stamps into a release.
+const releaseCommit = "0123456789abcdef0123456789abcdef01234567"
 
-	cmd := exec.Command(bv, "--version")
-	out, err := cmd.CombinedOutput()
+// A release build takes its version and commit from the linker flags in
+// .goreleaser.yaml, so it prints the same in every clone.
+func TestVersionFlag_ReleaseBuildPrintsLinkerVersion(t *testing.T) {
+	bv := buildReleaseBinary(t, "v9.9.9", releaseCommit)
+
+	want := "b9s v9.9.9 (01234567)\n" +
+		"commit https://github.com/vanderheijden86/b9s/commit/" + releaseCommit + "\n"
+	if got := versionOutput(t, bv); got != want {
+		t.Errorf("--version = %q, want %q", got, want)
+	}
+}
+
+// A plain go build, the binary every other e2e test runs, takes its version
+// and commit from the VCS stamp that Go derives from the clone. It names a
+// release only when its commit carries that tag, as in CI runs for a tag push.
+func TestVersionFlag_PlainBuildPrintsDevAndCommit(t *testing.T) {
+	bv := buildBvBinary(t)
+	commit := stampedCommit(t, bv)
+
+	// "b9s <version> (<commit>)", with ", modified" after the commit when the
+	// tree had uncommitted changes.
+	versionLine := regexp.MustCompile(`^b9s (.+) \(([0-9a-f]{8})(, modified)?\)$`)
+	// "dev" in a clone without tags, as CI's shallow checkout is, or
+	// "dev after vX.Y.Z" past a tag.
+	devVersion := regexp.MustCompile(`^dev( after v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?)?$`)
+
+	lines := strings.Split(strings.TrimSuffix(versionOutput(t, bv), "\n"), "\n")
+	m := versionLine.FindStringSubmatch(lines[0])
+	if m == nil || m[2] != commit[:8] {
+		t.Fatalf("--version first line = %q, want \"b9s <version> (%s)\"", lines[0], commit[:8])
+	}
+	if v := m[1]; !devVersion.MatchString(v) && !commitHasTag(t, commit, strings.TrimSuffix(v, "+dirty")) {
+		t.Errorf("plain build calls itself %q, want dev or dev after vX.Y.Z: commit %s carries no such tag", v, commit[:8])
+	}
+	wantCommit := "commit https://github.com/vanderheijden86/b9s/commit/" + commit
+	if len(lines) != 2 || lines[1] != wantCommit {
+		t.Errorf("--version lines = %q, want the second to be %q", lines, wantCommit)
+	}
+}
+
+// buildReleaseBinary builds b9s with the version and commit linker flags that
+// .goreleaser.yaml sets.
+func buildReleaseBinary(t *testing.T, version, commit string) string {
+	t.Helper()
+	bin := filepath.Join(t.TempDir(), "b9s")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	ldflags := "-X github.com/vanderheijden86/b9s/pkg/version.Version=" + version +
+		" -X github.com/vanderheijden86/b9s/pkg/version.Commit=" + commit
+	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", bin, "../../cmd/b9s")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+	return bin
+}
+
+func versionOutput(t *testing.T, bv string) string {
+	t.Helper()
+	out, err := exec.Command(bv, "--version").CombinedOutput()
 	if err != nil {
 		t.Fatalf("--version failed: %v\n%s", err, out)
 	}
+	return string(out)
+}
 
-	output := string(out)
-
-	if !strings.Contains(output, "v") {
-		t.Errorf("expected version to contain 'v', got: %s", output)
+// stampedCommit is the commit Go stamped into a binary built in a git checkout.
+func stampedCommit(t *testing.T, bin string) string {
+	t.Helper()
+	info, err := buildinfo.ReadFile(bin)
+	if err != nil {
+		t.Fatalf("read build info: %v", err)
 	}
-
-	versionPattern := regexp.MustCompile(`v\d+\.\d+\.\d+`)
-	if !versionPattern.MatchString(output) {
-		t.Errorf("expected semver format in version output, got: %s", output)
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" {
+			return s.Value
+		}
 	}
+	t.Fatal("binary carries no vcs.revision; run the e2e tests from a git checkout")
+	return ""
+}
+
+// commitHasTag reports whether tag points at commit in this checkout.
+func commitHasTag(t *testing.T, commit, tag string) bool {
+	t.Helper()
+	out, err := exec.Command("git", "tag", "--points-at", commit).Output()
+	if err != nil {
+		t.Fatalf("git tag --points-at %s: %v", commit, err)
+	}
+	return slices.Contains(strings.Fields(string(out)), tag)
 }
 
 func TestVersionFlag_IncludesBuildInfo(t *testing.T) {
