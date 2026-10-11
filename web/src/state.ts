@@ -37,14 +37,11 @@ export const S = {
   follow: store.get("follow", false),
   board: {
     group: store.get<"status" | "priority" | "type">("boardGroup", "status"),
-    col: null as string | null,
-    folded: new Set<string>(),
-    // The side-by-side board opens on the TUI's epic rail; a phone's one column reads better with rows.
+    /** folded columns: a phone box folded to its header, a wide column folded to a rail; saveBoardFolded keeps it across a reload */
+    folded: new Set<string>(store.get<string[]>("boardFolded", [])),
+    // The side-by-side board opens on the TUI's epic rail; a phone's boxes read better with rows.
     lanes: store.get<"off" | "rows" | "rail">("boardLanes", split() ? "rail" : "rows"),
-    /** the lane at the top of the phone column, which the rail marks as on */
-    lane: null as string | null,
     laneFold: new Set<string>(),
-    keep: false,
     hideEmpty: false,
   },
   graph: [] as string[],
@@ -54,17 +51,11 @@ export const S = {
   retryIn: 0,
 };
 
-export function phoneStatusBoardMode(): boolean {
-  return S.board.group === "status" && !split();
-}
-
-export function phoneStatusBoardHidesChips(): boolean {
-  return S.chips && S.view === "board" && phoneStatusBoardMode();
-}
-
 export function chipRowVisible(): boolean {
-  return S.chips && !phoneStatusBoardHidesChips();
+  return S.chips;
 }
+
+export function saveBoardFolded(): void { store.set("boardFolded", [...S.board.folded]); }
 
 /** initialCols reads the second-line columns. A choice saved before the
  *  status column existed never had the chance to include it, so it gains
@@ -112,7 +103,7 @@ export const SORT_HELP: Record<SortKey, string> = {
 };
 
 /** textMatches is the server's verdict on S.text; a pending query hides nothing. */
-function textMatches(i: Item): boolean {
+export function textMatches(i: Item): boolean {
   if (!S.text.trim()) return true;
   if (!S.qres || S.qres.text !== S.text) return true;
   return S.qres.ids.has(i.id);

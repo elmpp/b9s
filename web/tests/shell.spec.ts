@@ -112,41 +112,57 @@ test.describe("a long tree and a long detail", () => {
 test.describe("phone native layout", () => {
   test.use({ fixture: { issues: MANY } });
 
-  test("shows one status row on the status board and restores chips on the tree", async ({ page, project }) => {
+  // Mockup A's phone board (docs/mockups/responsive-web/shots/a-phone-board.png): the
+  // status columns are boxes, one below the other under the chip row, each with a
+  // header and its cards inside.
+  test("stacks the status columns as foldable boxes under the chip row, and a fold survives a reload", async ({ page, project }) => {
     test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
-    await page.addInitScript(() => localStorage.setItem("b9s.chips", JSON.stringify(["open"])));
     await open(page, project);
     await classOn(page);
-    await expect(page.locator("#chips")).toBeVisible();
-
     await page.locator('#bar [data-view="board"]').click();
-    await expect(page.locator("#tabs")).toBeVisible();
-    await expect(page.locator("#chips")).toBeHidden();
-    await expect(page.locator('#tabs [data-tab="in_progress"]')).toHaveCount(0);
-    const visibleRows = await page.locator("#chips, #tabs").evaluateAll(rows => rows.filter(row => {
-      const r = row.getBoundingClientRect(), s = getComputedStyle(row);
-      return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden";
-    }).map(row => row.id));
-    expect(visibleRows).toEqual(["tabs"]);
-
-    const filter = page.locator('#tabs [data-act="clearstatusfilter"]');
-    await expect(filter).toContainText(/filter: open/i);
-    await filter.click();
-    await expect(page.locator('#tabs [data-tab="in_progress"]')).toBeVisible();
-    await expect(filter).toHaveCount(0);
-
+    // One status row: the chips, with the ⚙ chip for the board options, and no column tab row.
+    await expect(page.locator("#chips")).toBeVisible();
+    await expect(page.locator('#chips [data-act="boardopts"]')).toBeVisible();
+    await expect(page.locator("#tabs")).toHaveCount(0);
+    const boxes = page.locator("#bcol .bbox");
+    await expect(boxes).toHaveCount(3);
+    expect(await boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked"]);
+    // Each box starts below the one before it and takes the whole width.
+    const col = await box(page, "#bcol");
+    const rects = await boxes.evaluateAll(els => els.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
+    for (let n = 1; n < rects.length; n++) expect(rects[n].y).toBeGreaterThanOrEqual(rects[n - 1].y + rects[n - 1].h);
+    for (const r of rects) { expect(r.x).toBeGreaterThanOrEqual(col.x); expect(r.w).toBeGreaterThanOrEqual(col.width - 30); }
+    // A chip and its box header count the same cards: the epic is a lane header, not a card.
+    const openHead = page.locator('#bcol .bbox[data-dcol="open"] .bhead');
+    await expect(openHead.locator("b")).toHaveText((await page.locator('#chips [data-chip="open"] .n').textContent())!);
+    expect((await openHead.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // A tap folds the box to its header, in place; a second tap opens it.
+    await expect(openHead).toHaveAttribute("aria-expanded", "true");
+    await openHead.click();
+    await expect(openHead).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator('#bcol .bbox[data-dcol="open"] [data-card]')).toHaveCount(0);
+    await expect(boxes.first()).toHaveAttribute("data-dcol", "open");
+    await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] [data-card="t-1"]')).toBeVisible();
+    await page.reload();
+    await expect(page.locator("body")).toHaveAttribute("data-live", "live", { timeout: 10000 });
+    await expect(openHead).toHaveAttribute("aria-expanded", "false");
+    await openHead.click();
+    await expect(openHead).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator('#bcol .bbox[data-dcol="open"] [data-card]').first()).toBeVisible();
     await page.locator('#bar [data-view="tree"]').click();
     await expect(page.locator("#chips")).toBeVisible();
   });
 
-  test("keeps status chips visible when the phone board groups by priority", async ({ page, project }) => {
+  test("stacks priority boxes under the chips when the phone board groups by priority", async ({ page, project }) => {
     test.skip(sizeClassOf(page.viewportSize()!.width) !== "phone", "phone only");
     await page.addInitScript(() => localStorage.setItem("b9s.boardGroup", JSON.stringify("priority")));
     await open(page, project);
     await classOn(page);
     await page.locator('#bar [data-view="board"]').click();
-    await expect(page.locator('#tabs [data-tab="1"]')).toBeVisible();
     await expect(page.locator("#chips")).toBeVisible();
+    await expect(page.locator("#tabs")).toHaveCount(0);
+    expect(await page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["0", "1", "2", "3", "4"]);
+    await expect(page.locator('#bcol .bbox[data-dcol="1"] [data-card="t-1"]')).toBeVisible();
   });
 
   test("draws active status chips differently from inactive ones", async ({ page, project }) => {

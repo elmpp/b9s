@@ -128,21 +128,20 @@
   .tabs { flex: none; display: flex; gap: 4px; padding: 6px 12px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
   .tabs::-webkit-scrollbar { display: none; }
   .tab { flex: none; height: 30px; border-radius: 6px; padding: 0 10px; display: flex; align-items: center; gap: 6px; color: var(--dim); border: 1px solid var(--transparent); font-size: 0.923rem; }
-  .tab b { font-weight: 500; color: var(--muted); }
-  .tab.on { border-color: var(--line); background: var(--bg3); color: var(--text); }
-  .tab.filter { border-color: var(--line); color: var(--text-soft); background: var(--surface-1); }
-  .tab.rail { padding: 0 6px; color: var(--muted); border: 1px dashed var(--line); writing-mode: vertical-rl; height: 30px; font-size: 0.769rem; line-height: 12px; }
-  .tab.drop { border-color: var(--yellow); background: var(--priority-soft); color: var(--yellow); }
   .tab.unf { color: var(--cyan); }
   .bbody { flex: 1; min-height: 0; display: flex; position: relative; }
-  .brail { flex: none; width: 64px; border-right: 1px solid var(--line); overflow-y: auto; scrollbar-width: none; }
-  .brail button { display: block; width: 100%; padding: 8px 6px; text-align: left; font-size: 0.846rem; line-height: 14px; color: var(--muted); border-bottom: 1px solid var(--row-rule-strong); }
-  .brail button[style]:not([data-rlane="none"]) { color: var(--muted); }
-  .brail button.on { color: var(--text); background: var(--selected); box-shadow: inset 2px 0 var(--accent); }
-  .brail button[data-rlane="none"].on { color: var(--dim); box-shadow: inset 2px 0 var(--muted); }
-  .brail button b { display: block; color: var(--dim); font-weight: 400; }
-  .bcol { flex: 1; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 16px; touch-action: pan-y; }
-  .bcol.snap { transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+  /* The phone board: every column is a box, stacked under the chip row, as mockup A's phone board (docs/adr/0052). */
+  .bcol { flex: 1; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 12px 16px; display: grid; grid-auto-rows: min-content; align-content: start; gap: 12px; touch-action: pan-y; }
+  .bbox { min-width: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-1); }
+  .bhead { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); border-radius: 3px 3px 0 0; color: var(--text); font-weight: 700; text-align: left; }
+  .bhead .st { width: 7px; height: 7px; }
+  .bhead .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bhead b { font-weight: 500; color: var(--muted); }
+  .bhead .ch { color: var(--muted); font-weight: 400; }
+  .bbox.folded .bhead { border-bottom: 0; border-radius: 3px; }
+  .bbox.drop { background: var(--hover); outline: 1px dashed var(--accent); outline-offset: -1px; }
+  .bcards { padding: 10px 10px 4px; }
+  .bcards .empty { padding: 12px 8px 16px; }
   .card { position: relative; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--surface-raised); padding: 6px 8px 6px calc(8px + min(var(--d, 0), 4) * 14px); margin-bottom: 6px; }
   .card .l1 { align-items: center; }
   .card .l1 .t { font-weight: 600; }
@@ -168,10 +167,8 @@
   .lane .bar i { display: block; height: 100%; background: var(--text-soft); }
   .card .l3 { padding-left: calc(1.1em + 6px); font-size: 0.885rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .l3 .e { color: var(--text-soft); }
-  /* On the phone each lane is a group, so its header sticks until the next lane pushes it off. */
-  .bcol { position: relative; }
-  .bcol .lane { position: sticky; top: -8px; z-index: 2; width: calc(100% + 24px); margin: 0 -12px 8px; padding: 8px 12px 7px; background: var(--bg); border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: inset 3px 0 var(--line); align-items: center; }
-  .bcol.indexed::after { content: ""; display: block; height: calc(100% - 48px); }
+  /* Inside a box each lane is a group, so its header sticks to the top of the board until the next lane pushes it off; the negative top lifts it over the board's 12 px padding. */
+  .bcards .lane { position: sticky; top: -12px; z-index: 2; width: calc(100% + 20px); margin: 0 -10px 8px; padding: 8px 10px 7px; background: var(--surface-1); border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; align-items: center; }
   /* the wide board: every column side by side, epic lanes as rows across them */
   .wboard { flex: 1; min-width: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-auto-rows: min-content; align-content: start; column-gap: 12px; padding: 0 16px 24px; touch-action: pan-x pan-y; }
   .whead { position: sticky; top: 0; z-index: 3; display: flex; align-items: baseline; gap: 8px; padding: 10px 8px 8px; background: var(--bg); border-bottom: 2px solid var(--hc, var(--line)); color: var(--text); font-weight: 700; text-align: left; }
@@ -208,9 +205,6 @@
   .wepic .en { color: var(--dim); font-variant-numeric: tabular-nums; }
   .wepic .ec { grid-column: 1 / -1; color: var(--muted); }
   .wcell .hid { color: var(--muted); font-size: 0.846rem; }
-  .edgehint { position: absolute; top: 0; bottom: 0; width: 36px; z-index: 5; display: none; align-items: center; justify-content: center; color: var(--yellow); background: var(--priority-wash); pointer-events: none; }
-  .dragging .edgehint { display: flex; }
-  .edgehint.l { left: 0; } .edgehint.r { right: 0; }
 
   /* ---------- search / more / graph ---------- */
   .sbox { flex: none; padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; background: var(--bg); }
@@ -388,7 +382,6 @@
   .app.phone nav.bar button { min-height: 50px; font-family: var(--ui); }
   .app.phone nav.bar button .g { font-family: var(--mono); color: var(--accent); }
   .app.phone nav.bar button.on { background: var(--selected); }
-  .app.phone .tab { height: 44px; border-radius: 4px; }
   .app.phone .detail, .app.phone .msheet { border-radius: 8px 8px 0 0; background: var(--surface-2); }
   .app.phone .detail.full { border-radius: 0; }
   .app.phone .dhead { padding: 0 12px 8px 16px; }

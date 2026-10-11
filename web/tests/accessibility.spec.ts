@@ -55,8 +55,6 @@ test("tree, board, detail, search and more pass WCAG checks in this size class",
   await closeDetail(page);
 
   await page.locator('#bar [data-view="board"]').click();
-  const allTab = page.locator('#tabs [data-tab="*"]');
-  if (await allTab.count()) await allTab.click();
   await expect(page.locator(cls === "phone" ? "#bcol" : "#wboard")).toBeVisible();
   await expectNoAxeViolations(page, `${cls}: board`);
 

@@ -66,8 +66,6 @@ test("board cards, epic lanes and rich detail use the calm look in this size cla
   const raised = await tokenColor(page, "--surface-raised");
 
   await page.locator('#bar [data-view="board"]').click();
-  const allTab = page.locator('#tabs [data-tab="*"]');
-  if (await allTab.count()) await allTab.click();
   const card = page.locator('[data-card="d-task"]');
   await expect(card).toBeVisible();
   await expect(card).toHaveCSS("background-color", raised);

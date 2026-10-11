@@ -5,8 +5,8 @@
 import * as api from "./api";
 import type { ProjectEntry, WriteRequest, WriteResult } from "./api.gen";
 import { D, descendants, eff, get, kids, load, openBlockers, pool, shortId, type Item } from "./data";
-import { ALL, boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, siblings, treeList } from "./render";
-import { PC, S, SORTS, SORT_HELP, ST, TY, defaultDetailSize, queryString, saveChips, stOf, type Sheet, type SortKey } from "./state";
+import { boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, siblings, treeList } from "./render";
+import { PC, S, SORTS, SORT_HELP, ST, TY, defaultDetailSize, queryString, saveBoardFolded, saveChips, stOf, type Sheet, type SortKey } from "./state";
 import { syncSoon } from "./nav";
 import { $, $opt, copyText, esc, fmtDate, haptic, split, store } from "./util";
 
@@ -288,7 +288,6 @@ export async function switchProject(key: string): Promise<void> {
   }
   Object.assign(S, { focus: null, detail: null, cursor: null, marking: false, graph: [], qres: null });
   S.marks.clear(); S.folded.clear();
-  S.board.lane = null;
   await refresh().catch(e => toast("Reload failed: " + (e instanceof Error ? e.message : String(e))));
   treeList().scrollTop = 0;
   toast(D.project.all ? "All projects" : "Project " + D.project.name);
@@ -335,9 +334,9 @@ export const GESTURES: [string, string, string][] = [
   ["Short swipe →", "start / stop", "S"], ["Long swipe →", "status picker", "S"], ["Short swipe ←", "close, 5 s undo", "K"], ["Long swipe ←", "action sheet", "e c y f x"],
   ["Long-press a row", "mark; tap more rows", "Space"], ["Long-press while marking", "mark the range", "Ctrl-Space"], ["Pull down on tree", "reload", "Ctrl-R"],
   ["Swipe ← → on detail", "next / previous sibling", "n p"], ["Scroll the detail up / tap its head", "full height / switch", "\\"], ["Pull the detail down", "half height / close", ""], ["Drag handle up / down", "full height / close", "Esc"], ["Tap a relation", "go there; ‹ goes back", ""],
-  ["Swipe ← → on board", "next column", "h l"], ["Tap the active column tab", "fold it into a rail", "z"], ["Tap Z unfold", "unfold all", "Z"],
-  ["Tap an epic in the rail", "scroll to its lane", ""], ["Long-press an epic in the rail", "fold its lane", "Tab"],
-  ["Long-press a card, drag", "move to a column", ""], ["Right-click a row, a card or an epic", "context menu with the swipe actions; Menu or Shift-F10 for the cursor row (desktop)", ""],
+  ["Tap a column header on the board", "fold the column, or open it again", "z"], ["Tap Z unfold, or ⚙ › Unfold all", "unfold all", "Z"],
+  ["Tap a lane header's title", "fold its lane", "Tab"],
+  ["Long-press a card, drag", "drop it on a column", ""], ["Right-click a row, a card or an epic", "context menu with the swipe actions; Menu or Shift-F10 for the cursor row (desktop)", ""],
   ["Tap project name", "project sheet", "1-9 0"], ["Tap the ● dot", "source health", "D"],
   ["Swipe down on header", "hide or show chips", "Ctrl-E"], ["Tap F", "follow live changes", "F"],
 ];
@@ -460,7 +459,7 @@ function sheetBody(sh: Sheet): [string, string, string] {
       + opt("expandall", "▾", "Expand all", "", { key: "L" }) + opt("collapseall", "▸", "Collapse all", "", { key: "H" })
       + `<div class="sec">Second line shows</div>` + [["status", "Status"], ["prio", "Priority"], ["type", "Type"], ["who", "Assignee"], ["age", "Updated age"], ["kids", "Children progress"], ["deps", "Blocked by and blocks"], ["notes", "Comment count"], ["labels", "Labels"]].map(([k, l]) => opt("col", S.cols.has(k) ? "☑" : "☐", l, "", { val: k })).join("")];
     case "boardopts": return ["Board options", "", `<div class="sec">Group by</div>` + ["status", "priority", "type"].map(g => opt("group", g === S.board.group ? "◉" : "○", g, "", { val: g })).join("")
-      + `<div class="sec">Epic lanes</div>` + [["off", "No lanes", "epics show as cards"], ["rows", "Rows", "cards grouped under each epic"], ["rail", "Rail", "epics in a first column; on a phone, a side rail filters one epic"]].map(([v, l, s]) => opt("lanes", v === S.board.lanes ? "◉" : "○", l, s, { val: v })).join("")
+      + `<div class="sec">Epic lanes</div>` + [["off", "No lanes", "epics show as cards"], ["rows", "Rows", "cards grouped under each epic"], ["rail", "Rail", "epics in a first column; a phone's boxes show rows"]].map(([v, l, s]) => opt("lanes", v === S.board.lanes ? "◉" : "○", l, s, { val: v })).join("")
       + `<div class="sec">Columns</div>` + opt("closedcol", S.st.has("closed") ? "☑" : "☐", "Show closed", "same as the C chip") + opt("unfoldall", "▭", "Unfold all columns", S.board.folded.size + " folded", { key: "Z" })];
     case "pairing": return ["Pairing", "b9s web listens on loopback. Tailscale serve publishes it to your tailnet.",
       `<table class="gtable"><tr><td>This browser</td><td>paired: it holds a session cookie</td></tr><tr><td>Pair another</td><td>open the link <b>b9s web</b> printed at start on the other device</td></tr><tr><td>Revoke</td><td>restart with <b>b9s web --new-token</b> to unpair every device</td></tr></table>`];
@@ -623,10 +622,10 @@ export async function sheetAction(a: string, val: string | undefined): Promise<v
     case "expandall": S.folded.clear(); closeSheet(); render(); break;
     case "collapseall": pool().forEach(i => { if (kids(i.id).length) S.folded.add(i.id); }); closeSheet(); render(); break;
     case "col": if (S.cols.has(val!)) S.cols.delete(val!); else S.cols.add(val!); store.set("cols", [...S.cols]); renderSheet(); render(); break;
-    case "group": S.board.group = val as typeof S.board.group; store.set("boardGroup", val); S.board.col = null; S.board.folded.clear(); renderSheet(); render(); break;
-    case "lanes": S.board.lanes = val as typeof S.board.lanes; store.set("boardLanes", val); S.board.lane = null; renderSheet(); render(); break;
+    case "group": S.board.group = val as typeof S.board.group; store.set("boardGroup", val); S.board.folded.clear(); saveBoardFolded(); renderSheet(); render(); break;
+    case "lanes": S.board.lanes = val as typeof S.board.lanes; store.set("boardLanes", val); renderSheet(); render(); break;
     case "closedcol": if (S.st.has("closed")) S.st.delete("closed"); else S.st.add("closed"); saveChips(); renderSheet(); render(); break;
-    case "unfoldall": S.board.folded.clear(); renderSheet(); render(); break;
+    case "unfoldall": S.board.folded.clear(); saveBoardFolded(); renderSheet(); render(); break;
   }
 }
 
@@ -781,7 +780,6 @@ export async function act(a: string): Promise<void> {
     case "follow": S.follow = !S.follow; store.set("follow", S.follow); render(); toast(S.follow ? "Follow on: live changes move the cursor" : "Follow off"); break;
     case "search": S.view = "search"; $<HTMLInputElement>("#sIn").value = S.text; render(); setTimeout(() => $("#sIn").focus(), 50); break;
     case "clearq": setText(""); render(); break;
-    case "clearstatusfilter": S.st.clear(); S.ready = false; saveChips(); render(); break;
     case "allq": S.st.clear(); S.ready = false; saveChips(); setText(""); S.focus = null; render(); break;
     case "sort": openSheet("sort"); break;
     case "unfocus": S.focus = null; render(); break;
@@ -817,7 +815,7 @@ export async function act(a: string): Promise<void> {
     case "edit": await openEdit(cur); break;
     case "comment": if (!readOnly()) openSheet("comment", { id: cur }); break;
     case "actions": openSheet("actions", { id: cur }); break;
-    case "unfoldall": S.board.folded.clear(); render(); toast("Unfolded all columns"); break;
+    case "unfoldall": S.board.folded.clear(); saveBoardFolded(); render(); toast("Unfolded all columns"); break;
     case "boardopts": openSheet("boardopts"); break;
     case "treeopts": openSheet("treeopts"); break;
     case "graph": S.graph = []; S.view = "graph"; render(); break;
@@ -843,24 +841,26 @@ export function setRetryLive(f: () => void): void { retryLive = f; }
 
 /* ================= board ================= */
 
+/**
+ * tabTap folds the column whose header was tapped, or unfolds it. A phone box
+ * folds to its header in place, so every box may fold; a wide column folds to
+ * a rail, and the last open one stays. The fold is kept across a reload.
+ */
 export function tabTap(k: string): void {
-  if (k === ALL) { S.board.col = ALL; renderBoard(); return; }
-  const cols = boardCols();
-  const name = (cols.find(([c]) => c === k) || [k, k])[1];
-  if (S.board.folded.has(k)) { S.board.folded.delete(k); S.board.col = k; renderBoard(); toast("Unfolded " + name); return; }
-  if (S.board.col === k) {
-    const open = openCols();
-    if (open.length < 2) { toast("The last open column cannot fold"); return; }
-    S.board.folded.add(k);
-    const idx = open.findIndex(([c]) => c === k);
-    const next = open[idx + 1] || open[idx - 1];
-    S.board.col = next[0];
+  const name = (boardCols().find(([c]) => c === k) || [k, k])[1];
+  const wide = split();
+  if (S.board.folded.has(k)) {
+    S.board.folded.delete(k);
+    saveBoardFolded();
     renderBoard();
-    toast("Folded " + name + " · Z unfolds");
+    if (wide) toast("Unfolded " + name);
     return;
   }
-  S.board.col = k;
+  if (wide && openCols().length < 2) { toast("The last open column cannot fold"); return; }
+  S.board.folded.add(k);
+  saveBoardFolded();
   renderBoard();
+  if (wide) toast("Folded " + name + " · Z unfolds");
 }
 
 export function foldSubtree(id: string): void {

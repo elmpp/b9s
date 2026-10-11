@@ -20,8 +20,8 @@ import * as api from "./api";
 import { memoryKey } from "./memory";
 import { D, eff, get, kids, laneOf, pool } from "./data";
 import { detailKids, ensureVisible, render, renderBoard, siblings } from "./render";
-import { S, saveChips, treeRows } from "./state";
-import { $, copyText, split, store } from "./util";
+import { S, saveBoardFolded, saveChips, treeRows } from "./state";
+import { $, copyText, store } from "./util";
 
 /**
  * keyName spells a key the way the README does: "j", "C-a", "S-Tab", or
@@ -322,7 +322,7 @@ function boardKey(k: string): boolean {
       return true;
     case "s": {
       const g = GROUP_ORDER[(GROUP_ORDER.indexOf(S.board.group) + 1) % GROUP_ORDER.length];
-      S.board.group = g; store.set("boardGroup", g); S.board.col = null; S.board.folded.clear();
+      S.board.group = g; store.set("boardGroup", g); S.board.folded.clear(); saveBoardFolded();
       render(); toast("Board by " + g);
       return true;
     }
@@ -342,13 +342,6 @@ function boardKey(k: string): boolean {
       if (first) { S.cursor = first; renderBoard(); }
       return true;
     }
-  }
-  if (!split() && (k === "h" || k === "l")) {
-    const cols = [...document.querySelectorAll<HTMLElement>("#tabs [data-tab]")].map(t => t.dataset.tab!);
-    const at = cols.indexOf(S.board.col || "");
-    const to = cols[at + (k === "l" ? 1 : -1)];
-    if (to) { S.board.col = to; renderBoard(); }
-    return true;
   }
   if (!c) return false;
   switch (k) {

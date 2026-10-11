@@ -379,21 +379,18 @@ Writes run `bd` on the machine that serves, as its `bd` actor. The all-projects 
 | Drag the detail handle | Up: full height. Down: half height, then close | `Esc` |
 | Tap a relation in the detail | Go there; `‹` goes back | |
 | Browser Back, or `Backspace` | Step back: an open sheet closes first, then the previous issue, the closed detail and the previous view. Forward redoes it, but never reopens a sheet | `Esc` |
-| Swipe left or right on the board | Next column | `h` / `l` |
-| Tap the active column tab | Fold it into a rail | `z` |
-| Tap the phone board's **All** tab | Show every unfolded column in one list, under the epic lanes, so open and in-progress cards sit together. The chips choose the statuses | `h` from the first column |
-| Tap `Z unfold` | Unfold every column | `Z` |
-| Tap an epic in the board rail | Scroll to its lane | |
-| Long-press an epic in the rail, or tap a lane header's title | Fold or unfold that lane | `Tab` |
+| Tap a column header on the board | Fold the column to its header, or open it again. The fold survives a reload, and the chips choose which columns show | `z` |
+| Tap `Z unfold`, or **Unfold all columns** under the ⚙ chip | Unfold every column | `Z` |
+| Tap a lane header's title | Fold or unfold that lane | `Tab` |
 | Tap a lane header's ▾ or epic ID | Open the epic | `Enter` on the epic |
-| Long-press a card, then drag | Move it to the column under the finger, or hold at an edge | |
+| Long-press a card, then drag | Drop it on another column | |
 | Tap the project name | Project sheet | `1`-`9`, `0` |
 | Tap the ● dot | Data source health | `D` |
 | Tap **More**, then **b9s version** | The release and the commit it was built from, linked on GitHub | The line under the `?` help title |
 | Swipe down on the header | Hide or show the filter chips | `Ctrl-E` |
 | Tap `F` | Follow live changes | `F` |
 
-On a phone, the board groups each column into epic lanes. A lane's header shows the epic, its completion and the card count, and stays at the top of the column while you scroll through the lane. The rail on the left is an index: the lane in view is highlighted, and a tap on another epic scrolls to it. A card nested below another task names that parent on a third line ([ADR 0022](docs/adr/0022-make-the-phone-epic-rail-an-index.md)).
+On a phone, the board stacks its columns as boxes, one below the other under the filter chips, as the direction A mockup draws it ([ADR 0052](docs/adr/0052-responsive-native-web-redesign.md)). Each box has a header with the status, the card count and a fold control, and its cards inside, grouped into epic lanes. A tap on the header folds the box to its header, and the fold survives a reload. On the board the chips count cards, so a chip and its box header agree, and the ⚙ chip at the end of the row opens the board options. A lane's header shows the epic, its completion and the card count, and stays at the top while you scroll through the lane. A card nested below another task names that parent on a third line ([ADR 0022](docs/adr/0022-make-the-phone-epic-rail-an-index.md)).
 
 No gesture starts in the outer 24 px of the screen, because iOS and Android use the edges for back and home. The `?` button shows this table in the app.
 
@@ -401,7 +398,7 @@ The address shows the view and the open issue, for example `#/board/bd-12`. A re
 
 ### Laptop, desktop and iPad
 
-A window at least 768 px wide, the tablet, desktop and wide size classes of ADR 0052, shows the whole board at once, and the views move from the bottom bar to a rail at the left. Every column sits side by side, and each epic is a swimlane across them. As in the TUI, the board opens on the epic rail: the first column holds one cell per epic, level with its lane, with the same facts as the TUI's epic cell: the first sentence of its description, done/total and the open P0 and P1 count, the in-progress, waiting and ready counts, and its labels, owner, due date and last change. Each issue is one line with its type, ID, title and the `blocked`, `lane`, `blocks` and `P0` or `P1` tags, and a card sits indented below its parent when both are in the same cell. The selected card opens to show its meta line. `v` switches to epic rows, a header row above each lane, and the choice stays. The detail opens as a panel on the right, below the filter chips, so the board stays in view beside it. On a tablet, upright or on its side, the list keeps a pane of 300 to 420 px at the left and the detail takes the rest, and a hardware keyboard works the split with the same keys as a desktop. `\` or the panel's ⤢ button widens it over the views, with the rail still in reach, and again makes it a panel. A phone keeps the one-column board. The tests run this layout in current Chrome, Safari and Firefox.
+A window at least 768 px wide, the tablet, desktop and wide size classes of ADR 0052, shows the whole board at once, and the views move from the bottom bar to a rail at the left. Every column sits side by side, and each epic is a swimlane across them. As in the TUI, the board opens on the epic rail: the first column holds one cell per epic, level with its lane, with the same facts as the TUI's epic cell: the first sentence of its description, done/total and the open P0 and P1 count, the in-progress, waiting and ready counts, and its labels, owner, due date and last change. Each issue is one line with its type, ID, title and the `blocked`, `lane`, `blocks` and `P0` or `P1` tags, and a card sits indented below its parent when both are in the same cell. The selected card opens to show its meta line. `v` switches to epic rows, a header row above each lane, and the choice stays. The detail opens as a panel on the right, below the filter chips, so the board stays in view beside it. On a tablet, upright or on its side, the list keeps a pane of 300 to 420 px at the left and the detail takes the rest, and a hardware keyboard works the split with the same keys as a desktop. `\` or the panel's ⤢ button widens it over the views, with the rail still in reach, and again makes it a panel. A phone stacks the columns as foldable boxes instead. The tests run this layout in current Chrome, Safari and Firefox.
 
 From 1280 px, the desktop and wide classes, the rail is a sidebar with the project above the views and the connection below them, the detail is a pane beside the tree or the board rather than a panel over it, rows and cards light up under the mouse, and sheets open as a dialog in the middle of the window. A right click on a row, a card or an epic cell, or `Menu` and `Shift-F10` for the cursor row, opens a menu with the swipe actions: open, start or stop, set status, close, edit, comment, copy ID, mark, more and delete. The arrows or `j` and `k` walk it, `Enter` picks and `Esc` closes.
 

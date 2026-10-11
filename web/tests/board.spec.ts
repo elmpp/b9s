@@ -1,76 +1,45 @@
-import { expect, longPress, open, test } from "./harness";
+import { expect, open, test } from "./harness";
 
-test("board lists columns and moves a card by drag onto a tab", async ({ page, project }) => {
+// The phone board stacks every column as a box under the chip row, as mockup
+// A's phone board does (docs/adr/0052). shell.spec.ts measures the stack and
+// the fold at 360 and 412 px; these specs cover what happens inside a box.
+test("the board stacks the columns as boxes and moves a card by drag onto another box", async ({ page, project }) => {
   await open(page, project);
   await page.locator('#bar [data-view="board"]').click();
-  await expect(page.locator('[data-tab="open"]')).toHaveClass(/on/);
-  const card = page.locator('[data-card="t-2"]');
+  await expect(page.locator("#bcol .bbox")).toHaveCount(3);
+  const card = page.locator('#bcol .bbox[data-dcol="open"] [data-card="t-2"]');
   await expect(card).toBeVisible();
   const cb = (await card.boundingBox())!;
-  const tb = (await page.locator('[data-tab="in_progress"]').boundingBox())!;
+  const tb = (await page.locator('#bcol .bbox[data-dcol="in_progress"] .bhead').boundingBox())!;
   await page.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2);
   await page.mouse.down();
   await page.waitForTimeout(600);
   for (let s = 1; s <= 10; s++) await page.mouse.move(cb.x + cb.width / 2 + ((tb.x + tb.width / 2 - cb.x - cb.width / 2) * s) / 10, cb.y + cb.height / 2 + ((tb.y + tb.height / 2 - cb.y - cb.height / 2) * s) / 10);
+  await expect(page.locator('#bcol .bbox[data-dcol="in_progress"]')).toHaveClass(/drop/);
   await page.mouse.up();
   await expect.poll(() => project.issues().find(i => i.id === "t-2")?.status).toBe("in_progress");
-  await expect(page.locator('[data-card="t-2"]')).toHaveCount(0);
+  await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] [data-card="t-2"]')).toBeVisible();
+  await expect(page.locator('#bcol .bbox[data-dcol="open"] [data-card="t-2"]')).toHaveCount(0);
 });
 
-test("swiping the column moves to the next one", async ({ page, project }) => {
+test("the chips choose which boxes show, and the ⚙ chip opens the board options", async ({ page, project }) => {
   await open(page, project);
   await page.locator('#bar [data-view="board"]').click();
-  const b = (await page.locator("#bcol").boundingBox())!;
-  const y = b.y + 40;
-  await page.mouse.move(b.x + b.width * 0.8, y);
-  await page.mouse.down();
-  for (let s = 1; s <= 10; s++) await page.mouse.move(b.x + b.width * (0.8 - 0.06 * s), y);
-  await page.mouse.up();
-  await expect(page.locator('[data-tab="in_progress"]')).toHaveClass(/on/);
-  await expect(page.locator('[data-card="t-1"]')).toBeVisible();
-});
-
-test("the All tab shows open, in-progress and blocked cards together", async ({ page, project }) => {
-  await open(page, project);
-  await page.locator('#bar [data-view="board"]').click();
-  await page.locator('[data-tab="*"]').click();
-  await expect(page.locator('[data-tab="*"]')).toHaveClass(/on/);
-  for (const id of ["t-1", "t-2", "t-3", "t-5"]) await expect(page.locator(`[data-card="${id}"]`)).toBeVisible();
-  await expect(page.locator('[data-card="t-4"]')).toHaveCount(0);
-  // The chips still decide which statuses the All tab merges.
-  await page.locator('#bar [data-view="tree"]').click();
+  await expect(page.locator("#chips")).toBeVisible();
+  await expect(page.locator("#tabs")).toHaveCount(0);
+  await expect(page.locator('#bcol .bbox[data-dcol="blocked"] [data-card="t-3"]')).toBeVisible();
   await page.locator('#chips [data-chip="blocked"]').click();
-  await page.locator('#bar [data-view="board"]').click();
-  await page.locator('[data-tab="*"]').click();
+  await expect(page.locator('#bcol .bbox[data-dcol="blocked"]')).toHaveCount(0);
   await expect(page.locator('[data-card="t-3"]')).toHaveCount(0);
-  await expect(page.locator('[data-card="t-1"]')).toBeVisible();
-});
-
-test("swiping right from the first column reaches the All tab", async ({ page, project }) => {
-  await open(page, project);
-  await page.locator('#bar [data-view="board"]').click();
-  const b = (await page.locator("#bcol").boundingBox())!;
-  const y = b.y + 40;
-  await page.mouse.move(b.x + b.width * 0.2, y);
-  await page.mouse.down();
-  for (let s = 1; s <= 10; s++) await page.mouse.move(b.x + b.width * (0.2 + 0.06 * s), y);
-  await page.mouse.up();
-  await expect(page.locator('[data-tab="*"]')).toHaveClass(/on/);
-  await expect(page.locator('[data-card="t-1"]')).toBeVisible();
-  await expect(page.locator('[data-card="t-2"]')).toBeVisible();
-});
-
-test("the options button in the board toolbar opens board options", async ({ page, project }) => {
-  await open(page, project);
-  await page.locator('#bar [data-view="board"]').click();
-  await page.locator('#tabs [data-act="boardopts"]').click();
+  await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] [data-card="t-1"]')).toBeVisible();
+  await page.locator('#chips [data-act="boardopts"]').click();
   await expect(page.locator("#sheetHost")).toContainText("Group by");
 });
 
-// Option 1 of docs/mockups/mobile-board-hierarchy-options.html: in rail mode
-// the column keeps every lane under a sticky epic header, and the rail is an
-// index into it rather than a filter.
-test.describe("epic lanes with the rail as an index", () => {
+// Inside a box every lane of the column sits under a sticky epic header, as
+// option 1 of docs/mockups/mobile-board-hierarchy-options.html keeps them;
+// a phone has no epic rail, so the rail setting draws the same rows.
+test.describe("epic lanes inside a box", () => {
   const many = Array.from({ length: 14 }, (_, n) => ({ id: `t-a${n}`, title: `Alpha task ${n}`, parent: "t-epic", priority: 2 }));
   test.use({
     fixture: {
@@ -89,51 +58,32 @@ test.describe("epic lanes with the rail as an index", () => {
     await page.addInitScript(() => localStorage.setItem("b9s.boardLanes", JSON.stringify("rail")));
   });
 
-  test("every lane shows under its epic header, not a filtered subset", async ({ page, project }) => {
+  test("every lane of a column shows under its epic header inside the column's box, with no rail", async ({ page, project }) => {
     await open(page, project);
     await page.locator('#bar [data-view="board"]').click();
-    for (const l of ["t-epic", "t-beta", "none"]) await expect(page.locator(`#bcol .lane[data-lane="${l}"]`)).toHaveCount(1);
-    await expect(page.locator("#bcol .card")).toHaveCount(17);
-    await expect(page.locator('#bcol .lane[data-lane="t-epic"] .bar')).toHaveCount(1);
+    const open_ = page.locator('#bcol .bbox[data-dcol="open"]');
+    for (const l of ["t-epic", "t-beta", "none"]) await expect(open_.locator(`.lane[data-lane="${l}"]`)).toHaveCount(1);
+    await expect(open_.locator(".card")).toHaveCount(17);
+    await expect(open_.locator('.lane[data-lane="t-epic"] .bar')).toHaveCount(1);
+    // The in-progress card of the same epic sits under that epic's lane header in its own box.
+    await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] .lane[data-lane="t-epic"]')).toHaveCount(1);
+    await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] [data-card="t-mid"]')).toBeVisible();
+    await expect(page.locator(".brail")).toHaveCount(0);
+    // Cards take the whole width of the box.
+    const bx = (await open_.boundingBox())!, cd = (await open_.locator('[data-card="t-a0"]').boundingBox())!;
+    expect(cd.width).toBeGreaterThanOrEqual(bx.width - 24);
   });
 
-  test("a rail tap scrolls to the lane and lights its entry, the column stays whole", async ({ page, project }) => {
+  test("a lane header stays at the top of the board while its lane scrolls through", async ({ page, project }) => {
     await open(page, project);
     await page.locator('#bar [data-view="board"]').click();
-    await page.locator('.brail [data-rlane="t-beta"]').click();
-    await expect(page.locator("#bcol .card")).toHaveCount(17);
-    await expect(page.locator('.brail [data-rlane="t-beta"]')).toHaveClass(/on/);
-    await expect.poll(async () => {
-      const col = (await page.locator("#bcol").boundingBox())!;
-      const h = (await page.locator('#bcol .lane[data-lane="t-beta"]').boundingBox())!;
-      return Math.abs(h.y - col.y) < 12;
-    }).toBe(true);
-    await expect(page.locator('#bcol [data-card="t-b1"]')).toBeInViewport();
-  });
-
-  test("scrolling the column lights the rail entry of the lane in view", async ({ page, project }) => {
-    await open(page, project);
-    await page.locator('#bar [data-view="board"]').click();
-    await expect(page.locator('.brail [data-rlane="t-epic"]')).toHaveClass(/on/);
-    // Halfway down its lane, the epic header is still pinned to the top.
+    // Halfway down its lane, the epic header is pinned to the top of the board.
     await page.locator("#bcol").evaluate(el => { el.scrollTop = 300; });
     await expect.poll(async () => {
       const col = (await page.locator("#bcol").boundingBox())!;
-      const h = (await page.locator('#bcol .lane[data-lane="t-epic"]').boundingBox())!;
+      const h = (await page.locator('#bcol .bbox[data-dcol="open"] .lane[data-lane="t-epic"]').boundingBox())!;
       return Math.abs(h.y - col.y) < 4;
     }).toBe(true);
-    await page.locator("#bcol").evaluate(el => { el.scrollTop = el.scrollHeight; });
-    await expect(page.locator('.brail [data-rlane="none"]')).toHaveClass(/on/);
-    await expect(page.locator('.brail [data-rlane="t-epic"]')).not.toHaveClass(/on/);
-  });
-
-  test("a long press on a rail entry folds that lane", async ({ page, project }) => {
-    await open(page, project);
-    await page.locator('#bar [data-view="board"]').click();
-    await longPress(page, '.brail [data-rlane="t-epic"]');
-    await expect(page.locator('#bcol .lane[data-lane="t-epic"]')).toHaveAttribute("aria-expanded", "false");
-    await expect(page.locator('#bcol [data-card="t-a0"]')).toHaveCount(0);
-    await expect(page.locator('#bcol [data-card="t-b1"]')).toBeVisible();
   });
 
   test("a tap on the lane title folds the lane", async ({ page, project }) => {

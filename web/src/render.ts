@@ -5,7 +5,7 @@
 import * as api from "./api";
 import type { Issue } from "./api.gen";
 import { D, ancestors, blocksOf, descendants, eff, get, isReady, kids, laneOf, openBlockers, pool, progress, projectOf, shortId, type Item } from "./data";
-import { S, SORTS, chipRowVisible, matches, phoneStatusBoardMode, queryString, stOf, treeRows, type TreeRow } from "./state";
+import { PC, S, SORTS, chipRowVisible, matches, queryString, stOf, textMatches, treeRows, tyOf, type TreeRow } from "./state";
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
@@ -98,11 +98,19 @@ function renderHeader(): void {
     <button class="ib" data-act="help" aria-label="Gestures">?</button>`;
 }
 
+/**
+ * renderChips draws the status filter. On the tree a chip counts every issue
+ * with that status; on the board it counts cards, with the board's own filter
+ * (boardCard), so the Open chip and the Open box header agree.
+ */
 function renderChips(): void {
   const el = $("#chips");
   el.hidden = !chipRowVisible();
   const P = pool();
-  const cnt = (s: string) => P.filter(i => eff(i) === s).length;
+  const onBoard = S.view === "board";
+  const keep = onBoard ? focusSet() : null;
+  const counted = onBoard ? P.filter(i => boardCard(i, keep) && textMatches(i) && (!S.ready || isReady(i))) : P;
+  const cnt = (s: string) => counted.filter(i => eff(i) === s).length;
   const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n));
   const chip = (k: string, key: string, label: string, color: string, on: boolean, n: number | null) =>
     `<button class="chip ${on ? "on" : ""}" data-chip="${key}" style="--sc:${color}" aria-pressed="${on}" title="${esc(k)}">${label}${n != null ? ` <span class="n">${fmt(n)}</span>` : ""}</button>`;
@@ -111,7 +119,7 @@ function renderChips(): void {
     + chip("b", "blocked", "Blocked", "var(--danger)", S.st.has("blocked"), cnt("blocked"))
     + chip("d", "deferred", "Deferred", "var(--priority)", S.st.has("deferred"), cnt("deferred"))
     + chip("C", "closed", "Closed", "var(--muted)", S.st.has("closed"), cnt("closed"))
-    + chip("r", "ready", "Ready", "var(--priority)", S.ready, P.filter(isReady).length)
+    + chip("r", "ready", "Ready", "var(--priority)", S.ready, counted.filter(isReady).length)
     + chip("a", "all", "All", "var(--dim)", S.st.size === 0 && !S.ready, null);
   h += `<span class="sep"></span>`;
   if (S.text.trim()) {
@@ -119,6 +127,8 @@ function renderChips(): void {
     h += `<button class="chip q ${err ? "err" : ""}" data-act="search"><span>⌕ ${esc(S.text.trim())}</span></button><button class="chip" data-act="clearq" aria-label="Clear query">✕</button>`;
   } else h += `<button class="chip" data-act="search">⌕ query</button>`;
   h += `<button class="chip" data-act="sort">⇅ ${S.sort}</button>`;
+  // The phone board has no toolbar of its own, so its options sit at the end of the chip row.
+  if (onBoard && !split()) h += `<button class="chip" data-act="boardopts" aria-label="Board options">⚙ ${esc(S.board.group)}</button>`;
   el.innerHTML = h;
 }
 
@@ -198,41 +208,33 @@ export function boardCols(): [string, string][] {
   return cols;
 }
 
-/**
- * ALL is the phone board's first tab: every unfolded column in one list, so
- * open and in-progress cards show side by side under their epic lanes. It is
- * not a status, so nothing can be dropped on it.
- */
-export const ALL = "*";
+/** focusSet is the focused issue and its subtree, the only issues the board shows while a focus is on. */
+const focusSet = (): Set<string> | null => (S.focus ? new Set([S.focus.id, ...descendants(S.focus.id)]) : null);
 
-function boardItems(key: string): Item[] {
-  if (key === ALL) {
-    const keys = new Set(openCols().map(([k]) => k));
-    return pool().filter(i => keys.has(colOf(i)) && inBoard(i)).sort(SORTS[S.sort]);
-  }
-  return pool().filter(i => colOf(i) === key && inBoard(i)).sort(SORTS[S.sort]);
+/**
+ * boardCard says whether an issue can be a card on the board: epics are lane
+ * headers unless lanes are off or the board groups by type, and a focus keeps
+ * only its subtree. The status chips and the text query come on top (inBoard).
+ */
+function boardCard(i: Item, keep: Set<string> | null): boolean {
+  if (i.type === "epic" && S.board.group !== "type" && S.board.lanes !== "off") return false;
+  return !keep || keep.has(i.id);
 }
 
-function inBoard(i: Item): boolean {
-  const keep = S.focus ? new Set([S.focus.id, ...descendants(S.focus.id)]) : null;
-  if (i.type === "epic" && S.board.group !== "type" && S.board.lanes !== "off") return false;
-  if (!matches(i)) return false;
-  return !keep || keep.has(i.id);
+const inBoard = (i: Item, keep: Set<string> | null): boolean => boardCard(i, keep) && matches(i);
+
+function boardItems(key: string): Item[] {
+  const keep = focusSet();
+  return pool().filter(i => colOf(i) === key && inBoard(i, keep)).sort(SORTS[S.sort]);
 }
 
 export function openCols(): [string, string][] { return boardCols().filter(([k]) => !S.board.folded.has(k)); }
 
-/** phoneCols are the columns a phone steps through: All, then every unfolded column. */
-export function phoneCols(): [string, string][] {
-  const cols = openCols();
-  return cols.length > 1 ? [[ALL, "All"], ...cols] : cols;
-}
-
-function activeCol(): [string, string] | null {
-  const cols = phoneCols();
-  if (!cols.length) return null;
-  if (!cols.some(([k]) => k === S.board.col)) S.board.col = openCols()[0][0];
-  return cols.find(([k]) => k === S.board.col) || null;
+/** colColor is the dot of a column header: the status, priority or type colour of the column's key. */
+function colColor(k: string): string {
+  if (S.board.group === "status") return stOf(k).c;
+  if (S.board.group === "priority") return PC[Number(k)] || "var(--muted)";
+  return tyOf(k)[1];
 }
 
 /** lanesShown says whether cards sit under epic lane headers, so a card's epic is already in view. */
@@ -348,46 +350,6 @@ function laneHTML(l: string, n: number, facts = false): string {
   return `<button class="lane${ef ? " lfacts" : ""}" data-lane="${esc(l)}" aria-expanded="${!f}"><span class="ch"${lo}>${f ? "▸" : "▾"}</span><span class="ei"${lo}>${l === "none" ? "none" : esc(shortId(l))}</span><span class="t">${l === "none" ? "No epic" : esc(e ? e.t : l)}</span>${more}${bar}<span class="n">${ef ? `${ef.done}/${ef.all}` : n}</span>${sum}</button>`;
 }
 
-/**
- * railHTML is the phone's index of the column's lanes, in the column's order.
- * A tap scrolls to the lane rather than filtering, and the entry of the lane
- * in view carries "on" (see spyLane).
- */
-function railHTML(lanes: [string, Item[]][]): string {
-  const total = lanes.reduce((a, [, arr]) => a + arr.length, 0);
-  const on = S.board.lane && lanes.some(([l]) => l === S.board.lane) ? S.board.lane : lanes[0]?.[0];
-  return `<div class="brail"><button data-rlane="" aria-label="Scroll to the top">all<b>${total}</b></button>`
-    + lanes.map(([l, arr]) => `<button class="${on === l ? "on" : ""}" data-rlane="${esc(l)}" aria-label="${l === "none" ? "No epic" : esc(shortId(l))}, ${arr.length} cards. Long press folds">${l === "none" ? "no epic" : esc(shortId(l))}<b>${arr.length}</b></button>`).join("") + `</div>`;
-}
-
-/**
- * spyLane marks the rail entry of the lane at the top of the column. Each lane
- * is a .lgrp group, so its offsetTop is where the lane starts even while its
- * sticky header is pinned.
- */
-export function spyLane(): void {
-  const col = document.getElementById("bcol");
-  const rail = document.querySelector(".brail");
-  if (!col || !rail) return;
-  const groups = [...col.querySelectorAll<HTMLElement>(".lgrp")];
-  if (!groups.length) return;
-  let cur = groups[0];
-  if (col.scrollTop > 0 && col.scrollTop + col.clientHeight >= col.scrollHeight - 2) cur = groups[groups.length - 1];
-  else for (const g of groups) if (g.offsetTop <= col.scrollTop + 16) cur = g;
-  const l = cur.dataset.lgrp!;
-  S.board.lane = l;
-  rail.querySelectorAll<HTMLElement>("[data-rlane]").forEach(b => b.classList.toggle("on", b.dataset.rlane === l));
-}
-
-/** scrollToLane brings a lane's header to the top of the column; "" scrolls to the top. */
-export function scrollToLane(l: string): void {
-  const col = document.getElementById("bcol");
-  if (!col) return;
-  const g = l ? col.querySelector<HTMLElement>(`.lgrp[data-lgrp="${CSS.escape(l)}"]`) : null;
-  col.scrollTop = g ? g.offsetTop : 0;
-  spyLane();
-}
-
 interface EpicFacts { done: number; all: number; urgent: number; wip: number; waiting: number; ready: number; last: number }
 
 /**
@@ -457,19 +419,6 @@ function optsTab(): string {
   return `<button class="tab" data-act="boardopts" style="color:var(--muted)">⚙ ${S.board.group}${S.board.lanes !== "off" ? " · lanes " + S.board.lanes : ""}</button>`;
 }
 
-const STATUS_TAB_LABELS: Record<string, string> = { open: "open", in_progress: "in prog", blocked: "blocked", deferred: "deferred", closed: "closed" };
-
-function statusFilterTab(): string {
-  if (S.board.group !== "status" || (!S.st.size && !S.ready)) return "";
-  const known = Object.keys(STATUS_TAB_LABELS);
-  const labels = [
-    ...known.filter(k => S.st.has(k)).map(k => STATUS_TAB_LABELS[k]),
-    ...[...S.st].filter(k => !known.includes(k)).map(k => stOf(k).w),
-    S.ready ? "ready" : "",
-  ].filter(Boolean);
-  return `<button class="tab filter" data-act="clearstatusfilter">filter: ${esc(labels.join(", "))} ✕</button>`;
-}
-
 /**
  * renderWideBoard lays every column out side by side in one grid, so an
  * epic lane is a row across all of them and the columns scroll together.
@@ -513,43 +462,38 @@ function renderWideBoard(v: HTMLElement): void {
   v.innerHTML = `<div class="tabs" id="tabs">${tools}</div><div class="bbody" id="bbody"><div class="wboard" id="wboard" style="grid-template-columns:${tmpl}">${rail ? `<div class="whead epich"><span>EPIC</span><b>${new Set(cols.flatMap(([k]) => per.get(k)!).map(i => laneOf(i) || "none")).size}</b></div>` : ""}${head}${rows}</div></div>`;
   const nb = document.getElementById("wboard")!;
   nb.scrollTop = top; nb.scrollLeft = left;
-  S.board.keep = false;
+}
+
+/**
+ * renderPhoneBoard stacks every column as a box, one below the other under
+ * the chip row, as mockup A's phone board does (docs/adr/0052): a header
+ * with the column's dot, name and card count, and the cards inside, grouped
+ * under their epic lane headers. The header folds the box to itself and
+ * S.board.folded keeps that across a reload. Each box is the drop target of a
+ * dragged card (data-dcol), as a wide column's cells are.
+ */
+function renderPhoneBoard(v: HTMLElement): void {
+  const cols = boardCols().filter(([k]) => !S.board.hideEmpty || boardItems(k).length > 0);
+  const boxes = cols.map(([k, l]) => {
+    const items = boardItems(k), f = S.board.folded.has(k);
+    const head = `<button class="bhead" data-tab="${esc(k)}" aria-expanded="${!f}"><span class="st" style="--sc:${colColor(k)}" aria-hidden="true"></span><span class="t">${esc(l)}</span><b>${items.length}</b><span class="ch" aria-hidden="true">${f ? "▸" : "▾"}</span></button>`;
+    if (f) return `<div class="bbox folded" data-dcol="${esc(k)}">${head}</div>`;
+    let inner = "";
+    const lanes = lanesShown() ? laneKeys(items) : [];
+    if (!items.length) inner = `<div class="empty">No cards in ${esc(l)}.</div>`;
+    else if (lanes.length) inner = lanes.map(([ln, arr]) => `<div class="lgrp" data-lgrp="${esc(ln)}">${laneHTML(ln, arr.length)}${S.board.laneFold.has(ln) ? "" : cellCards(arr)}</div>`).join("");
+    else inner = cellCards(items);
+    return `<div class="bbox" data-dcol="${esc(k)}">${head}<div class="bcards">${inner}</div></div>`;
+  }).join("");
+  const old = document.getElementById("bcol");
+  const top = old ? old.scrollTop : 0;
+  v.innerHTML = `<div class="bbody" id="bbody"><div class="bcol" id="bcol">${boxes || `<div class="empty">No column matches <b>${esc(queryString() || "the filter")}</b>.</div>`}</div></div>`;
+  document.getElementById("bcol")!.scrollTop = top;
 }
 
 export function renderBoard(): void {
   const v = $("#vBoard");
-  if (split()) { renderWideBoard(v); return; }
-  const cols = boardCols();
-  const cur = activeCol();
-  const folded = cols.filter(([k]) => S.board.folded.has(k));
-  let tabs = cols.map(([k, l]) => {
-    const n = boardItems(k).length;
-    if (S.board.folded.has(k)) return `<button class="tab rail" data-tab="${esc(k)}" aria-label="Unfold ${esc(l)}">${esc(l.slice(0, 4))} ${n}</button>`;
-    return `<button class="tab ${cur && cur[0] === k ? "on" : ""}" data-tab="${esc(k)}">${esc(l)} <b>${n}</b></button>`;
-  }).join("");
-  if (phoneCols()[0]?.[0] === ALL) tabs = `<button class="tab ${cur && cur[0] === ALL ? "on" : ""}" data-tab="${ALL}">All <b>${boardItems(ALL).length}</b></button>` + tabs;
-  if (folded.length) tabs += `<button class="tab unf" data-act="unfoldall">Z unfold</button>`;
-  tabs += statusFilterTab();
-  tabs += optsTab();
-  let body: string;
-  if (!cur) body = `<div class="bcol"><div class="empty">Every column is folded.<br><br><button data-act="unfoldall">Unfold all</button></div></div>`;
-  else {
-    const items = boardItems(cur[0]);
-    let inner = "";
-    const lanes = lanesShown() ? laneKeys(items) : [];
-    if (!items.length) inner = `<div class="empty">No cards in ${esc(cur[1])}.</div>`;
-    else if (lanes.length) inner = lanes.map(([l, arr]) => `<div class="lgrp" data-lgrp="${esc(l)}">${laneHTML(l, arr.length)}${S.board.laneFold.has(l) ? "" : cellCards(arr)}</div>`).join("");
-    else inner = cellCards(items);
-    const rail = S.board.lanes === "rail" && lanes.length ? railHTML(lanes) : "";
-    body = `${rail}<div class="bcol${rail ? " indexed" : ""}" id="bcol">${inner}</div><div class="edgehint l">‹</div><div class="edgehint r">›</div>`;
-  }
-  const old = document.getElementById("bcol");
-  const keepScroll = old ? old.scrollTop : 0;
-  v.innerHTML = `<div class="tabs" id="tabs">${tabs}</div><div class="bbody" id="bbody">${body}</div>`;
-  const nc = document.getElementById("bcol");
-  if (nc && S.board.keep) nc.scrollTop = keepScroll;
-  if (nc) { nc.addEventListener("scroll", spyLane, { passive: true }); spyLane(); }
-  S.board.keep = false;
+  if (split()) renderWideBoard(v); else renderPhoneBoard(v);
 }
 
 /* ================= search ================= */
@@ -641,7 +585,7 @@ function renderMore(): void {
   const it = (a: string, g: string, x: string, sub: string, v?: string | null, on?: boolean) =>
     `<button class="item" data-act="${a}"><span class="g" aria-hidden="true">${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${v != null ? `<span class="v ${on ? "on" : ""}">${esc(v)}</span>` : ""}</button>`;
   const h = D.health;
-  const chipState = !S.chips ? "hidden" : phoneStatusBoardMode() ? "hidden on status board" : "shown";
+  const chipState = S.chips ? "shown" : "hidden";
   $("#moreList").innerHTML =
     `<div class="sec">Project</div>`
     + (D.public ? "" : it("projects", "▤", "Projects", "slots 1-9 · all projects", D.project.all ? "all" : D.project.name))

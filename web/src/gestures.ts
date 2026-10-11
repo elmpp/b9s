@@ -10,8 +10,8 @@ import {
 import { adoptCursor, onKey } from "./keys";
 import { memoryBack } from "./memory";
 import { canGoBack } from "./nav";
-import { ALL, appW, colOf, ensureVisible, fullH, halfH, openCols, phoneCols, render, renderBoard, renderSearch, scrollToLane, siblings } from "./render";
-import { S, chipRowVisible, phoneStatusBoardHidesChips } from "./state";
+import { appW, colOf, ensureVisible, fullH, halfH, openCols, render, renderBoard, renderSearch, siblings } from "./render";
+import { S, chipRowVisible } from "./state";
 import { $, desktop, haptic, observeSize, split, store } from "./util";
 
 export const SHORT = 0.2, LONG = 0.55, LP_MS = 450, EDGE = 24;
@@ -168,7 +168,7 @@ function bindHeader(): void {
   hd.addEventListener("pointermove", e => {
     if (h && e.clientY - h.y0 > 26) {
       h = null;
-      void act("togglechips").then(() => toast(chipRowVisible() ? "Chips shown" : phoneStatusBoardHidesChips() ? "Chips hidden on status board" : "Chips hidden · swipe down again"));
+      void act("togglechips").then(() => toast(chipRowVisible() ? "Chips shown" : "Chips hidden · swipe down again"));
     }
   });
   hd.addEventListener("pointerup", () => { h = null; });
@@ -328,12 +328,12 @@ function bindSheet(): void {
 
 interface BoardGesture {
   tab?: string; col?: HTMLElement; card?: HTMLElement | null; id?: string; lane?: HTMLElement | null; epic?: HTMLElement | null;
-  x0: number; y0: number; pid: number; mode: null | "swipe" | "scroll" | "drag"; edge?: boolean; lp?: number;
-  /** wide is the side-by-side board, where a mouse drags at once and nothing swipes */
+  x0: number; y0: number; pid: number; mode: null | "scroll" | "drag"; lp?: number;
+  /** wide is the side-by-side board, where a mouse drags at once; a phone's boxes wait for a long press */
   wide?: boolean; mouse?: boolean;
   /** lopen is a tap on the epic named in a lane header, which opens the epic instead of folding */
   lopen?: boolean;
-  ghost?: HTMLElement; ox?: number; oy?: number; target?: string | null; edgeDir?: number; edgeT?: number;
+  ghost?: HTMLElement; ox?: number; oy?: number; target?: string | null;
 }
 let B: BoardGesture | null = null;
 
@@ -349,7 +349,7 @@ function bindBoard(): void {
     if (!col) return;
     const card = t.closest<HTMLElement>("[data-card]");
     const b: BoardGesture = {
-      col, card, id: card?.dataset.card, x0: e.clientX, y0: e.clientY, pid: e.pointerId, mode: null, edge: inDeadZone(e.clientX),
+      col, card, id: card?.dataset.card, x0: e.clientX, y0: e.clientY, pid: e.pointerId, mode: null,
       lane: t.closest<HTMLElement>("[data-lane]"), lopen: !!t.closest("[data-lopen]"), epic: t.closest<HTMLElement>("[data-epic]"), wide: col.id === "wboard", mouse: e.pointerType === "mouse",
     };
     if (card && !D.project.read_only && !(b.wide && b.mouse)) b.lp = window.setTimeout(() => { if (B === b && !b.mode) startDrag(b, app); }, LP_MS);
@@ -358,22 +358,11 @@ function bindBoard(): void {
   v.addEventListener("pointermove", e => {
     if (!B || e.pointerId !== B.pid) return;
     if (B.mode === "drag") { dragMove(B, e, app); return; }
-    if (B.tab) return;
+    if (B.tab || B.mode) return;
     const dx = e.clientX - B.x0, dy = e.clientY - B.y0;
-    if (B.wide) {
-      if (B.mode) return;
-      if (B.mouse && B.card && !D.project.read_only && Math.hypot(dx, dy) > 5) { startDrag(B, app); dragMove(B, e, app); return; }
-      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) { clearTimeout(B.lp); B.mode = "scroll"; }
-      return;
-    }
-    if (!B.mode) {
-      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.3 && !B.edge) {
-        clearTimeout(B.lp); B.mode = "swipe";
-        try { B.col!.setPointerCapture(B.pid); } catch { /* best effort */ }
-        B.col!.classList.remove("snap");
-      } else if (Math.abs(dy) > 8 || Math.abs(dx) > 8) { clearTimeout(B.lp); B.mode = "scroll"; }
-    }
-    if (B.mode === "swipe") B.col!.style.transform = `translateX(${dx}px)`;
+    // A mouse on the wide board drags at once; a finger, and a mouse on a phone, long-press first.
+    if (B.wide && B.mouse && B.card && !D.project.read_only && Math.hypot(dx, dy) > 5) { startDrag(B, app); dragMove(B, e, app); return; }
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) { clearTimeout(B.lp); B.mode = "scroll"; }
   });
   const end = (e: PointerEvent) => {
     if (!B || e.pointerId !== B.pid) return;
@@ -381,21 +370,13 @@ function bindBoard(): void {
     const b = B;
     B = null;
     if (b.mode === "drag") { finishDrag(b, e.type === "pointercancel"); return; }
-    if (e.type === "pointercancel") { if (b.col) { b.col.classList.add("snap"); b.col.style.transform = ""; } return; }
-    if (b.tab) {
-      if (Math.abs(e.clientX - b.x0) >= 10) return;
-      // A side-by-side board's header folds its own column; a phone tab first selects it.
-      if (split() && !S.board.folded.has(b.tab)) S.board.col = b.tab;
-      tabTap(b.tab);
-      return;
-    }
-    if (b.mode === "swipe") { swipeColumn(b, e.clientX - b.x0); return; }
-    if (b.mode) return;
+    if (e.type === "pointercancel" || b.mode) return;
+    // A column header folds its column, a phone box to its header and a wide column to a rail, or unfolds it.
+    if (b.tab) { if (Math.abs(e.clientX - b.x0) < 10) tabTap(b.tab); return; }
     if (b.lane) {
       const l = b.lane.dataset.lane!;
       if (b.lopen) { openDetail(l); return; }
       if (S.board.laneFold.has(l)) S.board.laneFold.delete(l); else S.board.laneFold.add(l);
-      S.board.keep = true;
       renderBoard();
       return;
     }
@@ -409,54 +390,6 @@ function bindBoard(): void {
   };
   v.addEventListener("pointerup", end);
   v.addEventListener("pointercancel", end);
-  // The rail indexes the column: a tap scrolls to a lane, a long press folds it.
-  let railLP = 0, railFolded = false, railXY = [0, 0];
-  v.addEventListener("pointerdown", e => {
-    const rl = (e.target as HTMLElement).closest<HTMLElement>(".brail [data-rlane]");
-    railFolded = false;
-    if (!rl || !rl.dataset.rlane) return;
-    const l = rl.dataset.rlane;
-    railXY = [e.clientX, e.clientY];
-    railLP = window.setTimeout(() => {
-      railFolded = true;
-      haptic(12);
-      if (!S.board.laneFold.delete(l)) S.board.laneFold.add(l);
-      S.board.keep = true;
-      renderBoard();
-    }, LP_MS);
-  });
-  v.addEventListener("pointermove", e => { if (railLP && Math.hypot(e.clientX - railXY[0], e.clientY - railXY[1]) > 8) { clearTimeout(railLP); railLP = 0; } });
-  const railEnd = () => { clearTimeout(railLP); railLP = 0; };
-  v.addEventListener("pointerup", railEnd);
-  v.addEventListener("pointercancel", railEnd);
-  v.addEventListener("click", e => {
-    const rl = (e.target as HTMLElement).closest<HTMLElement>("[data-rlane]");
-    if (!rl) return;
-    if (railFolded) { railFolded = false; return; }
-    scrollToLane(rl.dataset.rlane || "");
-  });
-}
-
-function swipeColumn(b: BoardGesture, dx: number): void {
-  const cols = phoneCols();
-  const idx = cols.findIndex(([k]) => k === S.board.col);
-  const next = cols[idx + (dx < 0 ? 1 : -1)];
-  const col = b.col!;
-  col.classList.add("snap");
-  if (Math.abs(dx) < appW() * 0.22 || !next) {
-    col.style.transform = "";
-    if (!next && Math.abs(dx) > 40) toast(dx < 0 ? "Last column" : "First column");
-    return;
-  }
-  col.style.transform = `translateX(${dx < 0 ? -appW() : appW()}px)`;
-  setTimeout(() => {
-    S.board.col = next[0];
-    renderBoard();
-    const nc = document.getElementById("bcol");
-    if (!nc) return;
-    nc.style.transform = `translateX(${dx < 0 ? appW() : -appW()}px)`;
-    requestAnimationFrame(() => { nc.classList.add("snap"); nc.style.transform = ""; });
-  }, 160);
 }
 
 function startDrag(b: BoardGesture, app: HTMLElement): void {
@@ -475,41 +408,27 @@ function startDrag(b: BoardGesture, app: HTMLElement): void {
   card.classList.add("lifted");
   try { b.col!.setPointerCapture(b.pid); } catch { /* best effort */ }
   document.getElementById("bbody")?.classList.add("dragging");
-  toast(b.wide ? "Drop on a column" : "Drop on a column tab, or hold at an edge");
+  toast("Drop on a column");
 }
 
+/**
+ * dragMove carries the ghost, targets the column under the pointer, a phone
+ * box or a wide column's cell (data-dcol), and scrolls the board near its
+ * edges, down the stack of boxes or across the wide columns.
+ */
 function dragMove(b: BoardGesture, e: PointerEvent, app: HTMLElement): void {
   const ar = app.getBoundingClientRect();
-  const x = e.clientX - ar.left, y = e.clientY - ar.top;
-  b.ghost!.style.left = x - b.ox! + "px";
-  b.ghost!.style.top = y - b.oy! + "px";
-  if (b.wide) { dragMoveWide(b, e); return; }
-  document.querySelectorAll(".tab.drop").forEach(t => t.classList.remove("drop"));
+  b.ghost!.style.left = e.clientX - ar.left - b.ox! + "px";
+  b.ghost!.style.top = e.clientY - ar.top - b.oy! + "px";
+  const col = b.col!;
+  col.querySelectorAll(".drop").forEach(x => x.classList.remove("drop"));
   const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-  const tab = el && el.closest<HTMLElement>("[data-tab]");
-  let target: string | null = tab ? tab.dataset.tab! : null;
-  const cols = phoneCols();
-  const idx = cols.findIndex(([k]) => k === S.board.col);
-  const edge = x < 36 ? -1 : x > appW() - 36 ? 1 : 0;
-  if (!tab && edge) {
-    if (b.edgeDir !== edge) { b.edgeDir = edge; b.edgeT = performance.now(); }
-    if (performance.now() - b.edgeT! > LP_MS && cols[idx + edge]) target = cols[idx + edge][0];
-  } else b.edgeDir = 0;
-  if (target === ALL) target = null;
-  b.target = target;
-  if (target != null) document.querySelector(`[data-tab="${CSS.escape(target)}"]`)?.classList.add("drop");
-}
-
-/** dragMoveWide targets whichever column is under the pointer, and scrolls the board near its edges. */
-function dragMoveWide(b: BoardGesture, e: PointerEvent): void {
-  document.querySelectorAll("#wboard .drop").forEach(x => x.classList.remove("drop"));
-  const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-  const c = el && el.closest<HTMLElement>("#wboard [data-dcol]");
-  b.target = c ? c.dataset.dcol! : null;
-  if (b.target != null) document.querySelectorAll(`#wboard [data-dcol="${CSS.escape(b.target)}"]`).forEach(x => x.classList.add("drop"));
-  const wb = b.col!, r = wb.getBoundingClientRect(), M = 40, STEP = 16;
-  if (e.clientX > r.right - M) wb.scrollLeft += STEP; else if (e.clientX < r.left + M) wb.scrollLeft -= STEP;
-  if (e.clientY > r.bottom - M) wb.scrollTop += STEP; else if (e.clientY < r.top + M) wb.scrollTop -= STEP;
+  const c = el && el.closest<HTMLElement>("[data-dcol]");
+  b.target = c && col.contains(c) ? c.dataset.dcol! : null;
+  if (b.target != null) col.querySelectorAll(`[data-dcol="${CSS.escape(b.target)}"]`).forEach(x => x.classList.add("drop"));
+  const r = col.getBoundingClientRect(), M = 40, STEP = 16;
+  if (e.clientX > r.right - M) col.scrollLeft += STEP; else if (e.clientX < r.left + M) col.scrollLeft -= STEP;
+  if (e.clientY > r.bottom - M) col.scrollTop += STEP; else if (e.clientY < r.top + M) col.scrollTop -= STEP;
 }
 
 function finishDrag(b: BoardGesture, cancel: boolean): void {
@@ -517,7 +436,7 @@ function finishDrag(b: BoardGesture, cancel: boolean): void {
   b.ghost?.remove();
   b.card?.classList.remove("lifted");
   document.getElementById("bbody")?.classList.remove("dragging");
-  document.querySelectorAll(".tab.drop, #wboard .drop").forEach(t => t.classList.remove("drop"));
+  document.querySelectorAll(".drop").forEach(t => t.classList.remove("drop"));
   const target = b.target;
   const i = b.id ? get(b.id) : undefined;
   if (cancel || target == null || !i || target === colOf(i) || !b.id) { hideToast(); return; }
@@ -671,15 +590,13 @@ function boardKey(key: string): boolean {
     if (!S.cursor || S.board.lanes === "off" || (S.cursor !== "none" && !get(S.cursor))) return false;
     const l = laneKey(S.cursor);
     if (S.board.laneFold.has(l)) S.board.laneFold.delete(l); else S.board.laneFold.add(l);
-    S.board.keep = true;
     renderBoard();
     return true;
   }
   if (key === "z") {
     const i = cur?.dataset.card && get(S.cursor!);
     if (!i) return false;
-    S.board.col = colOf(i);
-    tabTap(S.board.col);
+    tabTap(colOf(i));
     return true;
   }
   if (key === "Enter") { if (!cur || S.cursor === "none") return false; openDetail(S.cursor!); return true; }
