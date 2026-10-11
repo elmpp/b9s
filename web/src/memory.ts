@@ -37,7 +37,7 @@ const uml = (kind: string): { name: string; dash: boolean; head: "hollow" | "ope
   related: { name: "association", dash: false, head: "" as const },
 })[kind] || { name: "link", dash: false, head: "open" };
 const headMarker = (kind: string) => uml(kind).head ? `url(#memory-head-${uml(kind).head}-${kind})` : "";
-const color = (kind: string) => ({ follows: "var(--cyan)", cites: "var(--accent)", related: "var(--green)", blocks: "var(--orange)" })[kind] || "var(--dim)";
+const color = (kind: string) => kind === "blocks" ? "var(--danger)" : "var(--muted)";
 const cardWidth = 250, cardHeight = 102;
 
 // canvasSize measures the canvas, which flexes to fill the view below the
@@ -243,8 +243,8 @@ function draw(host: HTMLElement): void {
   const { width, height } = canvasSize(host);
   arrange(width, height);
   const edges = graph.edges.filter(e => filter === "all" || e.kind === filter);
-  host.innerHTML = `<div class="memoryTools"><b>Memory relationships</b><label>Link Type <select id="memoryType"><option value="all">All Types</option>${kinds.map(k => `<option value="${k}" ${filter === k ? "selected" : ""}>${label(k)}</option>`).join("")}</select></label><button id="memoryFit">Fit</button></div>
-    <div class="memoryLegend">${kinds.map(k => `<span style="color:${color(k)}" title="UML ${uml(k).name}"><svg width="40" height="10" aria-hidden="true"><line x1="1" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="1.5" ${uml(k).dash ? 'stroke-dasharray="5 3"' : ""} ${headMarker(k) ? `marker-end="${headMarker(k)}"` : ""}/></svg> ${label(k)} <small>${uml(k).name}</small></span>`).join(" · ")}<br>Select a bead to explore its connections. Drag a record to move it, or the background to pan.</div>
+  host.innerHTML = `<div class="memoryTools"><b>Memory</b><label>Link Type <select id="memoryType"><option value="all">All Types</option>${kinds.map(k => `<option value="${k}" ${filter === k ? "selected" : ""}>${label(k)}</option>`).join("")}</select></label><button id="memoryFit">Fit</button></div>
+    <div class="memoryLegend">${kinds.map(k => `<span style="color:${color(k)}" title="UML ${uml(k).name}"><svg width="40" height="10" aria-hidden="true"><line x1="1" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="1.5" ${uml(k).dash ? 'stroke-dasharray="5 3"' : ""} ${headMarker(k) ? `marker-end="${headMarker(k)}"` : ""}/></svg> ${label(k)} <small>${uml(k).name}</small></span>`).join("")}</div>
     <div class="memoryCanvas">${graph.nodes.length ? `<svg role="group" aria-label="Memory relationship graph" viewBox="0 0 ${width} ${height}"><defs>${kinds.filter(k => uml(k).head).map(k => `<marker id="memory-head-${uml(k).head}-${k}" viewBox="-1 -6 13 12" refX="10" markerWidth="5" markerHeight="5" markerUnits="strokeWidth" orient="auto">${uml(k).head === "hollow" ? `<path d="M0,-5L10,0L0,5Z" style="fill:var(--bg);stroke:${color(k)}" stroke-width="1.3" stroke-linejoin="round"/>` : `<path d="M0,-5L10,0L0,5" style="fill:none;stroke:${color(k)}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`}</marker>`).join("")}</defs><g class="memoryViewport">
     ${layout === "columns" ? '<text class="memoryLane" x="30" y="25">ISSUES · WORK</text><text class="memoryLane" x="510" y="25">MEMORIES · KNOWLEDGE</text>' : ''}
     ${edges.map((e, i) => {
@@ -526,10 +526,10 @@ export function memoryKey(k: string): boolean {
 
 function relRow(id: string, n: number, lead: string, edge?: Edge): string {
   const node = nodeOf(id);
-  return `<button class="rel" data-mnav="${esc(id)}"${edge?.note ? ` title="${esc(edge.note)}"` : ""}>${n <= 9 ? `<span class="kn">${n}</span>` : `<span class="kn"></span>`}<span class="id"${edge ? ` style="color:${color(edge.kind)}"` : ""}>${lead}</span><span class="t">${esc(node?.title || id)}</span></button>`;
+  return `<button class="rel" data-mnav="${esc(id)}"${edge?.note ? ` title="${esc(edge.note)}"` : ""}>${n <= 9 ? `<span class="kn">${n}</span>` : `<span class="kn"></span>`}<span class="id">${lead}</span><span class="t">${esc(node?.title || id)}</span></button>`;
 }
 
-const kindPill = (kind: string) => kind === "issue" ? `<span class="pill" style="color:var(--orange)">○ issue</span>` : `<span class="pill" style="color:var(--cyan)">◇ ${esc(kind)}</span>`;
+const kindPill = (kind: string) => kind === "issue" ? `<span class="pill">○ issue</span>` : `<span class="pill">◇ ${esc(kind)}</span>`;
 
 /** renderMemoryDetail draws the open record or Link in the tree detail's panel, so both read and size alike. */
 export function renderMemoryDetail(): void {
@@ -553,7 +553,7 @@ export function renderMemoryDetail(): void {
   let head: string, body: string;
   if (node) {
     const links = linksOf(node.id);
-    head = `<div class="dtitle">${esc(node.title)}</div><div class="pills">${kindPill(node.kind)}${node.kind === "issue" && node.status ? `<span class="pill" style="color:var(--green)">${esc(node.status)}</span>` : ""}</div>`;
+    head = `<div class="dtitle">${esc(node.title)}</div><div class="pills">${kindPill(node.kind)}${node.kind === "issue" && node.status ? `<span class="pill">${esc(node.status)}</span>` : ""}</div>`;
     body = `<dl class="meta"><dt>type</dt><dd>${esc(node.type)}</dd><dt>version</dt><dd>${esc(node.record_version || "—")}</dd></dl>
       <div class="dsec">Links · ${links.length}</div>${links.map((e, n) => {
         const out = e.source === node.id;
@@ -562,7 +562,7 @@ export function renderMemoryDetail(): void {
       <div class="dsec">${node.kind === "issue" ? "Description" : "Body"}</div><div class="md">${md(node.body || "No body.")}</div>`;
   } else {
     const e = openEdge!;
-    head = `<div class="dtitle">Link · ${esc(label(e.kind))}</div><div class="pills"><span class="pill" style="color:${color(e.kind)}">${esc(label(e.kind))}</span></div>`;
+    head = `<div class="dtitle">Link · ${esc(label(e.kind))}</div><div class="pills"><span class="pill">${esc(label(e.kind))}</span></div>`;
     body = `<dl class="meta"><dt>type</dt><dd>${esc(e.type)}</dd>${e.note ? `<dt>note</dt><dd>${esc(e.note)}</dd>` : ""}</dl>
       <div class="dsec">From</div>${relRow(e.source, 1, "", undefined)}<div class="dsec">To</div>${relRow(e.target, 2, "", undefined)}
       ${e.kind === "blocks" ? '<div class="md"><p>The source depends on the target: the target blocks the source.</p></div>' : ""}`;

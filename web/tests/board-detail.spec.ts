@@ -12,6 +12,31 @@ async function tokenColor(page: Page, token: string): Promise<string> {
   }, token);
 }
 
+async function tokenBackground(page: Page, token: string): Promise<string> {
+  return page.evaluate(t => {
+    const el = document.createElement("span");
+    el.style.background = `var(${t})`;
+    document.body.append(el);
+    const color = getComputedStyle(el).backgroundColor;
+    el.remove();
+    return color;
+  }, token);
+}
+
+const memoryGraph = {
+  version: 1,
+  available: true,
+  nodes: [
+    { id: "mem-1", kind: "memory", title: "Responsive search notes", status: "", type: "s/types/preview-memory-v2", record_version: "v1", body: "Search and projects stay neutral." },
+    { id: "d-task", kind: "issue", title: "Render Markdown detail", status: "open", type: "s/types/preview-issue-v2", record_version: "v2", body: "Work description." },
+    { id: "d-blocker", kind: "issue", title: "Resolve relation", status: "in_progress", type: "s/types/preview-issue-v2", record_version: "v3", body: "Blocking work." },
+  ],
+  edges: [
+    { id: "follow", source: "d-task", target: "mem-1", kind: "follows", type: "s/types/example-follows", note: "" },
+    { id: "block", source: "d-task", target: "d-blocker", kind: "blocks", type: "s/types/preview-blocks-v1", note: "" },
+  ],
+};
+
 test.use({
   fixture: {
     issues: [
@@ -65,4 +90,51 @@ test("board cards, epic lanes and rich detail use the calm look in this size cla
   await expect(detail.locator(".cm .who b").first()).toHaveCSS("color", textSoft);
   await expect(detail.locator(".pill").filter({ hasText: /open/ })).toHaveCSS("color", muted);
   await expect.poll(() => detail.locator(".pill.status .sdot").evaluate(el => getComputedStyle(el).backgroundColor)).toBe(dangerColor);
+});
+
+test("search, sheets, projects and Memory use the calm look in this size class", async ({ page, project }) => {
+  await page.route("**/api/memory-graph", route => route.fulfill({ json: memoryGraph }));
+  await open(page, project);
+  const text = await tokenColor(page, "--text");
+  const textSoft = await tokenColor(page, "--text-soft");
+  const muted = await tokenColor(page, "--muted");
+  const danger = await tokenColor(page, "--danger");
+  const surface1 = await tokenBackground(page, "--surface-1");
+  const raised = await tokenBackground(page, "--surface-raised");
+
+  await page.locator('#bar [data-view="search"]').click();
+  await expect(page.locator("#sIn")).toHaveCSS("background-color", surface1);
+  await expect(page.locator("#sSugg .chip").first()).toHaveCSS("color", textSoft);
+  await page.locator("#sIn").fill("status:");
+  await expect(page.locator("#sSugg .chip.v").first()).toHaveCSS("color", text);
+
+  await page.locator('#hd [data-act="create"]').click();
+  const sheet = page.locator("#sheetHost .msheet");
+  await expect(sheet).toHaveAttribute("aria-label", "New issue");
+  await expect(sheet.locator(".form input").first()).toHaveCSS("background-color", surface1);
+  await expect(sheet.locator('[data-seg="priority"] .segDot')).toHaveCount(5);
+  await expect(sheet.locator('[data-seg="type"] .segDot')).toHaveCount(0);
+  await sheet.locator('[data-sa="cancel"]').click();
+  await expect(sheet).toHaveCount(0);
+
+  await page.locator('#hd [data-act="projects"]').click();
+  await expect(sheet.locator('[data-sa="proj"]').first()).toBeVisible();
+  await expect(sheet.locator('[data-sa="proj"] .g').first()).toHaveCSS("color", muted);
+  await expect(sheet.locator('[data-sa="proj"].cur')).toHaveCSS("color", text);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+
+  await page.locator("#hdot").click();
+  await expect(sheet).toHaveAttribute("aria-label", "Data source health");
+  await expect(sheet.locator(".gtable .ok")).toHaveCSS("color", textSoft);
+  await sheet.locator('[data-sa="cancel"]').click();
+  await expect(sheet).toHaveCount(0);
+
+  await page.locator('#bar [data-view="memory"]').click();
+  await expect(page.locator("#vMemory [data-node]")).toHaveCount(3);
+  await expect(page.locator("#vMemory .memoryTools")).toHaveCSS("background-color", surface1);
+  await expect(page.locator("#vMemory .memoryLegend")).not.toContainText("Drag");
+  await expect(page.locator('[data-node="mem-1"] .memoryCard')).toHaveCSS("fill", raised);
+  await expect(page.locator('[data-edge="follow"] > path')).toHaveCSS("stroke", muted);
+  await expect(page.locator('[data-edge="block"] > path')).toHaveCSS("stroke", danger);
 });

@@ -572,7 +572,7 @@ export function renderSearch(): void {
   if (!q) {
     const rec = store.get<string[]>("recent", []);
     $("#sList").innerHTML = (rec.length ? `<div class="sec">Recent queries</div>` + rec.map(r => `<button class="item" data-recent="${esc(r)}"><span class="g">↺</span><span class="x">${esc(r)}</span></button>`).join("") : "")
-      + `<div class="sec">Syntax</div><div class="md" style="padding:0 16px"><p><code>status:open</code> <code>type:bug</code> <code>priority:1</code> <code>assignee:alice</code> <code>label:mobile</code> <code>project:b9s</code> <code>id:foit</code> <code>title:graph</code>. The same field twice means either value. <code>!</code> negates, and a bare <code>!closed</code> means not that status. Plain words match ID and title, fuzzily. It is the TUI's query language, evaluated by b9s.</p></div>`;
+      + `<div class="sec">Syntax</div><div class="md syntax"><p><code>status:open</code> <code>type:bug</code> <code>priority:1</code> <code>assignee:alice</code> <code>label:mobile</code> <code>project:b9s</code> <code>id:foit</code> <code>title:graph</code>. The same field twice means either value. <code>!</code> negates, and a bare <code>!closed</code> means not that status. Plain words match ID and title, fuzzily. It is the TUI's query language, evaluated by b9s.</p></div>`;
     return;
   }
   if (search.text !== q || search.version !== D.version) {

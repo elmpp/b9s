@@ -312,7 +312,7 @@ export function closeSheet(): void {
 }
 
 const opt = (a: string, g: string, x: string, sub: string, extra: { val?: string | number; cls?: string; color?: string; key?: string } = {}) =>
-  `<button class="opt ${extra.cls || ""}" data-sa="${a}"${extra.val != null ? ` data-val="${esc(extra.val)}"` : ""}><span class="g" ${extra.color ? `style="color:${extra.color}"` : ""}>${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${extra.key ? `<span class="key">${esc(extra.key)}</span>` : ""}</button>`;
+  `<button class="opt ${extra.cls || ""}" data-sa="${a}"${extra.val != null ? ` data-val="${esc(extra.val)}"` : ""}${extra.color ? ` style="--sc:${extra.color}"` : ""}><span class="g ${extra.color ? "dotg" : ""}" aria-hidden="true">${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${extra.key ? `<span class="key">${esc(extra.key)}</span>` : ""}</button>`;
 
 const SETTABLE = ["open", "in_progress", "blocked", "deferred", "review", "closed"];
 
@@ -357,15 +357,15 @@ function formHTML(sh: Sheet): string {
     ? { title: f.title, status: f.status, priority: f.priority, type: f.type, assignee: f.assignee, labels: f.labels.join(", "), description: f.description, notes: f.notes }
     : { title: "", status: "open", priority: 2, type: String(sh.type || "task"), assignee: "", labels: "", description: "", notes: "" };
   const seg = (name: string, vals: [string | number, string][], cur: string | number, color?: (v: string) => string) =>
-    `<div class="segs" data-seg="${name}">${vals.map(([v, l]) => `<button type="button" class="${String(v) === String(cur) ? "on" : ""}" data-v="${esc(v)}" style="${color ? "color:" + color(String(v)) : ""}">${esc(l)}</button>`).join("")}</div>`;
+    `<div class="segs" data-seg="${name}">${vals.map(([v, l]) => `<button type="button" class="${String(v) === String(cur) ? "on" : ""}" data-v="${esc(v)}"${color ? ` style="--sc:${color(String(v))}"` : ""}>${color ? `<span class="segDot" aria-hidden="true"></span>` : ""}${esc(l)}</button>`).join("")}</div>`;
   const types = [...new Set([...Object.keys(TY), e.type])];
   const statuses = [...new Set([...SETTABLE, e.status])];
   const people = [...new Set([D.actor, ...D.people.map(p => p.name)].filter(Boolean))];
   const epics = pool().filter(x => x.type === "epic" && !x.closed_like);
   return `<form class="form" id="fEdit"><label>Title<input id="fTitle" value="${esc(e.title)}" placeholder="Short imperative title" required></label>
-    ${edit ? `<label>Status${seg("status", statuses.map(s => [s, stOf(s).g + " " + (s === "in_progress" ? "prog" : s)]), e.status, s => stOf(s).c)}</label>` : ""}
+    ${edit ? `<label>Status${seg("status", statuses.map(s => [s, s === "in_progress" ? "in progress" : s]), e.status, s => stOf(s).c)}</label>` : ""}
     <label>Priority${seg("priority", [0, 1, 2, 3, 4].map(p => [p, "P" + p]), e.priority, p => PC[+p])}</label>
-    <label>Type${seg("type", types.map(t => [t, (TY[t] ? TY[t][0] + " " : "") + t]), e.type, t => (TY[t] ? TY[t][1] : "var(--muted)"))}</label>
+    <label>Type${seg("type", types.map(t => [t, t]), e.type)}</label>
     <label>Assignee<input id="fAssignee" value="${esc(e.assignee)}" placeholder="none" list="dlWho" autocapitalize="off"><datalist id="dlWho">${people.map(a => `<option value="${esc(a)}">`).join("")}</datalist></label>
     <label>Labels<input id="fLabels" value="${esc(e.labels)}" placeholder="comma separated" autocapitalize="off"></label>
     ${!edit ? `<label>Parent<select id="fParent"><option value="">none</option>${epics.map(x => `<option value="${esc(x.id)}" ${x.id === sh.parent ? "selected" : ""}>${esc(shortId(x.id) + " " + x.t)}</option>`).join("")}${sh.parent && !epics.some(x => x.id === sh.parent) ? `<option value="${esc(sh.parent)}" selected>${esc(shortId(String(sh.parent)))}</option>` : ""}</select></label>` : ""}
@@ -416,8 +416,8 @@ function sheetBody(sh: Sheet): [string, string, string] {
       if (!projectList) return ["Projects", "", `<div class="empty">Loading…</div>`];
       const rows = projectList.map(p => opt("proj", p.slot ? String(p.slot) : "·", esc(p.name),
         p.reach && p.reach !== "ok" ? esc(p.reach) : `${p.open} open · ${p.in_progress} in progress · ${p.ready} ready${p.blocked ? " · " + p.blocked + " blocked" : ""}`,
-        { val: p.key, key: p.slot ? String(p.slot) : "", cls: p.active && !D.project.all ? "cur" : "", color: "var(--accent)" })).join("");
-      return ["Projects", "What b9s can read from here", rows + opt("proj", "0", "All projects", "one tree, grouped by project", { val: "*", key: "0", cls: D.project.all ? "cur" : "", color: "var(--accent)" })];
+        { val: p.key, key: p.slot ? String(p.slot) : "", cls: p.active && !D.project.all ? "cur" : "" })).join("");
+      return ["Projects", "What b9s can read from here", rows + opt("proj", "0", "All projects", "one tree, grouped by project", { val: "*", key: "0", cls: D.project.all ? "cur" : "" })];
     }
     case "health": {
       const h = D.health;
