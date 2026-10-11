@@ -203,8 +203,13 @@ export function openDetail(id: string, push = false): void {
 
 export function closeDetail(): void {
   const sec = $opt(".detail");
-  if (sec) { sec.style.transform = split() ? "translateX(100%)" : "translateY(100%)"; setTimeout(() => { S.detail = null; render(); }, 220); }
-  else { S.detail = null; render(); }
+  // The detail is closed at once, so a key pressed while the panel slides out
+  // acts on a closed detail, and a detail it opens outlives the slide. Only
+  // the render that takes the panel away waits for the slide to end.
+  S.detail = null;
+  if (!sec) { render(); return; }
+  sec.style.transform = split() ? "translateX(100%)" : "translateY(100%)";
+  setTimeout(() => { if (!S.detail) render(); }, 220);
 }
 
 const detailId = () => (S.detail ? S.detail.stack[S.detail.stack.length - 1] : S.cursor) || "";

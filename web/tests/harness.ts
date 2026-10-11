@@ -130,8 +130,22 @@ export function stopProject(p: Project): void {
   }
 }
 
+/**
+ * cpuThrottle is B9S_E2E_CPU_THROTTLE, the factor by which a Chromium page
+ * runs slower than this machine (Emulation.setCPUThrottlingRate). CI runners
+ * are slower than a laptop, so a race between the app's timers and the keys a
+ * test presses can fail there only; docs/testing.md says how to bring it here.
+ */
+const cpuThrottle = Number(process.env.B9S_E2E_CPU_THROTTLE) || 0;
+
 // The fixture list is wrapped in an object: Playwright reads a bare array option as a [value, options] tuple.
 export const test = base.extend<{ project: Project; fixture: { issues: FixtureIssue[] }; bdEnv: Record<string, string>; paired: boolean }>({
+  page: async ({ page, browserName }, use) => {
+    if (cpuThrottle > 1 && browserName === "chromium") {
+      await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: cpuThrottle });
+    }
+    await use(page);
+  },
   fixture: [{ issues: SAMPLE }, { option: true }],
   bdEnv: [{}, { option: true }],
   paired: [false, { option: true }],

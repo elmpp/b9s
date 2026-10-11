@@ -229,6 +229,9 @@ test("Enter opens the selected epic when the board DOM redraws under it", async 
   await board(page, project);
   await card(page, "t-2").click();
   await page.keyboard.press("Escape");
+  // The observer below holds the epic out of this #wboard only: the render
+  // that ends the panel's slide out draws a new one, so it runs first.
+  await expect(page.locator(".detail")).toHaveCount(0);
   await page.keyboard.press("h");
   await expect(epic(page, "t-epic")).toHaveClass(/sel/);
   await card(page, "t-2").evaluate((el: HTMLElement) => el.focus());
@@ -240,6 +243,57 @@ test("Enter opens the selected epic when the board DOM redraws under it", async 
   await expect(epic(page, "t-epic")).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(page.locator(".detail")).toHaveAttribute("data-id", "t-epic");
+});
+
+test("keys typed while the closed panel slides out act on a closed panel", async ({ page, project }) => {
+  await board(page, project);
+  await card(page, "t-2").click();
+  const d = page.locator(".detail");
+  await expect(d).toHaveAttribute("data-id", "t-2");
+  // Esc, h and Enter land in one task, before the panel has slid out. A timer
+  // started after them fires after the slide's own, so what follows sees the
+  // board once the slide has ended.
+  await page.evaluate(async () => {
+    for (const key of ["Escape", "h", "Enter"]) {
+      (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  });
+  await expect(d).toHaveAttribute("data-id", "t-epic");
+  await expect(page).toHaveURL(/#\/board\/t-epic$/);
+});
+
+test("Enter while the closed panel's Back is under way keeps the epic open", async ({ page, project }) => {
+  await board(page, project);
+  await card(page, "t-2").click();
+  const d = page.locator(".detail");
+  await expect(d).toHaveAttribute("data-id", "t-2");
+  // Closing the panel steps the browser Back, and the browser reports the step
+  // a moment later. h and Enter land in that moment, as keys do on a slow runner.
+  await page.evaluate(() => {
+    const back = history.back;
+    (window as Window & { __b9sBackLanded?: Promise<void> }).__b9sBackLanded = new Promise<void>((resolve, reject) => {
+      history.back = () => {
+        history.back = back;
+        back.call(history);
+        addEventListener("popstate", () => resolve(), { once: true });
+        queueMicrotask(() => {
+          for (const key of ["h", "Enter"]) {
+            (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+          }
+        });
+      };
+      setTimeout(() => reject(new Error("closing the panel stepped no Back within 5 s")), 5000);
+    });
+  });
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => (window as Window & { __b9sBackLanded?: Promise<void> }).__b9sBackLanded);
+  await expect(d).toHaveAttribute("data-id", "t-epic");
+  await expect(page).toHaveURL(/#\/board\/t-epic$/);
+  // The epic is a step of its own: Back closes it and stays on the board.
+  await page.goBack();
+  await expect(d).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/board$/);
 });
 
 test("\\ or the panel's button switches the detail between a side panel and the full width", async ({ page, project }) => {

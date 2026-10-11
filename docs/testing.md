@@ -170,6 +170,7 @@ The probe refuses non-loopback URLs, compares visible nodes and Links with the c
 - Gestures use real pointer events through `page.mouse`, so swipes, long-presses and drags run the same handlers as a finger.
 - `perf.spec.ts` loads 1000 issues and checks load, a full re-render and a swipe deep in the list. Emulated phones on a laptop are faster than real ones, so this catches a render path that went quadratic, not a slow handset. It runs in the `pixel-perf` and `iphone-perf` projects, which start once every other project has finished, so the timing does not share the CPU with other workers. A failure elsewhere therefore skips it.
 - A failed test attaches the `bd` call log and the server output.
+- A test that fails on CI and passes here may race the app's own timers, which a slower CI runner reaches between two of the test's steps. `B9S_E2E_CPU_THROTTLE=<n>` runs every Chromium page `n` times slower (CDP `Emulation.setCPUThrottlingRate`), so the failure shows before anything changes: `B9S_E2E_CPU_THROTTLE=10 npm --prefix web run test:e2e -- tests/wide.spec.ts -g '<title>' --project desktop --repeat-each 20 --workers 4`. On an Apple M4 Max, 4 reproduced nothing and 8 to 12 matched the GitHub runner of b9m-vdp.4.16. Fix the race, never with a retry or a longer timeout.
 
 ## bd releases
 

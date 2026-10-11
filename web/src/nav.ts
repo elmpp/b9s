@@ -72,7 +72,7 @@ export function syncHistory(): void {
   if (!cur) { history.replaceState({ place: now, n: 0, prev: null } satisfies Entry, "", hashOf(now)); return; }
   if (same(cur.place, now)) return;
   if (cur.n > 0 && same(cur.prev, now)) {
-    // The popstate that follows restores this same place, so nothing redraws.
+    // The popstate that follows lands on this same place, so nothing redraws.
     backing = window.setTimeout(() => { backing = 0; }, 1000);
     history.back();
     return;
@@ -109,7 +109,15 @@ export function openHash(h = parseHash()): boolean {
 
 export function bindHistory(render: () => void, closeSheet: () => void): void {
   window.addEventListener("popstate", () => {
-    if (backing) { clearTimeout(backing); backing = 0; }
+    if (backing) {
+      // Our own Back has landed. S holds the place it stepped back to, or a
+      // place a key or a tap has moved to while the browser took the step:
+      // restoring the entry would undo that move, so it is recorded instead.
+      clearTimeout(backing);
+      backing = 0;
+      syncHistory();
+      return;
+    }
     const e = entry();
     if (e?.place.s && !S.sheet) { history.back(); return; }
     restoring = true;
