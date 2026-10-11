@@ -11,9 +11,9 @@
 
 https://github.com/user-attachments/assets/ccc8ebc9-4daf-4867-8c41-3f91df364f42
 
-| Terminal | Browser | Phone |
-|:---:|:---:|:---:|
-| ![b9s in a terminal, the issue tree of the sample web shop: epics, features and tasks](docs/screenshot.png) | ![b9s web on a desktop browser, the board of the sample web shop with one swimlane per epic](docs/screenshot-web-board.png) | <img src="docs/screenshot-phone.png" alt="b9s web on a phone, the issue tree of the sample web shop" width="200"> |
+| Terminal | Phone | Tablet | Desktop |
+|:---:|:---:|:---:|:---:|
+| ![b9s in a terminal, the issue tree of the sample web shop: epics, features and tasks](docs/screenshot.png) | <img src="docs/screenshot-web-phone.png" alt="b9s web on a phone, with dense rows, status chips and bottom navigation" width="160"> | <img src="docs/screenshot-web-tablet.png" alt="b9s web on a tablet, with the issue list and detail visible together" width="220"> | ![b9s web on a desktop browser, with a sidebar and the board split into epic swimlanes](docs/screenshot-web-desktop.png) |
 
 b9s is a keyboard-driven terminal UI modelled on [k9s](https://k9scli.io/): if you know k9s, you already know most of b9s. It opens any Beads project, including a fresh `bd init` with no server, and shows changes from `bd` or another agent as they happen. `b9s web` serves the same project, with every write, to a browser or a phone.
 
@@ -327,9 +327,9 @@ The detail pane shows an issue's attachments above its comments, and `R` lists t
 
 ## Phone and browser
 
-`b9s web` serves the same project to a phone browser: the tree, the board, search with the TUI query language, the detail sheet, the dependency graph, and every write the TUI makes, through the same `bd` calls. Changes from anywhere show up live.
+`b9s web` serves the same project to a browser at phone, tablet, desktop and wide monitor sizes: the tree, the board, search with the TUI query language, detail, the dependency graph, and every write the TUI makes, through the same `bd` calls. Changes from anywhere show up live.
 
-Mermaid fences in the web detail sheet render as diagrams when opened. Large diagrams scroll sideways, and invalid diagrams stay as source code. Copy and Edit keep the original Mermaid text.
+Mermaid fences in the web detail view render as diagrams when opened. Large diagrams scroll sideways, and invalid diagrams stay as source code. Copy and Edit keep the original Mermaid text.
 
 ```bash
 cd ~/code/my-project       # a folder with .beads, as for b9s itself

@@ -639,7 +639,9 @@ b9s reads the file once at startup. See [ADR 0035](adr/0035-take-hotkeys-from-a-
 
 ## Phone and browser
 
-`b9s web` serves the project in the current folder to a browser, sized for a phone. It opens the project the same way `b9s` does and never falls back to another one: a server started in the wrong folder exits rather than show other data.
+`b9s web` serves the project in the current folder to a responsive browser app. It opens the project the same way `b9s` does and never falls back to another one: a server started in the wrong folder exits rather than show other data.
+
+The app chooses a size class from the browser width. Phones use bottom navigation and sheets. Tablets use a left rail with the list and detail side by side. Desktop and wide monitors use a sidebar, hover states, context menus, drag on board cards and a detail pane beside the tree or board.
 
 ```bash
 b9s web                        # 127.0.0.1:7979, pairing on
