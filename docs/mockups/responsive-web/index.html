@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>b9s responsive web mockups</title>
+<meta name="description" content="Clickable responsive b9s web mockups for phone, tablet, desktop and wide layouts.">
+<style>
+  :root {
+    color-scheme: dark;
+    --ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --lab-page: #090a0d;
+    --lab-panel: #11131a;
+    --lab-line: #2b3040;
+    --lab-text: #f2f4f8;
+    --lab-muted: #8f9ab0;
+  }
+
+  body[data-direction="a"] {
+    --surface-0: #0b0c0f;
+    --surface-1: #14161d;
+    --surface-2: #1a1d26;
+    --surface-3: #232737;
+    --surface-raised: #202433;
+    --line: #303648;
+    --line-soft: #252b3a;
+    --text: #f4f6f8;
+    --text-soft: #c6ccd6;
+    --muted: #8793aa;
+    --ghost: #626e82;
+    --open: #58d987;
+    --progress: #6fcdf2;
+    --priority: #d7b66b;
+    --danger: #ff6f74;
+    --focus: rgba(111, 205, 242, 0.25);
+    --hover: rgba(255, 255, 255, 0.045);
+    --selected: rgba(111, 205, 242, 0.11);
+    --shadow: rgba(0, 0, 0, 0.48);
+  }
+
+  body[data-direction="b"] {
+    --surface-0: #0c0f12;
+    --surface-1: #15191d;
+    --surface-2: #1d2328;
+    --surface-3: #262d34;
+    --surface-raised: #222930;
+    --line: #34404a;
+    --line-soft: #28323a;
+    --text: #f1f4f2;
+    --text-soft: #c2cbc5;
+    --muted: #8d9a91;
+    --ghost: #667368;
+    --open: #69d18f;
+    --progress: #79b8ff;
+    --priority: #cdbb78;
+    --danger: #ee776f;
+    --focus: rgba(121, 184, 255, 0.24);
+    --hover: rgba(234, 241, 238, 0.045);
+    --selected: rgba(105, 209, 143, 0.10);
+    --shadow: rgba(0, 0, 0, 0.42);
+  }
+
+  body[data-direction="c"] {
+    --surface-0: #090b11;
+    --surface-1: #121520;
+    --surface-2: #191d2a;
+    --surface-3: #222838;
+    --surface-raised: #1d2330;
+    --line: #31394d;
+    --line-soft: #252c3c;
+    --text: #f3f5fb;
+    --text-soft: #c4cad8;
+    --muted: #8f99ae;
+    --ghost: #667084;
+    --open: #72d7a0;
+    --progress: #8ab4f8;
+    --priority: #d6a96d;
+    --danger: #f47c7c;
+    --focus: rgba(138, 180, 248, 0.25);
+    --hover: rgba(255, 255, 255, 0.05);
+    --selected: rgba(138, 180, 248, 0.10);
+    --shadow: rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--lab-page); }
+  body {
+    min-height: 100%;
+    margin: 0;
+    background: var(--lab-page);
+    color: var(--lab-text);
+    font: 14px/1.45 var(--ui);
+    letter-spacing: 0;
+  }
+  button, input, textarea, select {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    border: 0;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  a { color: inherit; }
+  :focus-visible {
+    outline: 2px solid var(--progress);
+    outline-offset: 2px;
+  }
+
+  .lab {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: minmax(220px, 0.8fr) minmax(360px, 2fr);
+    gap: 14px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--lab-line);
+    background: color-mix(in oklab, var(--lab-panel) 92%, transparent);
+    backdrop-filter: blur(18px);
+  }
+  .lab h1 {
+    margin: 0;
+    font-size: 16px;
+    line-height: 22px;
+  }
+  .lab .note {
+    margin: 4px 0 0;
+    color: var(--lab-muted);
+    font-size: 12px;
+    max-width: 70ch;
+  }
+  .control-group {
+    display: grid;
+    gap: 8px;
+  }
+  .control-title {
+    color: var(--lab-muted);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .lab button,
+  .lab a {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 10px;
+    border: 1px solid var(--lab-line);
+    border-radius: 8px;
+    color: var(--lab-muted);
+    text-decoration: none;
+    background: #151821;
+    white-space: nowrap;
+  }
+  .lab [aria-pressed="true"],
+  .lab a.active {
+    color: var(--lab-text);
+    border-color: var(--progress);
+    background: color-mix(in oklab, var(--progress) 14%, #151821);
+  }
+  .legend {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    color: var(--lab-muted);
+    font-size: 12px;
+  }
+  .legend strong {
+    color: var(--lab-text);
+    font-weight: 600;
+  }
+  .preview {
+    padding: 18px;
+    overflow-x: auto;
+  }
+  .stage {
+    min-width: min-content;
+  }
+
+  .device {
+    width: var(--frame-w);
+    height: var(--frame-h);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-0);
+    color: var(--text);
+    box-shadow: 0 22px 70px var(--shadow);
+    font: 14px/1.4 var(--ui);
+    letter-spacing: 0;
+    position: relative;
+  }
+  .device.phone {
+    border-radius: 28px;
+    border-width: 6px;
+  }
+  .device.wide {
+    border-radius: 10px;
+  }
+  .app {
+    height: 100%;
+    display: grid;
+    background: var(--surface-1);
+  }
+  .app.phone {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .app.tablet {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .app.desktop,
+  .app.wide {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .mono,
+  .id,
+  .key,
+  code {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .topbar {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .brand {
+    font-weight: 700;
+    color: var(--text);
+  }
+  .project {
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--open);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--open) 16%, transparent);
+  }
+  .countline {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .countline b {
+    color: var(--open);
+    font-weight: 650;
+  }
+  .top-actions {
+    display: flex;
+    gap: 4px;
+    color: var(--muted);
+  }
+  .icon-button {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--muted);
+  }
+  .icon-button:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .chipbar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-1);
+    overflow: hidden;
+  }
+  .chip {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--text-soft);
+    white-space: nowrap;
+  }
+  .chip.open { color: var(--open); border-color: color-mix(in oklab, var(--open) 70%, var(--line)); }
+  .chip.progress { color: var(--progress); border-color: color-mix(in oklab, var(--progress) 70%, var(--line)); }
+  .chip.blocked { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 70%, var(--line)); }
+  .chip.priority { color: var(--priority); }
+  .phone-nav {
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+    padding-bottom: 2px;
+  }
+  .phone-nav button {
+    min-height: 56px;
+    color: var(--muted);
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 2px;
+    font-size: 12px;
+  }
+  .phone-nav b {
+    font-size: 18px;
+    line-height: 18px;
+    font-weight: 600;
+  }
+  .phone-nav .active {
+    color: var(--progress);
+  }
+  .phone-head {
+    min-height: 46px;
+    display: grid;
+    grid-template-columns: 72px 1fr 72px;
+    align-items: center;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .phone-head .title {
+    text-align: center;
+    font-weight: 700;
+  }
+  .phone-head .back {
+    min-height: 44px;
+    color: var(--progress);
+    text-align: left;
+  }
+  .phone-head .done {
+    min-height: 44px;
+    color: var(--open);
+    text-align: right;
+  }
+
+  .scroll {
+    min-height: 0;
+    overflow: auto;
+  }
+  .tree {
+    padding: 6px 0 20px;
+  }
+  .issue-row {
+    min-height: 46px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: start;
+    padding: 7px 12px 7px calc(12px + var(--depth, 0) * 18px);
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--text);
+    text-align: left;
+    width: 100%;
+  }
+  .issue-row:hover,
+  .issue-card:hover {
+    background: var(--hover);
+  }
+  .issue-row.selected,
+  .issue-card.selected {
+    background: var(--selected);
+    box-shadow: inset 3px 0 var(--progress);
+  }
+  .twisty {
+    width: 18px;
+    color: var(--muted);
+  }
+  .row-main {
+    min-width: 0;
+  }
+  .row-title {
+    display: flex;
+    gap: 7px;
+    min-width: 0;
+    align-items: baseline;
+  }
+  .row-title .title {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 650;
+  }
+  .row-meta {
+    color: var(--muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+  .id {
+    color: var(--progress);
+    font-weight: 650;
+  }
+  .status-open { color: var(--open); }
+  .status-progress { color: var(--progress); }
+  .status-blocked { color: var(--danger); }
+  .priority-high { color: var(--priority); }
+  .type-bug { color: var(--danger); }
+  .type-feature { color: var(--open); }
+  .type-task { color: var(--progress); }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--text-soft);
+    font-size: 12px;
+  }
+  .badge.open { color: var(--open); }
+  .badge.progress { color: var(--progress); }
+  .badge.blocked { color: var(--danger); }
+  .badge.priority { color: var(--priority); }
+
+  .sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.30);
+  }
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    min-height: 64%;
+    max-height: 90%;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -22px 50px var(--shadow);
+  }
+  .sheet.full {
+    top: 0;
+    min-height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+  .grabber {
+    height: 20px;
+    display: grid;
+    place-items: center;
+  }
+  .grabber::before {
+    content: "";
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+  .sheet-title {
+    padding: 0 16px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-title h2 {
+    margin: 2px 0 8px;
+    font-size: 18px;
+    line-height: 23px;
+  }
+  .sheet-title .line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .back-inline {
+    min-height: 30px;
+    padding: 0 8px;
+    border-radius: 7px;
+    color: var(--progress);
+  }
+  .back-inline:hover {
+    background: var(--hover);
+  }
+  .sheet-body {
+    overflow: auto;
+    padding: 14px 16px 20px;
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 6px 12px;
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+  .detail-grid dt {
+    color: var(--muted);
+  }
+  .detail-grid dd {
+    margin: 0;
+    color: var(--text-soft);
+  }
+  .section-title {
+    margin: 16px 0 6px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .detail-copy {
+    max-width: 68ch;
+    color: var(--text-soft);
+  }
+  .sheet-actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .action {
+    min-height: 40px;
+    flex: 1;
+    border-radius: 8px;
+    background: var(--surface-3);
+    color: var(--text-soft);
+  }
+  .action.primary {
+    background: color-mix(in oklab, var(--open) 18%, var(--surface-3));
+    color: var(--open);
+  }
+  .field {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 14px;
+  }
+  .field label {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .field input,
+  .field textarea,
+  .field select {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-1);
+    color: var(--text);
+    padding: 9px 10px;
+  }
+  .field textarea {
+    min-height: 126px;
+    resize: none;
+  }
+  .search-box {
+    position: relative;
+  }
+  .search-box input {
+    padding-left: 34px;
+  }
+  .search-box::before {
+    content: "/";
+    position: absolute;
+    left: 13px;
+    top: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .suggestions {
+    display: grid;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .suggestion {
+    min-height: 44px;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-1);
+  }
+
+  .board {
+    height: 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(260px, 1fr);
+    gap: 10px;
+    padding: 12px;
+    overflow: auto;
+  }
+  .board.phone-board {
+    grid-auto-flow: row;
+    grid-auto-rows: min-content;
+    grid-auto-columns: auto;
+    gap: 12px;
+  }
+  .board.wide-board {
+    grid-auto-columns: minmax(320px, 1fr);
+  }
+  .column {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--surface-1) 86%, var(--surface-0));
+    overflow: hidden;
+  }
+  .column-head {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-bottom: 2px solid var(--column-color, var(--line));
+    color: var(--text);
+    font-weight: 700;
+  }
+  .column-head span {
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .column-body {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+  }
+  .lane-head {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 -10px 2px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--surface-1);
+    color: var(--text-soft);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .lane-head .bar {
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .lane-head .bar i {
+    display: block;
+    height: 100%;
+    width: var(--pct);
+    background: var(--lane-color, var(--progress));
+  }
+  .issue-card {
+    width: 100%;
+    display: grid;
+    gap: 4px;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--card-color, var(--line));
+    border-radius: 8px;
+    background: var(--surface-raised);
+    color: var(--text);
+    text-align: left;
+  }
+  .issue-card .card-title {
+    display: flex;
+    gap: 7px;
+    min-width: 0;
+  }
+  .issue-card .card-title strong {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .issue-card .parent {
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .split {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(320px, 38%) minmax(0, 1fr);
+  }
+  .tablet.landscape .split {
+    grid-template-columns: 420px minmax(0, 1fr);
+  }
+  .list-pane {
+    min-width: 0;
+    border-right: 1px solid var(--line);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .pane-title {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .detail-pane {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    background: var(--surface-1);
+  }
+  .detail-pane-head {
+    display: grid;
+    gap: 8px;
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .detail-pane-head h2 {
+    margin: 0;
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .detail-pane-body {
+    overflow: auto;
+    padding: 18px;
+  }
+
+  .side {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    border-right: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .side-brand {
+    min-height: 62px;
+    display: grid;
+    gap: 2px;
+    align-content: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .side-brand strong {
+    font-size: 18px;
+  }
+  .side-brand span {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .side-nav {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    padding: 12px;
+  }
+  .side-nav button {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--text-soft);
+    text-align: left;
+  }
+  .side-nav .active,
+  .side-nav button:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .side-foot {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .work {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .work.desktop-grid {
+    grid-template-columns: minmax(0, 1fr) 430px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .work.wide-grid {
+    grid-template-columns: minmax(0, 1fr) 560px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .work > .topbar {
+    grid-column: 1 / -1;
+  }
+  .desktop-board-wrap {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .desktop-detail {
+    min-height: 0;
+    border-left: 1px solid var(--line);
+    background: var(--surface-1);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .desktop-detail .detail-copy {
+    max-width: 66ch;
+  }
+
+  .context-menu {
+    position: fixed;
+    z-index: 100;
+    width: 190px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-3);
+    box-shadow: 0 18px 44px var(--shadow);
+    display: none;
+  }
+  .context-menu.open {
+    display: block;
+  }
+  .context-menu button {
+    width: 100%;
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    border-radius: 6px;
+    text-align: left;
+    color: var(--text-soft);
+  }
+  .context-menu button:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  @media (max-width: 900px) {
+    .lab {
+      position: static;
+      grid-template-columns: 1fr;
+    }
+    .legend {
+      grid-template-columns: 1fr;
+    }
+    .preview {
+      padding: 14px 10px;
+    }
+  }
+</style>
+</head>
+<body data-direction="b">
+<header class="lab">
+  <div>
+    <h1>b9s responsive web directions</h1>
+    <p class="note">Static mockups for the approved B1 plan. Text uses system UI, with monospace only for ids, code and commands.</p>
+  </div>
+  <div class="control-group">
+    <div class="control-title">Direction</div>
+    <div class="pill-row" id="directionControls">
+      <button data-direction="a" aria-pressed="false">A calm terminal</button>
+      <button data-direction="b" aria-pressed="true">B workbench</button>
+      <button data-direction="c" aria-pressed="false">C graphite</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <div class="control-title">Screen</div>
+    <div class="pill-row" id="screenControls">
+      <a href="#phone-tree" data-screen="phone-tree">Phone tree</a>
+      <a href="#phone-detail" data-screen="phone-detail">Phone detail</a>
+      <a href="#phone-board" data-screen="phone-board">Phone board</a>
+      <a href="#phone-search" data-screen="phone-search">Phone search</a>
+      <a href="#phone-edit" data-screen="phone-edit">Phone edit</a>
+      <a href="#tablet-portrait" data-screen="tablet-portrait">Tablet 820</a>
+      <a href="#tablet-landscape" data-screen="tablet-landscape">Tablet 1180</a>
+      <a href="#desktop" data-screen="desktop">Desktop 1440</a>
+      <a href="#wide" data-screen="wide">Wide 2560</a>
+    </div>
+  </div>
+  <div class="legend" id="directionLegend"></div>
+</header>
+<main class="preview">
+  <div class="stage" id="stage"></div>
+</main>
+<div class="context-menu" id="contextMenu" role="menu" aria-label="Row actions">
+  <button role="menuitem">Open detail</button>
+  <button role="menuitem">Set in progress</button>
+  <button role="menuitem">Add comment</button>
+  <button role="menuitem">Copy id</button>
+  <button role="menuitem">Close issue</button>
+</div>
+<script>
+  const directions = {
+    a: {
+      name: "A calm terminal",
+      note: "Closest to today's b9s: the dark terminal base remains, but colour is reserved for state and priority."
+    },
+    b: {
+      name: "B workbench",
+      note: "Recommended: it keeps b9s dense and dark, adds native web structure, and feels least like a terminal skin."
+    },
+    c: {
+      name: "C graphite",
+      note: "The quietest option: more neutral surfaces, soft focus, and colour that appears only at decision points."
+    }
+  };
+
+  const screens = {
+    "phone-tree": { label: "Phone tree", kind: "phone", width: 390, height: 780 },
+    "phone-detail": { label: "Phone detail sheet", kind: "phone", width: 390, height: 780 },
+    "phone-board": { label: "Phone board", kind: "phone", width: 390, height: 780 },
+    "phone-search": { label: "Phone search sheet", kind: "phone", width: 390, height: 780 },
+    "phone-edit": { label: "Phone edit sheet", kind: "phone", width: 390, height: 780 },
+    "tablet-portrait": { label: "Tablet portrait", kind: "tablet", width: 820, height: 1080 },
+    "tablet-landscape": { label: "Tablet landscape", kind: "tablet landscape", width: 1180, height: 820 },
+    desktop: { label: "Desktop", kind: "desktop", width: 1440, height: 900 },
+    wide: { label: "Wide", kind: "wide", width: 2560, height: 960 }
+  };
+
+  const issues = [
+    { id: "7nw", title: "Spring launch", status: "blocked", priority: "P0", type: "epic", owner: "kim", age: "14m", depth: 0, kids: "0/3", parent: "" },
+    { id: "7nw.3", title: "Load test checkout at 10x traffic", status: "blocked", priority: "P1", type: "task", owner: "alex", age: "13m", depth: 1, kids: "", parent: "7nw Spring launch" },
+    { id: "7nw.1", title: "Spring catalogue", status: "in progress", priority: "P1", type: "feature", owner: "kim", age: "13m", depth: 1, kids: "1/3", parent: "7nw Spring launch" },
+    { id: "7nw.1.1", title: "Upload the spring catalogue", status: "in progress", priority: "P1", type: "task", owner: "kim", age: "13m", depth: 2, kids: "", parent: "7nw.1 Spring catalogue" },
+    { id: "7nw.1.3", title: "Write the product description set", status: "open", priority: "P2", type: "task", owner: "kim", age: "14m", depth: 2, kids: "", parent: "7nw.1 Spring catalogue" },
+    { id: "7nw.2", title: "Launch campaign", status: "open", priority: "P2", type: "feature", owner: "kim", age: "14m", depth: 1, kids: "0/2", parent: "7nw Spring launch" },
+    { id: "7nw.2.1", title: "Homepage banner for spring", status: "blocked", priority: "P2", type: "task", owner: "kim", age: "14m", depth: 2, kids: "", parent: "7nw.2 Launch campaign" },
+    { id: "7nw.2.2", title: "Newsletter to existing customers", status: "blocked", priority: "P2", type: "task", owner: "kim", age: "14m", depth: 2, kids: "", parent: "7nw.2 Launch campaign" },
+    { id: "wv3", title: "Checkout", status: "open", priority: "P1", type: "epic", owner: "sam", age: "14m", depth: 0, kids: "0/3", parent: "" },
+    { id: "wv3.2", title: "Card payments through the provider", status: "in progress", priority: "P1", type: "feature", owner: "alex", age: "13m", depth: 1, kids: "1/4", parent: "wv3 Checkout" },
+    { id: "wv3.2.4", title: "Double click on Pay charges twice", status: "in progress", priority: "P0", type: "bug", owner: "sam", age: "13m", depth: 2, kids: "", parent: "wv3.2 Card payments through the provider" },
+    { id: "wv3.2.2", title: "Handle the payment webhook", status: "in progress", priority: "P1", type: "task", owner: "alex", age: "13m", depth: 2, kids: "", parent: "wv3.2 Card payments through the provider" },
+    { id: "wv3.2.3", title: "Refund an order from the admin page", status: "blocked", priority: "P2", type: "task", owner: "alex", age: "13m", depth: 2, kids: "", parent: "wv3.2 Card payments through the provider" },
+    { id: "wv3.1", title: "Shopping cart", status: "open", priority: "P1", type: "feature", owner: "sam", age: "14m", depth: 1, kids: "1/3", parent: "wv3 Checkout" },
+    { id: "wv3.1.2", title: "Keep the cart between visits", status: "in progress", priority: "P2", type: "task", owner: "sam", age: "13m", depth: 2, kids: "", parent: "wv3.1 Shopping cart" },
+    { id: "wv3.1.3", title: "Apply a discount code", status: "open", priority: "P3", type: "task", owner: "jo", age: "13m", depth: 2, kids: "", parent: "wv3.1 Shopping cart" },
+    { id: "21o", title: "Product search", status: "blocked", priority: "P0", type: "epic", owner: "robin", age: "14m", depth: 0, kids: "0/3", parent: "" },
+    { id: "21o.2", title: "Match misspelt product names", status: "open", priority: "P2", type: "feature", owner: "robin", age: "13m", depth: 1, kids: "0/2", parent: "21o Product search" },
+    { id: "21o.2.2", title: "Fuzzy match on product titles", status: "open", priority: "P2", type: "task", owner: "jo", age: "13m", depth: 2, kids: "", parent: "21o.2 Match misspelt product names" },
+    { id: "21o.1.3", title: "Search takes 4 s on a cold cache", status: "in progress", priority: "P1", type: "bug", owner: "robin", age: "13m", depth: 1, kids: "", parent: "21o Product search" },
+    { id: "21o.3.2", title: "Filter panel on the results page", status: "blocked", priority: "P3", type: "task", owner: "jo", age: "13m", depth: 1, kids: "", parent: "21o Product search" }
+  ];
+
+  let state = {
+    direction: "b",
+    screen: "phone-tree",
+    selected: "wv3",
+    menu: null
+  };
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const selectedIssue = () => issues.find(issue => issue.id === state.selected) || issues[8];
+  const statusClass = status => status === "open" ? "status-open" : status === "blocked" ? "status-blocked" : "status-progress";
+  const shortStatus = status => status === "in progress" ? "in prog" : status;
+  const typeClass = type => type === "bug" ? "type-bug" : type === "feature" ? "type-feature" : "type-task";
+  const cardColor = issue => issue.status === "blocked" ? "var(--danger)" : issue.status === "in progress" ? "var(--progress)" : "var(--open)";
+  const escapeAttr = value => String(value).replace(/"/g, "&quot;");
+
+  function issueRow(issue) {
+    const selected = issue.id === state.selected ? " selected" : "";
+    const kids = issue.kids ? `<span class="badge ${issue.status === "blocked" ? "blocked" : issue.status === "open" ? "open" : "progress"}">${issue.kids}</span>` : "";
+    const twisty = issue.type === "epic" || issue.type === "feature" ? "v" : "";
+    return `<button class="issue-row js-open js-context${selected}" data-id="${issue.id}" style="--depth:${issue.depth}">
+      <span class="twisty mono">${twisty}</span>
+      <span class="row-main">
+        <span class="row-title"><span class="id">${issue.id}</span><span class="title">${issue.title}</span></span>
+        <span class="row-meta"><span class="${statusClass(issue.status)}">${shortStatus(issue.status)}</span> - <span class="priority-high">${issue.priority}</span> - <span class="${typeClass(issue.type)}">${issue.type}</span> - @${issue.owner} - ${issue.age}</span>
+      </span>
+      ${kids}
+    </button>`;
+  }
+
+  function issueCard(issue) {
+    const selected = issue.id === state.selected ? " selected" : "";
+    return `<button class="issue-card js-open js-context${selected}" data-id="${issue.id}" style="--card-color:${cardColor(issue)}">
+      <span class="card-title"><span class="id">${issue.id}</span><strong>${issue.title}</strong></span>
+      <span class="row-meta"><span class="${statusClass(issue.status)}">${shortStatus(issue.status)}</span> - <span class="priority-high">${issue.priority}</span> - <span class="${typeClass(issue.type)}">${issue.type}</span> - @${issue.owner} - ${issue.age}</span>
+      ${issue.parent ? `<span class="parent">${issue.parent}</span>` : ""}
+    </button>`;
+  }
+
+  function topbar() {
+    return `<div class="topbar">
+      <span class="brand">b9s</span><span class="project">webshop</span><span class="status-dot"></span>
+      <span class="countline"><b>25</b> open - <span class="status-progress">9</span> in progress - <span class="status-blocked">10</span> blocked</span>
+      <span class="top-actions"><button class="icon-button" aria-label="Focus">F</button><button class="icon-button" aria-label="Create">+</button><button class="icon-button" aria-label="Help">?</button></span>
+    </div>`;
+  }
+
+  function chips() {
+    return `<div class="chipbar">
+      <span class="chip open">o Open 25</span>
+      <span class="chip progress">i In prog 9</span>
+      <span class="chip blocked">b Blocked 10</span>
+      <span class="chip priority">d Deferred 2</span>
+    </div>`;
+  }
+
+  function phoneNav(active) {
+    const item = (id, icon, label) => `<button class="${active === id ? "active" : ""}" data-nav="${id}"><b>${icon}</b>${label}</button>`;
+    return `<nav class="phone-nav" aria-label="Phone navigation">
+      ${item("phone-tree", "T", "Tree")}
+      ${item("phone-board", "B", "Board")}
+      ${item("phone-search", "S", "Search")}
+      ${item("phone-edit", "+", "Edit")}
+    </nav>`;
+  }
+
+  function treeList(limit) {
+    return `<div class="tree">${issues.slice(0, limit || issues.length).map(issueRow).join("")}</div>`;
+  }
+
+  function detailContent(issue) {
+    const children = issues.filter(candidate => candidate.parent.startsWith(issue.id)).slice(0, 4);
+    return `<dl class="detail-grid">
+      <dt>Status</dt><dd><span class="${statusClass(issue.status)}">${issue.status}</span></dd>
+      <dt>Priority</dt><dd><span class="priority-high">${issue.priority}</span></dd>
+      <dt>Type</dt><dd><span class="${typeClass(issue.type)}">${issue.type}</span></dd>
+      <dt>Owner</dt><dd>@${issue.owner}</dd>
+      <dt>Updated</dt><dd>${issue.age} ago</dd>
+      <dt>Parent</dt><dd>${issue.parent || "No parent"}</dd>
+    </dl>
+    <div class="section-title">Description</div>
+    <p class="detail-copy">${issue.title} keeps the current b9s issue model visible while the web layout uses native panes, sheets and menus for each screen size.</p>
+    <p class="detail-copy">The detail line length stays readable. Dense metadata remains present, but the page no longer depends on terminal-style chrome to explain itself.</p>
+    <div class="section-title">Children</div>
+    <div class="suggestions">
+      ${(children.length ? children : issues.slice(10, 13)).map(child => `<button class="suggestion js-open" data-id="${child.id}"><span class="id">${child.id}</span> ${child.title}</button>`).join("")}
+    </div>
+    <div class="section-title">Comments</div>
+    <p class="detail-copy"><span class="mono">@kim</span> The same issue can open as a sheet on phones, a split detail on tablets, and a panel on desktop.</p>`;
+  }
+
+  function detailSheet(full) {
+    const issue = selectedIssue();
+    return `<div class="sheet-backdrop"></div>
+    <section class="sheet ${full ? "full" : ""}">
+      <div>
+        <div class="grabber"></div>
+        <div class="sheet-title">
+          <div class="line"><button class="back-inline" data-nav="phone-tree">Back</button><span class="id">${issue.id}</span><span>${issue.priority}</span><span class="${statusClass(issue.status)}">${issue.status}</span></div>
+          <h2>${issue.title}</h2>
+          <div class="line">${issue.parent || "Top level"} - @${issue.owner} - ${issue.age}</div>
+        </div>
+      </div>
+      <div class="sheet-body">${detailContent(issue)}</div>
+      <div class="sheet-actions"><button class="action primary">Status</button><button class="action">Edit</button><button class="action">Comment</button><button class="action">More</button></div>
+    </section>`;
+  }
+
+  function phoneScreen(screen) {
+    if (screen === "phone-detail") {
+      return `<div class="app phone">
+        <div>${topbar()}${chips()}</div>
+        <div class="scroll" style="position:relative">${treeList(15)}${detailSheet(false)}</div>
+        ${phoneNav("phone-tree")}
+      </div>`;
+    }
+    if (screen === "phone-search") {
+      return `<div class="app phone">
+        <div class="phone-head"><button class="back" data-nav="phone-tree">Back</button><div class="title">Search</div><button class="done">Done</button></div>
+        <div class="scroll" style="position:relative">${treeList(13)}
+          <section class="sheet full">
+            <div class="sheet-title"><div class="grabber"></div><div class="search-box"><input value="status:open checkout" aria-label="Search query"></div></div>
+            <div class="sheet-body">
+              <div class="section-title">Suggestions</div>
+              <div class="suggestions">
+                <button class="suggestion">status:open assignee:sam</button>
+                <button class="suggestion">priority:P1 type:feature</button>
+                <button class="suggestion">parent:wv3 updated:&lt;1h</button>
+              </div>
+              <div class="section-title">Results</div>
+              ${issues.filter(issue => issue.id.startsWith("wv3")).map(issueRow).join("")}
+            </div>
+          </section>
+        </div>
+        ${phoneNav("phone-search")}
+      </div>`;
+    }
+    if (screen === "phone-edit") {
+      const issue = selectedIssue();
+      return `<div class="app phone">
+        <div class="phone-head"><button class="back" data-nav="phone-tree">Back</button><div class="title">Edit</div><button class="done">Save</button></div>
+        <div class="scroll" style="position:relative">
+          <section class="sheet full">
+            <div class="sheet-title"><div class="grabber"></div><div class="line"><span class="id">${issue.id}</span><span>${issue.priority}</span></div><h2>${issue.title}</h2></div>
+            <div class="sheet-body">
+              <div class="field"><label for="title">Title</label><input id="title" value="${escapeAttr(issue.title)}"></div>
+              <div class="field"><label for="status">Status</label><select id="status"><option>open</option><option selected>in progress</option><option>blocked</option></select></div>
+              <div class="field"><label for="owner">Assignee</label><input id="owner" value="@${issue.owner}"></div>
+              <div class="field"><label for="notes">Notes</label><textarea id="notes">Keep dense issue data, but use a sheet pattern that feels native on phone.</textarea></div>
+            </div>
+            <div class="sheet-actions"><button class="action">Cancel</button><button class="action primary">Save</button></div>
+          </section>
+        </div>
+        ${phoneNav("phone-edit")}
+      </div>`;
+    }
+    if (screen === "phone-board") {
+      return `<div class="app phone">
+        <div>${topbar()}${chips()}</div>
+        <div class="scroll">${board({ phone: true })}</div>
+        ${phoneNav("phone-board")}
+      </div>`;
+    }
+    return `<div class="app phone">
+      <div>${topbar()}${chips()}</div>
+      <div class="scroll">${treeList()}</div>
+      ${phoneNav("phone-tree")}
+    </div>`;
+  }
+
+  function laneHead(id, title, pct, color) {
+    return `<div class="lane-head" style="--lane-color:${color}"><span class="id">${id}</span><span style="flex:1">${title}</span><span class="bar"><i style="--pct:${pct}%"></i></span></div>`;
+  }
+
+  function board(options = {}) {
+    const open = issues.filter(issue => issue.status === "open");
+    const progress = issues.filter(issue => issue.status === "in progress");
+    const blocked = issues.filter(issue => issue.status === "blocked");
+    const ready = issues.filter(issue => issue.priority === "P2").slice(0, 5);
+    const closed = issues.filter(issue => issue.type === "feature").slice(0, 4);
+    const columns = [
+      ["Open", open, "var(--open)"],
+      ["In progress", progress, "var(--progress)"],
+      ["Blocked", blocked, "var(--danger)"]
+    ];
+    if (options.wide) {
+      columns.push(["Ready", ready, "var(--priority)"], ["Closed", closed, "var(--muted)"]);
+    }
+    const columnHtml = columns.map(([title, list, color]) => `<section class="column" style="--column-color:${color}">
+      <div class="column-head">${title} <span>${list.length}</span></div>
+      <div class="column-body">
+        ${title === "Open" ? laneHead("wv3", "Checkout", 34, "var(--progress)") : ""}
+        ${list.slice(0, options.phone ? 7 : 8).map(issueCard).join("")}
+      </div>
+    </section>`).join("");
+    return `<div class="board ${options.phone ? "phone-board" : ""} ${options.wide ? "wide-board" : ""}">${columnHtml}</div>`;
+  }
+
+  function tabletScreen(landscape) {
+    return `<div class="app tablet ${landscape ? "landscape" : ""}">
+      <div>${topbar()}${chips()}</div>
+      <div class="split">
+        <aside class="list-pane">
+          <div class="pane-title"><span class="badge open">Open</span><span class="badge progress">Hardware keyboard ready</span></div>
+          <div class="scroll">${treeList()}</div>
+        </aside>
+        <section class="detail-pane">${detailPane()}</section>
+      </div>
+    </div>`;
+  }
+
+  function detailPane() {
+    const issue = selectedIssue();
+    return `<div class="detail-pane-head">
+      <div><span class="id">${issue.id}</span> <span class="badge ${issue.status === "blocked" ? "blocked" : issue.status === "open" ? "open" : "progress"}">${issue.status}</span> <span class="badge priority">${issue.priority}</span></div>
+      <h2>${issue.title}</h2>
+      <div class="row-meta">${issue.parent || "Top level"} - @${issue.owner} - updated ${issue.age} ago</div>
+    </div>
+    <div class="detail-pane-body">${detailContent(issue)}</div>`;
+  }
+
+  function sideNav(active) {
+    const item = (id, label) => `<button class="${active === id ? "active" : ""}" data-nav="${id}"><span class="mono">${label.slice(0, 1)}</span>${label}</button>`;
+    return `<aside class="side">
+      <div class="side-brand"><strong>b9s</strong><span>webshop - live</span></div>
+      <nav class="side-nav" aria-label="Desktop navigation">
+        ${item("desktop", "Board")}
+        ${item("phone-tree", "Tree")}
+        ${item("phone-search", "Search")}
+        ${item("phone-edit", "Create")}
+        ${item("wide", "Wide")}
+      </nav>
+      <div class="side-foot"><span><span class="status-dot"></span> connected</span><span>project switcher</span></div>
+    </aside>`;
+  }
+
+  function desktopScreen(wide) {
+    return `<div class="app ${wide ? "wide" : "desktop"}">
+      ${sideNav(wide ? "wide" : "desktop")}
+      <main class="work ${wide ? "wide-grid" : "desktop-grid"}">
+        ${topbar()}
+        <div class="desktop-board-wrap">${board({ wide })}</div>
+        <aside class="desktop-detail">${detailPane()}</aside>
+      </main>
+    </div>`;
+  }
+
+  function render() {
+    const screen = screens[state.screen] || screens["phone-tree"];
+    document.body.dataset.direction = state.direction;
+    $("#stage").innerHTML = `<section class="device ${screen.kind}" style="--frame-w:${screen.width}px; --frame-h:${screen.height}px" aria-label="${screen.label}">
+      ${screen.kind.startsWith("phone") ? phoneScreen(state.screen) : screen.kind.startsWith("tablet") ? tabletScreen(screen.kind.includes("landscape")) : desktopScreen(screen.kind === "wide")}
+    </section>`;
+    $("#directionLegend").innerHTML = Object.entries(directions).map(([key, value]) => `<div><strong>${value.name}${key === state.direction ? " selected" : ""}</strong><br>${value.note}</div>`).join("");
+    $$("#directionControls [data-direction]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.direction === state.direction)));
+    $$("#screenControls a").forEach(link => link.classList.toggle("active", link.dataset.screen === state.screen));
+    bindStage();
+  }
+
+  function bindStage() {
+    $$(".js-open").forEach(button => {
+      button.addEventListener("click", event => {
+        const id = event.currentTarget.dataset.id;
+        if (id) state.selected = id;
+        if (state.screen === "phone-tree" || state.screen === "phone-board") state.screen = "phone-detail";
+        render();
+      });
+      button.addEventListener("contextmenu", openMenu);
+    });
+    $$(".js-context").forEach(row => row.addEventListener("contextmenu", openMenu));
+    $$("[data-nav]", $("#stage")).forEach(button => {
+      button.addEventListener("click", () => {
+        state.screen = button.dataset.nav;
+        updateHash();
+        render();
+      });
+    });
+  }
+
+  function openMenu(event) {
+    event.preventDefault();
+    const id = event.currentTarget.dataset.id;
+    if (id) state.selected = id;
+    const menu = $("#contextMenu");
+    menu.classList.add("open");
+    const x = Math.min(event.clientX, window.innerWidth - 210);
+    const y = Math.min(event.clientY, window.innerHeight - 210);
+    menu.style.left = `${Math.max(8, x)}px`;
+    menu.style.top = `${Math.max(8, y)}px`;
+    render();
+  }
+
+  function updateHash() {
+    history.replaceState(null, "", `#${state.screen}`);
+  }
+
+  $("#directionControls").addEventListener("click", event => {
+    const button = event.target.closest("[data-direction]");
+    if (!button) return;
+    state.direction = button.dataset.direction;
+    render();
+  });
+  $("#screenControls").addEventListener("click", event => {
+    const link = event.target.closest("[data-screen]");
+    if (!link) return;
+    event.preventDefault();
+    state.screen = link.dataset.screen;
+    updateHash();
+    render();
+  });
+  document.addEventListener("click", event => {
+    const menu = $("#contextMenu");
+    if (!event.target.closest("#contextMenu")) menu.classList.remove("open");
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") $("#contextMenu").classList.remove("open");
+  });
+
+  const initial = location.hash.replace("#", "");
+  if (screens[initial]) state.screen = initial;
+  render();
+</script>
+</body>
+</html>
