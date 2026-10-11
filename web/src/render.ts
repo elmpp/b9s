@@ -5,32 +5,42 @@
 import * as api from "./api";
 import type { Issue } from "./api.gen";
 import { D, ancestors, blocksOf, descendants, eff, get, isReady, kids, laneOf, openBlockers, pool, progress, projectOf, shortId, type Item } from "./data";
-import { PC, S, SORTS, matches, queryString, stOf, treeRows, tyOf, type TreeRow } from "./state";
+import { S, SORTS, matches, queryString, stOf, treeRows, type TreeRow } from "./state";
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
 import { $, $opt, age, esc, fmtDate, md, sizeClass, split, store } from "./util";
 
+const metaSep = '<span class="msep">-</span>';
+
+function statusDotHTML(status: string): string {
+  return `<span class="st" style="--sc:${stOf(status).c}" aria-hidden="true"></span>`;
+}
+
+function statusMetaHTML(status: string): string {
+  const st = stOf(status);
+  return `<span class="mi stw" style="--sc:${st.c}"><span class="sdot" aria-hidden="true"></span>${esc(st.w)}</span>`;
+}
+
 export function l2HTML(i: Item, opts: { proj?: boolean; status?: boolean } = {}): string {
   const bits: string[] = [];
-  const [tg, tc] = tyOf(i.type);
-  if (S.cols.has("status") && opts.status !== false) { const st = stOf(eff(i)); bits.push(`<span class="stw" style="color:${st.c}">${esc(st.w)}</span>`); }
-  if (S.cols.has("prio")) bits.push(`<span style="color:${PC[i.priority] || "var(--muted)"}">P${i.priority}</span>`);
-  if (S.cols.has("type")) bits.push(`<span style="color:${tc}">${tg} ${esc(i.type)}</span>`);
-  if (S.cols.has("who") && i.assignee) bits.push(`<span style="color:var(--dim)">@${esc(i.assignee)}</span>`);
-  if (S.cols.has("age")) bits.push(`<span>${age(i.upd)}</span>`);
+  if (S.cols.has("status") && opts.status !== false) bits.push(statusMetaHTML(eff(i)));
+  if (S.cols.has("prio")) bits.push(`<span class="mi prio">P${i.priority}</span>`);
+  if (S.cols.has("type")) bits.push(`<span class="mi typ">${esc(i.type)}</span>`);
+  if (S.cols.has("who") && i.assignee) bits.push(`<span class="mi who">@${esc(i.assignee)}</span>`);
+  if (S.cols.has("age")) bits.push(`<span class="mi age">${age(i.upd)}</span>`);
   const pr = progress(i.id);
-  if (S.cols.has("kids") && pr) bits.push(`<span style="color:var(--green)">${pr.done}/${pr.all}</span>`);
+  if (S.cols.has("kids") && pr) bits.push(`<span class="mi count">${pr.done}/${pr.all}</span>`);
   if (S.cols.has("deps")) {
     const ob = openBlockers(i).length;
-    if (ob) bits.push(`<span style="color:var(--red)">⊘${ob}</span>`);
+    if (ob) bits.push(`<span class="mi count">blocked-by ${ob}</span>`);
     const bl = blocksOf(i).filter(x => !x.closed_like).length;
-    if (bl) bits.push(`<span style="color:var(--orange)">→${bl}</span>`);
+    if (bl) bits.push(`<span class="mi count">blocks ${bl}</span>`);
   }
-  if (S.cols.has("notes") && i.comment_count) bits.push(`<span>✎${i.comment_count}</span>`);
-  if (S.cols.has("labels") && i.labels.length) bits.push(`<span style="color:var(--cyan)">#${esc(i.labels.join(" #"))}</span>`);
-  if (opts.proj && D.project.all) bits.push(`<span style="color:var(--accent)">${esc(projectOf(i))}</span>`);
-  return `<div class="l2">${bits.join("<span>·</span>")}</div>`;
+  if (S.cols.has("notes") && i.comment_count) bits.push(`<span class="mi count">comments ${i.comment_count}</span>`);
+  if (S.cols.has("labels") && i.labels.length) bits.push(`<span class="mi label">#${esc(i.labels.join(" #"))}</span>`);
+  if (opts.proj && D.project.all) bits.push(`<span class="mi proj">${esc(projectOf(i))}</span>`);
+  return `<div class="l2">${bits.join(metaSep)}</div>`;
 }
 
 export function rowHTML(r: TreeRow, flat = false): string {
@@ -40,7 +50,7 @@ export function rowHTML(r: TreeRow, flat = false): string {
   const chev = flat ? "" : `<span class="chev ${r.hasKids ? "" : "none"}" data-chev aria-hidden="true">${r.hasKids ? (r.folded ? "▸" : "▾") : "·"}</span>`;
   const mk = S.marking ? `<span class="mk">${S.marks.has(i.id) ? "▪" : "▫"}</span>` : "";
   const label = `${shortId(i.id)} ${i.t}, ${st.w}, P${i.priority} ${i.type}${S.marks.has(i.id) ? ", marked" : ""}`;
-  return `<div class="${cls}" data-id="${esc(i.id)}" role="listitem" tabindex="0" aria-label="${esc(label)}"><div class="ul"></div><div class="ur"></div><div class="rc" style="--d:${flat ? 0 : Math.min(r.d, 6)}"><div class="l1">${mk}${chev}<span class="st" style="color:${st.c}">${st.g}</span><span class="id">${esc(shortId(i.id))}</span><span class="t">${esc(i.t)}</span></div>${l2HTML(i, { proj: true })}</div></div>`;
+  return `<div class="${cls}" data-id="${esc(i.id)}" role="listitem" tabindex="0" aria-label="${esc(label)}"><div class="ul"></div><div class="ur"></div><div class="rc" style="--d:${flat ? 0 : Math.min(r.d, 6)}"><div class="l1">${mk}${chev}<span class="id">${esc(shortId(i.id))}</span><span class="t">${esc(i.t)}</span></div>${l2HTML(i, { proj: true })}</div></div>`;
 }
 
 /* ================= shell ================= */
@@ -78,10 +88,11 @@ function renderHeader(): void {
   const n = (s: string) => P.filter(i => eff(i) === s).length;
   const pname = D.project.all ? "all" : D.project.name;
   const bad = S.live === "stale" || (D.health && !D.health.ok);
-  const proj = `b9s <small>·</small> ${esc(pname)}${D.project.read_only ? ` <span class="ro">ro</span>` : ""}`;
+  const proj = `<span class="prompt">$</span> b9s <small>/</small> ${esc(pname)}${D.project.read_only ? ` <span class="ro">ro</span>` : ""}`;
+  const stat = (label: string, color: string, count: number) => `<span class="hstat" style="--sc:${color}"><span class="sdot" aria-hidden="true"></span>${count} ${label}</span>`;
   $("#hd").innerHTML = (D.public ? `<span class="proj">${proj}</span>` : `<button class="proj" data-act="projects" aria-label="Switch project">${proj} <small>▾</small></button>`) + `
     <button class="dot ${bad ? "bad" : ""}" id="hdot" data-act="health" aria-label="Data source health">●</button>
-    <span class="cnt"><b>${n("open")}</b> open · <i>${n("in_progress")}</i> prog${n("blocked") ? ` · <span style="color:var(--red)">${n("blocked")}</span> blk` : ""}</span>
+    <span class="cnt">${stat("open", "var(--open)", n("open"))}${stat("in progress", "var(--progress)", n("in_progress"))}${n("blocked") ? stat("blocked", "var(--danger)", n("blocked")) : ""}</span>
     <button class="ib follow ${S.follow ? "on" : ""}" data-act="follow" aria-label="Follow mode" aria-pressed="${S.follow}">F</button>
     <button class="ib" data-act="create" aria-label="Create issue">+</button>
     <button class="ib" data-act="help" aria-label="Gestures">?</button>`;
@@ -94,20 +105,20 @@ function renderChips(): void {
   const cnt = (s: string) => P.filter(i => eff(i) === s).length;
   const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n));
   const chip = (k: string, key: string, label: string, color: string, on: boolean, n: number | null) =>
-    `<button class="chip ${on ? "on" : ""}" data-chip="${key}" style="color:${color}" aria-pressed="${on}"><span class="k">${k}</span>${label}${n != null ? ` <span class="n">${fmt(n)}</span>` : ""}</button>`;
-  let h = chip("o", "open", "Open", "var(--green)", S.st.has("open"), cnt("open"))
-    + chip("i", "in_progress", "In prog", "var(--cyan)", S.st.has("in_progress"), cnt("in_progress"))
-    + chip("b", "blocked", "Blocked", "var(--red)", S.st.has("blocked"), cnt("blocked"))
-    + chip("d", "deferred", "Deferred", "var(--orange)", S.st.has("deferred"), cnt("deferred"))
+    `<button class="chip ${on ? "on" : ""}" data-chip="${key}" style="--sc:${color}" aria-pressed="${on}" title="${esc(k)}">${label}${n != null ? ` <span class="n">${fmt(n)}</span>` : ""}</button>`;
+  let h = chip("o", "open", "Open", "var(--open)", S.st.has("open"), cnt("open"))
+    + chip("i", "in_progress", "In prog", "var(--progress)", S.st.has("in_progress"), cnt("in_progress"))
+    + chip("b", "blocked", "Blocked", "var(--danger)", S.st.has("blocked"), cnt("blocked"))
+    + chip("d", "deferred", "Deferred", "var(--priority)", S.st.has("deferred"), cnt("deferred"))
     + chip("C", "closed", "Closed", "var(--muted)", S.st.has("closed"), cnt("closed"))
-    + chip("r", "ready", "Ready", "var(--yellow)", S.ready, P.filter(isReady).length)
+    + chip("r", "ready", "Ready", "var(--priority)", S.ready, P.filter(isReady).length)
     + chip("a", "all", "All", "var(--dim)", S.st.size === 0 && !S.ready, null);
   h += `<span class="sep"></span>`;
   if (S.text.trim()) {
     const err = S.qres && S.qres.text === S.text && S.qres.error;
     h += `<button class="chip q ${err ? "err" : ""}" data-act="search"><span>⌕ ${esc(S.text.trim())}</span></button><button class="chip" data-act="clearq" aria-label="Clear query">✕</button>`;
-  } else h += `<button class="chip" data-act="search" style="color:var(--muted)">⌕ query</button>`;
-  h += `<button class="chip" data-act="sort" style="color:var(--dim)">⇅ ${S.sort}</button>`;
+  } else h += `<button class="chip" data-act="search">⌕ query</button>`;
+  h += `<button class="chip" data-act="sort">⇅ ${S.sort}</button>`;
   el.innerHTML = h;
 }
 
@@ -253,10 +264,9 @@ function cardTagsHTML(i: Item): string {
  */
 function cardHTML(i: Item, depth = 0): string {
   const st = stOf(eff(i));
-  const [tg, tc] = tyOf(i.type);
   const sel = S.cursor === i.id;
   const open = sel ? `${l2HTML(i, { proj: true, status: S.board.group !== "status" })}` : "";
-  return `<div class="card ${sel ? "sel" : ""} ${S.flash.has(i.id) ? "flash" : ""}" data-card="${esc(i.id)}" tabindex="0" role="listitem" aria-label="${esc(shortId(i.id) + " " + i.t + ", " + st.w)}" style="--c:${tc};--d:${depth}"><div class="l1"><span class="ty" style="color:${tc}">${tg}</span><span class="id">${esc(shortId(i.id))}</span><span class="t">${esc(i.t)}</span>${cardTagsHTML(i)}</div>${open}${parentLineHTML(i)}</div>`;
+  return `<div class="card ${sel ? "sel" : ""} ${S.flash.has(i.id) ? "flash" : ""}" data-card="${esc(i.id)}" tabindex="0" role="listitem" aria-label="${esc(shortId(i.id) + " " + i.t + ", " + st.w)}" style="--d:${depth}"><div class="l1">${statusDotHTML(eff(i))}<span class="id">${esc(shortId(i.id))}</span><span class="t">${esc(i.t)}</span>${cardTagsHTML(i)}</div>${open}${parentLineHTML(i)}</div>`;
 }
 
 /**
@@ -326,7 +336,7 @@ function laneHTML(l: string, n: number, facts = false): string {
   const lo = l === "none" ? "" : " data-lopen";
   const more = ef && e ? `<span class="lf">${epicCountsHTML(ef)}${ef.urgent ? `<span class="tp">P1 ${ef.urgent}</span>` : ""}${epicMetaHTML(e, ef)}</span>` : "";
   const sum = ef && e && e.summary ? `<span class="ls">${esc(e.summary)}</span>` : "";
-  return `<button class="lane${ef ? " lfacts" : ""}" data-lane="${esc(l)}" aria-expanded="${!f}" style="--ec:${epicHue(l)}"><span class="ch"${lo}>${f ? "▸" : "▾"}</span><span class="ei"${lo}>${l === "none" ? "·" : "◆ " + esc(shortId(l))}</span><span class="t">${l === "none" ? "No epic" : esc(e ? e.t : l)}</span>${more}${bar}<span class="n">${ef ? `${ef.done}/${ef.all}` : n}</span>${sum}</button>`;
+  return `<button class="lane${ef ? " lfacts" : ""}" data-lane="${esc(l)}" aria-expanded="${!f}"><span class="ch"${lo}>${f ? "▸" : "▾"}</span><span class="ei"${lo}>${l === "none" ? "none" : esc(shortId(l))}</span><span class="t">${l === "none" ? "No epic" : esc(e ? e.t : l)}</span>${more}${bar}<span class="n">${ef ? `${ef.done}/${ef.all}` : n}</span>${sum}</button>`;
 }
 
 /**
@@ -338,7 +348,7 @@ function railHTML(lanes: [string, Item[]][]): string {
   const total = lanes.reduce((a, [, arr]) => a + arr.length, 0);
   const on = S.board.lane && lanes.some(([l]) => l === S.board.lane) ? S.board.lane : lanes[0]?.[0];
   return `<div class="brail"><button data-rlane="" aria-label="Scroll to the top">all<b>${total}</b></button>`
-    + lanes.map(([l, arr]) => `<button class="${on === l ? "on" : ""}" data-rlane="${esc(l)}" style="--ec:${epicHue(l)}" aria-label="${l === "none" ? "No epic" : esc(shortId(l))}, ${arr.length} cards. Long press folds">${l === "none" ? "no epic" : "♦" + esc(shortId(l))}<b>${arr.length}</b></button>`).join("") + `</div>`;
+    + lanes.map(([l, arr]) => `<button class="${on === l ? "on" : ""}" data-rlane="${esc(l)}" aria-label="${l === "none" ? "No epic" : esc(shortId(l))}, ${arr.length} cards. Long press folds">${l === "none" ? "no epic" : esc(shortId(l))}<b>${arr.length}</b></button>`).join("") + `</div>`;
 }
 
 /**
@@ -368,9 +378,6 @@ export function scrollToLane(l: string): void {
   col.scrollTop = g ? g.offsetTop : 0;
   spyLane();
 }
-
-const EPIC_HUES = ["var(--red)", "var(--orange)", "var(--yellow)", "var(--green)", "var(--cyan)", "var(--accent)", "var(--blue)", "var(--feat)"];
-const epicHue = (l: string) => (l === "none" ? "var(--line)" : EPIC_HUES[[...l].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % EPIC_HUES.length]);
 
 interface EpicFacts { done: number; all: number; urgent: number; wip: number; waiting: number; ready: number; last: number }
 
@@ -432,8 +439,8 @@ function epicCellHTML(l: string, n: number): string {
     const meta = epicMetaHTML(e, f);
     if (meta) body += `<div class="em">${meta}</div>`;
   } else body = `<div class="ec">${n} issue${n === 1 ? "" : "s"}</div>`;
-  return `<div class="wepic lt ${S.cursor === l ? "sel" : ""}" data-epic="${esc(l)}" style="--ec:${epicHue(l)}" tabindex="0" aria-label="${esc(label)}, ${n} issues">`
-    + `<div class="eh"><button data-lane="${esc(l)}" aria-expanded="${!f0}" aria-label="${f0 ? "Unfold" : "Fold"} lane">${f0 ? "▸" : "▾"}</button>${l === "none" ? "<span>·</span>" : `<span class="ei">◆ ${esc(shortId(l))}</span>`}<span class="t">${esc(l === "none" ? "No epic" : e ? e.t : l)}</span></div>`
+  return `<div class="wepic lt ${S.cursor === l ? "sel" : ""}" data-epic="${esc(l)}" tabindex="0" aria-label="${esc(label)}, ${n} issues">`
+    + `<div class="eh"><button data-lane="${esc(l)}" aria-expanded="${!f0}" aria-label="${f0 ? "Unfold" : "Fold"} lane">${f0 ? "▸" : "▾"}</button>${l === "none" ? "<span>none</span>" : `<span class="ei">${esc(shortId(l))}</span>`}<span class="t">${esc(l === "none" ? "No epic" : e ? e.t : l)}</span></div>`
     + body + `</div>`;
 }
 
@@ -455,7 +462,7 @@ function renderWideBoard(v: HTMLElement): void {
     const n = per.get(k)!.length;
     return folded(k)
       ? `<button class="whead rail" data-tab="${esc(k)}" data-dcol="${esc(k)}" aria-label="Unfold ${esc(l)}" title="Unfold ${esc(l)}"><span>${esc(l)}</span><b>${n}</b></button>`
-      : `<button class="whead" data-tab="${esc(k)}" data-dcol="${esc(k)}" style="--hc:${S.board.group === "status" ? stOf(k).c : "var(--line)"}" aria-label="${esc(l)}, ${n} cards. Fold" title="Fold ${esc(l)} (z)"><span>${esc(l)}</span><b>${n}</b></button>`;
+      : `<button class="whead" data-tab="${esc(k)}" data-dcol="${esc(k)}" style="--hc:var(--line)" aria-label="${esc(l)}, ${n} cards. Fold" title="Fold ${esc(l)} (z)"><span>${esc(l)}</span><b>${n}</b></button>`;
   }).join("");
   const cell = (k: string, arr: Item[]) => folded(k)
     ? `<div class="wcell rail" data-dcol="${esc(k)}"></div>`
@@ -661,7 +668,7 @@ function renderGraph(): void {
     if (!c) { v.innerHTML = `<div class="empty">No issues.</div>`; return; }
     S.graph = [c.id];
   }
-  const id = S.graph[S.graph.length - 1], i = get(id)!, st = stOf(eff(i));
+  const id = S.graph[S.graph.length - 1], i = get(id)!;
   const rowsOf = (rs: GRow[]) => rs.map(r => {
     const html = rowHTML({ i: get(r.id)!, d: 0 }, true);
     const pad = `<div class="rc" style="--d:${Math.min(r.depth, 6)}">`;
@@ -672,8 +679,8 @@ function renderGraph(): void {
   const flat = (ids: string[]) => ids.filter(x => get(x)).map(x => ({ id: x, depth: 0, cycle: false }));
   const up = i.parent && get(i.parent) ? [i.parent] : [];
   const bb = chain(id, blockedByOf), bl = chain(id, blocksIds);
-  v.innerHTML = `<div class="crumbs">${S.graph.map((g, n) => `<button data-crumb="${n}">${esc(shortId(g))}</button>`).join("<span style='color:var(--muted)'>›</span>")}</div>
-    <div class="scroll" id="gList" role="list"><button class="gnode" data-open="${esc(id)}" style="display:block;width:calc(100% - 24px);text-align:left"><div class="l1"><span class="st" style="color:${st.c}">${st.g}</span><span class="id">${esc(i.id)}</span></div><div class="t2">${esc(i.t)}</div>${l2HTML(i)}<div class="pager" style="margin-top:4px">tap for detail · tap a row below to go there</div></button>
+  v.innerHTML = `<div class="crumbs">${S.graph.map((g, n) => `<button data-crumb="${n}">${esc(shortId(g))}</button>`).join("<span class='msep'>›</span>")}</div>
+    <div class="scroll" id="gList" role="list"><button class="gnode" data-open="${esc(id)}" style="display:block;width:calc(100% - 24px);text-align:left"><div class="l1">${statusDotHTML(eff(i))}<span class="id">${esc(i.id)}</span></div><div class="t2">${esc(i.t)}</div>${l2HTML(i)}<div class="pager" style="margin-top:4px">tap for detail · tap a row below to go there</div></button>
     ${sec("Blocked by", bb)}${sec("Blocks", bl)}${sec("Parent", flat(up))}${sec("Children", flat(kids(id)))}${sec("Discovered from", flat(i.discovered_from))}
     ${!bb.length && !bl.length ? `<div class="empty">No blocking relations. Parent and children are still listed.</div>` : ""}</div>`;
 }
@@ -722,8 +729,7 @@ export function detailKids(id: string): string[] {
 function relHTML(x: string, num = 0): string {
   const j = get(x);
   if (!j) return "";
-  const st = stOf(eff(j));
-  return `<button class="rel" data-nav="${esc(x)}">${num ? `<span class="kn">${num}</span>` : ""}<span class="st" style="color:${st.c}">${st.g}</span><span class="id">${esc(shortId(x))}</span><span class="t">${esc(j.t)}</span></button>`;
+  return `<button class="rel" data-nav="${esc(x)}">${num ? `<span class="kn">${num}</span>` : ""}${statusDotHTML(eff(j))}<span class="id">${esc(shortId(x))}</span><span class="t">${esc(j.t)}</span></button>`;
 }
 
 function textSec(label: string, text: string | undefined, loading: boolean): string {
@@ -782,7 +788,7 @@ export function renderDetail(was = detailPlace()): void {
   const id = S.detail.stack[S.detail.stack.length - 1], i = get(id);
   if (!i) { S.detail = null; host.innerHTML = ""; $("#app").classList.remove("hasdetail"); return; }
   const f = fullIssue(id);
-  const st = stOf(eff(i)), [tg, tc] = tyOf(i.type);
+  const st = stOf(eff(i));
   const sib = siblings(id), pos = sib.indexOf(id);
   const pr = progress(id);
   const ob = i.blocked_by.filter(x => get(x)), bl = blocksOf(i).map(x => x.id);
@@ -801,14 +807,14 @@ export function renderDetail(was = detailPlace()): void {
     <div class="dhead" id="dhead"><div class="grab"></div>
       <div class="dtop">${back}<span class="id">${esc(i.id)}</span><span class="sp"></span><span class="pager">${pos + 1}/${sib.length} ‹ swipe ›</span><button data-act="dsize" aria-label="${size[1]}" title="${size[1]} (\\)">${size[0]}</button><button data-act="dclose" aria-label="Close">✕</button></div>
       <div class="dtitle">${esc(i.t)}</div>
-      <div class="pills"><span class="pill" style="color:${st.c}">${st.g} ${esc(i.status === eff(i) ? st.w : i.status + " · " + st.w)}</span><span class="pill" style="color:${PC[i.priority] || "var(--muted)"}">P${i.priority}</span><span class="pill" style="color:${tc}">${tg} ${esc(i.type)}</span>${i.labels.map(l => `<span class="pill" style="color:var(--cyan)">#${esc(l)}</span>`).join("")}</div>
+      <div class="pills"><span class="pill status" style="--sc:${st.c}"><span class="sdot" aria-hidden="true"></span>${esc(i.status === eff(i) ? st.w : i.status + " - " + st.w)}</span><span class="pill">P${i.priority}</span><span class="pill">${esc(i.type)}</span>${i.labels.map(l => `<span class="pill">#${esc(l)}</span>`).join("")}</div>
     </div>
     <div class="dbody" id="dbody">
       <dl class="meta"><dt>assignee</dt><dd>${i.assignee ? "@" + esc(i.assignee) : "—"}</dd><dt>creator</dt><dd>${esc(i.created_by || "—")}</dd><dt>created</dt><dd>${fmtDate(i.crt)}${i.crt ? " · " + age(i.crt) : ""}</dd><dt>updated</dt><dd>${fmtDate(i.upd)}${i.upd ? " · " + age(i.upd) : ""}</dd>${i.cls ? `<dt>closed</dt><dd>${fmtDate(i.cls)}</dd>` : ""}${i.defer_until ? `<dt>deferred</dt><dd>until ${esc(i.defer_until.slice(0, 10))}</dd>` : ""}${D.project.all ? `<dt>project</dt><dd>${esc(projectOf(i))}</dd>` : ""}</dl>
       ${i.parent && get(i.parent) ? `<div class="dsec">Parent</div>${relHTML(i.parent)}` : ""}
       ${pr ? `<div class="dsec"><span>Children ${pr.done}/${pr.all}</span><button data-act="dfocus">⌖ subtree</button></div><div class="bar2"><i style="width:${Math.round(100 * pr.done / pr.all)}%"></i></div>${detailKids(id).map((k, n) => relHTML(k, n < 9 ? n + 1 : 0)).join("")}` : ""}
-      ${ob.length ? `<div class="dsec"><span style="color:var(--red)">Blocked by ${ob.length}</span><button data-act="dgraph">⋔ graph</button></div>${ob.map(relHTML).join("")}` : ""}
-      ${bl.length ? `<div class="dsec"><span style="color:var(--orange)">Blocks ${bl.length}</span><button data-act="dgraph">⋔ graph</button></div>${bl.map(relHTML).join("")}` : ""}
+      ${ob.length ? `<div class="dsec"><span>Blocked by ${ob.length}</span><button data-act="dgraph">⋔ graph</button></div>${ob.map(relHTML).join("")}` : ""}
+      ${bl.length ? `<div class="dsec"><span>Blocks ${bl.length}</span><button data-act="dgraph">⋔ graph</button></div>${bl.map(relHTML).join("")}` : ""}
       ${i.discovered_from.some(x => get(x)) ? `<div class="dsec">Discovered from</div>${i.discovered_from.map(relHTML).join("")}` : ""}
       ${i.related.some(x => get(x)) ? `<div class="dsec">Related</div>${i.related.map(relHTML).join("")}` : ""}
       ${memoryLinks(f)}
