@@ -22,6 +22,13 @@ const sizes = [
   { name: "desktop-1920", use: { ...devices["Desktop Chrome"], viewport: { width: 1920, height: 1080 } } },
   { name: "wide-2560", use: { ...devices["Desktop Chrome"], viewport: { width: 2560, height: 1440 } } },
 ];
+const perfBaseDependencies = ["pixel", "iphone", "desktop", "desktop-safari", "desktop-firefox", "ipad", ...sizes.map(size => size.name)];
+const perfProjects = [
+  { name: "pixel-perf", use: devices["Pixel 7"], dependencies: perfBaseDependencies },
+  { name: "iphone-perf", use: devices["iPhone 14"], dependencies: [...perfBaseDependencies, "pixel-perf"] },
+  { name: "tablet-perf", use: devices["iPad Mini landscape"], dependencies: [...perfBaseDependencies, "iphone-perf"] },
+  { name: "desktop-perf", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, dependencies: [...perfBaseDependencies, "tablet-perf"] },
+];
 
 // Each test starts its own `b9s web` on a free port (tests/harness.ts), so
 // there is no shared webServer. globalSetup builds the binary under test.
@@ -57,11 +64,11 @@ export default defineConfig({
     { name: "ipad", use: { ...devices["iPad Pro 11"] }, testMatch: /(wide|keys)\.spec/ },
     // desktop.spec.ts covers the desktop and wide classes; at 1440 px the three desktop browsers run it already.
     ...sizes.map(size => ({ ...size, testMatch: size.name === "desktop-1920" || size.name === "wide-2560" ? /(shell|desktop|board-detail)\.spec/ : /(shell|board-detail)\.spec/ })),
-    ...(["Pixel 7", "iPhone 14"] as const).map((device) => ({
-      name: device === "Pixel 7" ? "pixel-perf" : "iphone-perf",
-      use: { ...devices[device] },
+    ...perfProjects.map(({ name, use, dependencies }) => ({
+      name,
+      use,
       testMatch: /perf\.spec/,
-      dependencies: ["pixel", "iphone", "desktop", "desktop-safari", "desktop-firefox", "ipad", ...sizes.map(size => size.name)],
+      dependencies,
     })),
     // The spec launches the browsers and devices it measures itself; one
     // worker at a time keeps the timings from sharing the CPU. Its output

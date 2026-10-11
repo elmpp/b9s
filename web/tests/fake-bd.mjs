@@ -17,6 +17,9 @@ if (process.env.FAKE_BD_FAIL && args[0] === process.env.FAKE_BD_FAIL) {
   process.exit(1);
 }
 
+const delay = Number(process.env.FAKE_BD_DELAY_MS || 0);
+if (delay > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+
 const issues = fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l));
 const byId = new Map(issues.map(i => [i.id, i]));
 const now = new Date().toISOString();

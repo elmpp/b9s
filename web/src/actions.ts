@@ -89,6 +89,19 @@ export function readOnly(): boolean {
   return true;
 }
 
+function pendingWriteLabel(r: WriteRequest): string {
+  switch (r.op) {
+    case "create": return "Creating issue...";
+    case "comment": return "Adding comment...";
+    case "delete": return "Deleting...";
+    case "defer": return "Deferring...";
+    case "update": return "Saving...";
+    case "status": return r.status === "closed" ? "Closing..." : "Changing status...";
+    case "close": return "Closing...";
+  }
+  return "Writing...";
+}
+
 /**
  * send runs a write, logs it and refetches. optimistic changes the local
  * copy first so the row moves at once; any failure refetches, which puts
@@ -97,6 +110,7 @@ export function readOnly(): boolean {
 export async function send(r: WriteRequest, optimistic?: () => void): Promise<WriteResult> {
   const cmd = describe(r);
   if (optimistic) { optimistic(); render(); }
+  else toast(pendingWriteLabel(r), cmd, null, 30000);
   const res = await api.write(r);
   S.log.unshift({ at: Date.now(), cmd, ok: res.ok });
   if (S.log.length > 100) S.log.length = 100;

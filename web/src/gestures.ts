@@ -121,11 +121,9 @@ function swipeEnd(g: RowGesture, dx: number): void {
   const f = Math.abs(dx) / g.w, i = get(g.id);
   snapBack(g.row);
   if (f < SHORT || !i) return;
-  setTimeout(() => {
-    if (dx > 0) { if (f >= LONG) openSheet("status", { id: g.id }); else void setStatus([g.id], nextStatus(i)); }
-    else if (f >= LONG) openSheet("actions", { id: g.id });
-    else if (eff(i) !== "closed") void setStatus([g.id], "closed");
-  }, 160);
+  if (dx > 0) { if (f >= LONG) openSheet("status", { id: g.id }); else void setStatus([g.id], nextStatus(i)); }
+  else if (f >= LONG) openSheet("actions", { id: g.id });
+  else if (eff(i) !== "closed") void setStatus([g.id], "closed");
 }
 
 /* ================= pull to reload ================= */

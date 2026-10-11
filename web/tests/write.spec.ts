@@ -94,6 +94,20 @@ test.describe("writing through bd", () => {
   });
 });
 
+test.describe("slow bd feedback", () => {
+  test.use({ bdEnv: { FAKE_BD_DELAY_MS: "800" } });
+
+  test("non-optimistic writes show pending feedback", async ({ page, project }) => {
+    await open(page, project);
+    await row(page, "t-2").click();
+    await page.locator('.detail .dacts [data-act="comment"]').click();
+    await page.locator("#fComment").fill("Delayed write feedback");
+    await page.locator('[data-sa="docomment"]').click();
+    await expect(page.locator("#toast")).toContainText("Adding comment...", { timeout: 100 });
+    await expect(page.locator(".detail .cm", { hasText: "Delayed write feedback" })).toBeVisible();
+  });
+});
+
 test.describe("a failing bd", () => {
   test.use({ bdEnv: { FAKE_BD_FAIL: "update" } });
   test("shows the error and keeps the old status", async ({ page, project }) => {
