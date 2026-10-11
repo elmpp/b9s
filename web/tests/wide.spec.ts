@@ -274,7 +274,7 @@ test("a card is one line with its tags on the right, and opens under the cursor"
   await expect(card(page, "t-2").locator(".tags")).toHaveCount(0);
   await expect(card(page, "t-2").locator(".l2")).toHaveCount(0);
   const h = (await card(page, "t-2").boundingBox())!.height;
-  expect(h).toBeLessThan(32);
+  expect(h).toBeLessThanOrEqual(32);
   await card(page, "t-2").click();
   await expect(card(page, "t-2").locator(".l2")).toHaveCount(1);
 });

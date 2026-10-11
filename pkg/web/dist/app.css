@@ -55,7 +55,7 @@
   .chip[data-chip]::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--sc, var(--muted)); }
   .chip .k { color: var(--muted); font-size: 0.846rem; }
   .chip .n { color: var(--muted); font-size: 0.846rem; }
-  .chip.on { border-color: var(--text-soft); background: var(--selected); color: var(--text); }
+  .chip.on { border-color: var(--line); background: var(--selected); color: var(--muted); }
   .chip.on .k, .chip.on .n { color: var(--text-soft); opacity: 1; }
   .chip.q { border-style: dashed; max-width: 180px; }
   .chip.q span { overflow: hidden; text-overflow: ellipsis; }

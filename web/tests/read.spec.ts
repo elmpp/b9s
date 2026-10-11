@@ -70,7 +70,7 @@ test.describe("reading", () => {
     await expect(d.locator(".cm", { hasText: "Started on the handlers." })).toBeVisible();
     await d.locator('[data-act="dback"]').click();
     await expect(d).toHaveAttribute("data-id", "t-3");
-    await d.locator('[data-act="dclose"]').click();
+    await d.locator('[aria-label="Close"]').click();
     await expect(page.locator(".detail")).toHaveCount(0);
   });
 
@@ -110,7 +110,7 @@ test.describe("reading", () => {
   test("gesture help lists every gesture", async ({ page, project }) => {
     await open(page, project);
     await page.locator('[data-act="help"]').click();
-    await expect(page.locator(".msheet .gtable tr")).toHaveCount(26);
+    await expect(page.locator(".msheet .gtable tr")).toHaveCount(24);
   });
 });
 

@@ -6,7 +6,8 @@ import { expect, open, test } from "./harness";
 test("the board stacks the columns as boxes and moves a card by drag onto another box", async ({ page, project }) => {
   await open(page, project);
   await page.locator('#bar [data-view="board"]').click();
-  await expect(page.locator("#bcol .bbox")).toHaveCount(3);
+  await expect(page.locator("#bcol .bbox")).toHaveCount(4);
+  expect(await page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
   const card = page.locator('#bcol .bbox[data-dcol="open"] [data-card="t-2"]');
   await expect(card).toBeVisible();
   const cb = (await card.boundingBox())!;

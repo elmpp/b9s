@@ -12,6 +12,21 @@ import { renderMemory, renderMemoryDetail } from "./memory";
 import { $, $opt, age, desktop, esc, fmtDate, md, sizeClass, split, store } from "./util";
 
 const metaSep = '<span class="msep">-</span>';
+const sizeClassNames = ["phone", "tablet", "desktop", "wide"] as const;
+let cachedDetailPlace: { id: string; place: TextPlace } | null = null;
+let suppressDetailScrollCacheUntil = 0;
+let detailResizeGuardBound = false;
+
+function currentSizeClass(): (typeof sizeClassNames)[number] | null {
+  const app = $opt("#app");
+  return sizeClassNames.find(c => app?.classList.contains(c)) || null;
+}
+
+function bindDetailResizeGuard(): void {
+  if (detailResizeGuardBound) return;
+  detailResizeGuardBound = true;
+  window.addEventListener("resize", () => { suppressDetailScrollCacheUntil = performance.now() + 300; }, { passive: true });
+}
 
 function statusDotHTML(status: string): string {
   return `<span class="st" style="--sc:${stOf(status).c}" aria-hidden="true"></span>`;
@@ -59,8 +74,12 @@ export function render(): void {
   if (!D.loaded) return;
   // Both reads come while the layout is still clean, so the reads inside the views below force none,
   // and the detail's place comes first: once the size class moves, the layout no longer holds it (textPlace).
-  const was = detailPlace();
-  sizeClass();
+  const oldClass = currentSizeClass();
+  const currentPlace = detailPlace();
+  const nextClass = sizeClass();
+  const was = oldClass && oldClass !== nextClass && cachedDetailPlace && (!currentPlace || cachedDetailPlace.id === currentPlace.id)
+    ? cachedDetailPlace
+    : currentPlace;
   renderHeader(); renderChips(); renderBar(); renderStale();
   (["tree", "board", "search", "more", "graph", "memory"] as const).forEach(v => { $("#v" + v[0].toUpperCase() + v.slice(1)).hidden = S.view !== v; });
   if (S.view === "tree") renderTree();
@@ -794,9 +813,9 @@ export function renderDetail(was = detailPlace()): void {
   if (S.view === "memory") { renderMemoryDetail(); return; }
   const host = $("#detailHost");
   $("#app").classList.toggle("hasdetail", !!S.detail);
-  if (!S.detail) { host.innerHTML = ""; return; }
+  if (!S.detail) { host.innerHTML = ""; cachedDetailPlace = null; return; }
   const id = S.detail.stack[S.detail.stack.length - 1], i = get(id);
-  if (!i) { S.detail = null; host.innerHTML = ""; $("#app").classList.remove("hasdetail"); return; }
+  if (!i) { S.detail = null; host.innerHTML = ""; cachedDetailPlace = null; $("#app").classList.remove("hasdetail"); return; }
   const f = fullIssue(id);
   const st = stOf(eff(i));
   const sib = siblings(id), pos = sib.indexOf(id);
@@ -839,7 +858,19 @@ export function renderDetail(was = detailPlace()): void {
     <div class="dacts">${ro ? "" : `<button data-act="status"><span class="g" aria-hidden="true">◐</span>Status</button><button data-act="edit"><span class="g" aria-hidden="true">✎</span>Edit</button><button data-act="comment"><span class="g" aria-hidden="true">✉</span>Comment</button>`}<button data-act="dbranch"><span class="g" aria-hidden="true">⎇</span>Branch</button><button data-act="actions"><span class="g" aria-hidden="true">⋯</span>More</button></div>
   </section>`;
   const sec = host.querySelector<HTMLElement>(".detail")!;
-  if (kept) scrollToPlace(sec.querySelector<HTMLElement>(".dbody")!, kept);
+  const body = sec.querySelector<HTMLElement>(".dbody")!;
+  bindDetailResizeGuard();
+  const rememberDetailPlace = () => {
+    if (performance.now() < suppressDetailScrollCacheUntil) return;
+    const place = detailPlace();
+    if (place) cachedDetailPlace = place;
+  };
+  body.addEventListener("scroll", rememberDetailPlace, { passive: true });
+  if (kept) {
+    scrollToPlace(body, kept);
+    requestAnimationFrame(() => { scrollToPlace(body, kept); rememberDetailPlace(); });
+  }
+  rememberDetailPlace();
   renderMermaidBlocks(sec);
   if (!existing) requestAnimationFrame(() => requestAnimationFrame(() => sec.classList.remove("enter")));
 }

@@ -50,7 +50,7 @@ test("the in-app back and close buttons use the same history as the browser", as
 
   await row(page, "t-2").click();
   await expect(d).toHaveAttribute("data-id", "t-2");
-  await d.locator('[data-act="dclose"]').click();
+  await d.locator('[aria-label="Close"]').click();
   await expect(d).toHaveCount(0);
   await page.goForward();
   await expect(d).toHaveAttribute("data-id", "t-2");

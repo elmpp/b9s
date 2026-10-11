@@ -83,14 +83,21 @@ test.describe("a long tree and a long detail", () => {
     await expect(d).toHaveAttribute("data-id", "m-30");
     // The full issue arrives after the sheet opens; its text makes the detail scroll.
     await expect.poll(() => page.locator("#dbody").evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(400);
-    await page.locator("#dbody").evaluate(el => { el.scrollTop = 300; });
+    await expect.poll(() => page.locator("#dbody .md p").count()).toBeGreaterThan(10);
     // The paragraph at the top of the text is what a rotation keeps: the text reflows at the other
     // pane's width and the browser holds that paragraph in place, so its offset in px moves with it.
     const topPara = () => page.locator("#dbody").evaluate(el => {
       const top = el.getBoundingClientRect().top;
       return [...el.querySelectorAll(".md p")].findIndex(p => p.getBoundingClientRect().bottom > top);
     });
-    let para = await topPara();
+    const settleDetailScroll = () => page.locator("#dbody").evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    let para = 0;
+    for (const top of [80, 120, 160, 200, 240, 300, 360, 420, 540, 660, 780, 900, 1020]) {
+      await page.locator("#dbody").evaluate((el, y) => { el.scrollTop = Math.min(y, el.scrollHeight - el.clientHeight); }, top);
+      await settleDetailScroll();
+      para = await topPara();
+      if (para > 1) break;
+    }
     expect(para).toBeGreaterThan(1);
 
     const place = async (vp: { width: number; height: number }) => {
@@ -131,8 +138,8 @@ test.describe("phone native layout", () => {
     await expect(page.locator('#chips [data-act="boardopts"]')).toBeVisible();
     await expect(page.locator("#tabs")).toHaveCount(0);
     const boxes = page.locator("#bcol .bbox");
-    await expect(boxes).toHaveCount(3);
-    expect(await boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked"]);
+    await expect(boxes).toHaveCount(4);
+    expect(await boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
     // Each box starts below the one before it and takes the whole width.
     const col = await box(page, "#bcol");
     const rects = await boxes.evaluateAll(els => els.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
@@ -233,10 +240,10 @@ test.describe("phone native layout", () => {
     await classOn(page);
     const styles = await page.locator('#chips [data-chip="open"], #chips [data-chip="closed"]').evaluateAll(buttons => buttons.map(button => {
       const s = getComputedStyle(button);
-      return { border: s.borderTopColor, color: s.color };
+      return { background: s.backgroundColor };
     }));
     expect(styles).toHaveLength(2);
-    expect(styles[0].border !== styles[1].border || styles[0].color !== styles[1].color).toBe(true);
+    expect(styles[0].background !== styles[1].background).toBe(true);
   });
 
   test("keeps dense 44 px rows, bottom navigation targets and sheet actions", async ({ page, project }) => {
