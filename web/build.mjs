@@ -44,6 +44,7 @@ const ctx = await context({
 async function buildAll() {
   await ctx.rebuild();
   copyFileSync(join(root, "src", "app.css"), join(dist, "app.css"));
+  copyFileSync(join(root, "src", "tokens.css"), join(dist, "tokens.css"));
   copyFileSync(join(root, "node_modules", "mermaid", "dist", "mermaid.min.js"), join(dist, "mermaid.min.js"));
   for (const name of readdirSync(join(root, "public"))) copyFileSync(join(root, "public", name), join(dist, name));
 }

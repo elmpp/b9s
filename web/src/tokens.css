@@ -1,0 +1,74 @@
+:root {
+  color-scheme: dark;
+
+  --surface-0: #070809;
+  --surface-1: #0d1012;
+  --surface-2: #111619;
+  --surface-3: #171e22;
+  --surface-raised: #12181b;
+  --line: #293238;
+  --line-soft: #1b2327;
+  --text: #f3f4ef;
+  --text-soft: #c4c8c2;
+  --muted: #828a83;
+  --ghost: #5f665f;
+  --open: #7bd88f;
+  --progress: #7cc7d8;
+  --priority: #d2b25c;
+  --danger: #dc7a75;
+  --accent: #7cc7d8;
+  --focus: rgba(124, 199, 216, 0.24);
+  --hover: rgba(124, 199, 216, 0.07);
+  --selected: rgba(124, 199, 216, 0.12);
+  --shadow: rgba(0, 0, 0, 0.60);
+
+  --ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-root-size: 13px;
+  --font-body: 1rem/1.385 var(--ui);
+  --font-input: max(16px, 1.231rem)/1.375 var(--ui);
+
+  --page: var(--surface-0);
+  --bg: var(--surface-1);
+  --bg2: var(--surface-2);
+  --bg3: var(--surface-3);
+  --dim: var(--text-soft);
+  --cyan: var(--progress);
+  --hi: var(--progress);
+  --green: var(--open);
+  --red: var(--danger);
+  --orange: var(--priority);
+  --blue: var(--progress);
+  --feat: var(--open);
+  --yellow: var(--priority);
+  --ink: var(--surface-0);
+
+  --transparent: transparent;
+  --banner-sheen: rgba(124, 199, 216, 0.07);
+  --text-wash: rgba(243, 244, 239, 0.06);
+  --text-wash-strong: rgba(243, 244, 239, 0.07);
+  --row-rule: rgba(41, 50, 56, 0.55);
+  --row-rule-strong: rgba(41, 50, 56, 0.60);
+  --row-selected: var(--selected);
+  --row-marked: rgba(210, 178, 92, 0.14);
+  --row-flash: rgba(210, 178, 92, 0.16);
+  --bulk-bg: rgba(124, 199, 216, 0.10);
+  --priority-soft: rgba(210, 178, 92, 0.12);
+  --priority-faint: rgba(210, 178, 92, 0.07);
+  --priority-wash: rgba(210, 178, 92, 0.08);
+  --priority-alert: rgba(210, 178, 92, 0.14);
+  --progress-soft: rgba(124, 199, 216, 0.14);
+  --progress-wash: rgba(124, 199, 216, 0.10);
+  --panel-shadow: 0 -12px 40px var(--shadow);
+  --side-panel-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+  --lifted-shadow: 0 12px 30px var(--shadow);
+  --toast-shadow: 0 8px 26px rgba(0, 0, 0, 0.50);
+  --overlay: rgba(0, 0, 0, 0.50);
+  --qr-bg: var(--text);
+  --qr-ink: var(--surface-2);
+
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
