@@ -22,7 +22,7 @@ export interface FixtureIssue {
   updatedMinutesAgo?: number;
 }
 
-function toJSONL(list: FixtureIssue[]): string {
+export function toJSONL(list: FixtureIssue[]): string {
   const base = Date.now();
   return list.map((f, n) => {
     const t = new Date(base - (f.updatedMinutesAgo ?? n) * 60000).toISOString();
@@ -83,8 +83,9 @@ async function waitFor(proc: ChildProcess, url: string, deadlineMs: number, log:
   throw new Error(`b9s web did not start within ${deadlineMs} ms:\n${log()}`);
 }
 
-export async function startProject(list: FixtureIssue[], env: Record<string, string> = {}, paired = false, nextPort: () => Promise<number> = freePort, args: string[] = []): Promise<Project> {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "b9s-web-e2e-"));
+export async function startProject(list: FixtureIssue[], env: Record<string, string> = {}, paired = false, nextPort: () => Promise<number> = freePort, args: string[] = [], projectDir = ""): Promise<Project> {
+  const dir = projectDir || fs.mkdtempSync(path.join(os.tmpdir(), "b9s-web-e2e-"));
+  fs.mkdirSync(dir, { recursive: true });
   const beads = path.join(dir, ".beads");
   fs.mkdirSync(beads);
   fs.writeFileSync(path.join(beads, "issues.jsonl"), toJSONL(list));
