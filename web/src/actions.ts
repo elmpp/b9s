@@ -349,15 +349,15 @@ export const GESTURES: [string, string, string][] = [
 export const KEYS: [string, string][] = [
   ["j k, ↑ ↓", "move the cursor"], ["h l", "collapse or expand, or go to the parent or child"],
   ["Tab, Shift-Tab", "fold the issue, or the whole tree"], ["X, Z, Ctrl-A", "expand all, collapse all, switch"],
-  ["v", "wrap titles"], ["p { }", "parent, first sibling, last sibling"], ["Ctrl-F Ctrl-B, Ctrl-D Ctrl-U", "page, half page"],
-  ["Home, End", "top, bottom"], ["Enter, d", "open the detail; d closes it again"], ["/, n N, O", "search, next or previous match, only matches"],
+  ["v", "wrap titles"], ["p { }", "parent, first sibling, last sibling"], ["Ctrl-F Ctrl-B PgDn PgUp, Ctrl-D Ctrl-U", "page, half page"],
+  ["Home, End", "top, bottom"], ["PgDn PgUp", "scroll a sheet, a Memory record, or a detail that covers the list by a page"], ["Enter, d", "open the detail; d closes it again"], ["/, n N, O", "search, next or previous match, only matches"],
   ["o C r a", "open, closed, ready or all issues"], ["f, x", "only the branch or the subtree; again undoes it"], ["F", "follow live changes"],
   ["s, |", "sort, columns"], ["Space, V, u, Ctrl-\\", "mark, mark a range, unmark, clear the marks"],
   ["e, S, K, Delete", "edit, status, close, delete"], ["Ctrl-N, c", "create, copy ID and title"],
   ["b, t, g, Esc", "board and back, tree or flat list, dependency graph, back"], ["M", "Memory graph and back"], ["Memory: d, l, f, + -", "show or hide the detail, Link labels, fit, zoom"], ["1-9, 0", "open a recent project, all projects"],
   ["L, A, P", "put labels, assignees or projects on 1-9"], ["Ctrl-E H, D", "hide the header, source health"],
   ["Ctrl-R, F5", "reload"], ["Detail: n p, c, \\", "next or previous sibling, copy as Markdown, full size or back"],
-  ["Board: h j k l, z Z", "move, fold the column, unfold all"], ["Board: o i C, r, c", "toggle open, in progress, closed; ready; closed column"],
+  ["Board: h j k l, z Z", "move, fold the column, unfold all"], ["Board: Ctrl-D Ctrl-F PgDn, Ctrl-U Ctrl-B PgUp", "a third of the board down or up the column"], ["Board: o i C, r, c", "toggle open, in progress, closed; ready; closed column"],
   ["Board: s, v, e", "group by, epic rows or rail, hide empty columns"], ["Board: y, f, { }", "copy ID, branch, previous or next epic"],
   ["Board: Tab, Shift-Tab", "step the cursor's lane, or every lane, through compact, open and full; on epic rows, fold it"],
 ];

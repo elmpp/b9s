@@ -3,8 +3,9 @@
 // disagree. README.md's key tables are the reference; keys with no meaning
 // in a browser (Ctrl-C quits, < > resize panes) are left out.
 //
-//   keydown ──▶ sheet open? ── only Esc
+//   keydown ──▶ sheet open? ── only Esc, PageDown and PageUp
 //               │
+//               ├─ PageDown and PageUp scroll a pane without a row cursor
 //               ├─ \ sizes the detail when it shows
 //               ├─ 1-9 open a numbered child when the detail shows
 //               ├─ global keys (views, projects, reload, help)
@@ -21,7 +22,7 @@ import { memoryKey } from "./memory";
 import { D, eff, get, kids, laneOf, pool } from "./data";
 import { detailKids, ensureVisible, railShown, render, renderBoard, revealBoardCursor, siblings } from "./render";
 import { S, saveBoardFolded, saveChips, stepLanes, treeRows } from "./state";
-import { $, copyText, store } from "./util";
+import { $, $opt, copyText, split, store } from "./util";
 
 /**
  * keyName spells a key the way the README does: "j", "C-a", "S-Tab", or
@@ -44,6 +45,8 @@ export function onKey(e: KeyboardEvent): boolean {
   if (!k) return false;
   // Enter and Space on a focused button press the button.
   if ((k === "Enter" || k === " ") && (e.target as HTMLElement).closest("button, a")) return false;
+  const paging = k === "PageDown" ? 1 : k === "PageUp" ? -1 : 0;
+  if (paging && scrollPane(pagePane(), paging)) return true;
   if (S.sheet) {
     if (k === "Escape") { closeSheet(); return true; }
     return false;
@@ -67,7 +70,7 @@ export function onKey(e: KeyboardEvent): boolean {
 }
 
 /** Tree keys that put the cursor on the first row themselves when it has none. */
-const TREE_STEPS = new Set(["j", "k", "ArrowDown", "ArrowUp", "C-f", "C-b", "C-d", "C-u", "Home", "End", "n", "N"]);
+const TREE_STEPS = new Set(["j", "k", "ArrowDown", "ArrowUp", "C-f", "C-b", "PageDown", "PageUp", "C-d", "C-u", "Home", "End", "n", "N"]);
 /** Board keys that act on the card under the cursor. */
 const BOARD_CURSOR = new Set(["z", "Enter", "Tab", "y", "f", "S", "K"]);
 
@@ -96,6 +99,35 @@ function escape(): boolean {
   if (S.marking) { void act("unmark"); return true; }
   if (S.view !== "tree") { S.view = "tree"; render(); return true; }
   return false;
+}
+
+/* ================= page keys ================= */
+
+/** ROW is about one tree row, the overlap a page keeps in view so a reader does not lose the line. */
+const ROW = 40;
+
+/**
+ * pagePane is the pane PageDown and PageUp scroll when nothing on screen has
+ * a row cursor: an open sheet, the Memory record, a detail that covers the
+ * list (a phone's sheet, or the full width of a split layout), or the graph,
+ * search and More lists. In the tree and the board, with the detail beside
+ * them or closed, the keys page the cursor instead, as the TUI's do.
+ */
+function pagePane(): HTMLElement | null {
+  if (S.sheet) return $opt("#sheetHost .mb");
+  if (S.view === "memory") return $opt("#memoryDetail .dbody");
+  if (S.detail && (!split() || S.detail.size === "full")) return $opt("#dbody");
+  if (S.view === "graph") return $opt("#gList");
+  if (S.view === "search") return $opt("#sList");
+  if (S.view === "more") return $opt("#moreList");
+  return null;
+}
+
+/** scrollPane scrolls a pane by a page less a row of overlap, as a browser pages a document, and says whether there was one. */
+function scrollPane(el: HTMLElement | null, dir: number): boolean {
+  if (!el) return false;
+  el.scrollBy({ top: dir * Math.max(ROW, el.clientHeight - ROW) });
+  return true;
 }
 
 /* ================= everywhere ================= */
@@ -183,10 +215,25 @@ function step(ids: string[], by: number): void {
   moveTo(ids[Math.max(0, Math.min(ids.length - 1, at + by))]);
 }
 
-/** page is how many rows fit in the tree's scroll area. */
+/** rowHeight is the pitch of the last tree row measured in view, which page measures the list by. */
+let rowHeight = ROW;
+
+/**
+ * page is how many rows fit in the tree's scroll area. A row's own box is its
+ * placeholder height (app.css .row) out of view, and for a frame or more
+ * after a redraw, while its content box already has the real height, so the
+ * row pitch is the content of a row in view plus the row's border and padding.
+ */
 function page(): number {
-  const r = $("#treeRows").querySelector<HTMLElement>(".row");
-  return Math.max(1, Math.floor($("#treeList").clientHeight / (r ? r.offsetHeight : 40)) - 1);
+  const tl = $("#treeList"), top = tl.getBoundingClientRect().top;
+  const row = [...$("#treeRows").querySelectorAll<HTMLElement>(".row")].find(r => r.getBoundingClientRect().bottom > top);
+  const rc = row?.querySelector(".rc");
+  if (row && rc) {
+    const cs = getComputedStyle(row);
+    const chrome = [cs.borderTopWidth, cs.borderBottomWidth, cs.paddingTop, cs.paddingBottom].reduce((n, v) => n + (parseFloat(v) || 0), 0);
+    rowHeight = rc.getBoundingClientRect().height + chrome || rowHeight;
+  }
+  return Math.max(1, Math.floor(tl.clientHeight / rowHeight) - 1);
 }
 
 function setFolded(all: boolean): void {
@@ -215,8 +262,8 @@ function treeKey(k: string): boolean {
   switch (k) {
     case "j": case "ArrowDown": step(ids, 1); return true;
     case "k": case "ArrowUp": step(ids, -1); return true;
-    case "C-f": step(ids, page()); return true;
-    case "C-b": step(ids, -page()); return true;
+    case "C-f": case "PageDown": step(ids, page()); return true;
+    case "C-b": case "PageUp": step(ids, -page()); return true;
     case "C-d": step(ids, Math.ceil(page() / 2)); return true;
     case "C-u": step(ids, -Math.ceil(page() / 2)); return true;
     case "Home": moveTo(ids[0]); return true;
@@ -307,9 +354,45 @@ function detailChild(n: number): void {
 
 const GROUP_ORDER = ["status", "priority", "type"] as const;
 
+/** boardCursorEl is the cursor's card or epic cell on screen: null on a fresh page, or when a folded lane hides it. */
+const boardCursorEl = () => (S.cursor ? document.querySelector<HTMLElement>(`#vBoard [data-card="${CSS.escape(S.cursor)}"], #vBoard [data-epic="${CSS.escape(S.cursor)}"]`) : null);
+
+/** selectCard puts the cursor on a card or epic cell and brings it into view; an open detail follows it, as it follows the cursor keys. */
+function selectCard(id: string): void {
+  S.cursor = id;
+  if (S.detail && id !== "none") { S.detail.stack = [id]; render(); } else renderBoard();
+  revealBoardCursor();
+}
+
+/**
+ * boardPage moves the cursor about a third of the board's height down or up
+ * its column, as the TUI's board pages, counted in cards of the cursor's
+ * height. The epic rail's cells are a column of their own. A fresh page puts
+ * the cursor on the first card first, as the tree's page keys do.
+ */
+function boardPage(dir: number): void {
+  const cur = boardCursorEl();
+  if (!cur) {
+    const first = document.querySelector<HTMLElement>("#vBoard [data-card]");
+    if (first) selectCard(first.dataset.card!);
+    return;
+  }
+  const col = cur.closest<HTMLElement>("[data-dcol]")?.dataset.dcol || "";
+  const column = cur.dataset.epic !== undefined
+    ? [...document.querySelectorAll<HTMLElement>("#wboard [data-epic]")]
+    : [...document.querySelectorAll<HTMLElement>(`#vBoard [data-dcol="${CSS.escape(col)}"] [data-card]`)];
+  const view = $opt("#wboard") || $opt("#bcol");
+  // A card's height plus its margin (app.css .card), so the page is a third of the view in cards.
+  const by = Math.max(1, Math.floor((view ? view.clientHeight : 0) / 3 / (cur.offsetHeight + 6)));
+  const to = column[Math.max(0, Math.min(column.length - 1, column.indexOf(cur) + dir * by))];
+  if (to) selectCard((to.dataset.card || to.dataset.epic)!);
+}
+
 function boardKey(k: string): boolean {
   const c = S.cursor ? get(S.cursor) : undefined;
   switch (k) {
+    case "C-d": case "C-f": case "PageDown": boardPage(1); return true;
+    case "C-u": case "C-b": case "PageUp": boardPage(-1); return true;
     case "o": chipTap("open"); return true;
     case "i": chipTap("in_progress"); return true;
     case "C": chipTap("closed"); return true;

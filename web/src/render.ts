@@ -928,7 +928,11 @@ export function renderDetail(was = detailPlace()): void {
   body.addEventListener("scroll", rememberDetailPlace, { passive: true });
   if (kept) {
     scrollToPlace(body, kept);
-    requestAnimationFrame(() => { scrollToPlace(body, kept); rememberDetailPlace(); });
+    // The second pass settles the place once the new text has laid out. A page key, the wheel or a
+    // finger may have scrolled the body before the frame comes, under load a few frames late, and
+    // that scroll must stand: the pass applies only while the body still sits where the first left it.
+    const placed = body.scrollTop;
+    requestAnimationFrame(() => { if (body.scrollTop === placed) scrollToPlace(body, kept); rememberDetailPlace(); });
   }
   rememberDetailPlace();
   renderMermaidBlocks(sec);

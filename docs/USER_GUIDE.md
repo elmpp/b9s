@@ -742,6 +742,7 @@ From 1280 px, the desktop and wide classes, the rail is a sidebar with the proje
 | `Tab`, `Shift-Tab` | Step the height of the selected card's or epic's lane, or of every lane. On epic rows they fold or unfold the lane |
 | `v` | Switch between the epic rail and epic rows |
 | `j` `k`, `Down` `Up` | Move the cursor through the column |
+| `Ctrl-D` `Ctrl-F` `PgDn`, `Ctrl-U` `Ctrl-B` `PgUp` | Move the cursor about a third of the board down or up its column |
 | `Enter` | Open the detail panel. With it open, the cursor keys change the issue it shows |
 | `\` | Switch the detail between a side panel and the full width |
 | `z`, `Z` | Fold the cursor's column into a rail, unfold every column |
@@ -755,7 +756,8 @@ With a keyboard, the web UI takes the TUI's keys, with the same case-sensitive m
 
 | Keys | Effect |
 |------|--------|
-| `j` `k`, `Down` `Up`, `Ctrl-F` `Ctrl-B`, `Ctrl-D` `Ctrl-U`, `Home` `End` | Move the tree cursor, by a row, a page or half a page, or to the top or bottom |
+| `j` `k`, `Down` `Up`, `Ctrl-F` `Ctrl-B` `PgDn` `PgUp`, `Ctrl-D` `Ctrl-U`, `Home` `End` | Move the tree cursor, by a row, a page or half a page, or to the top or bottom |
+| `PgDn` `PgUp` | Scroll a pane without a cursor by a page: a sheet, a Memory record, the detail as a phone's sheet or at full width, or the graph. Beside the list, the detail leaves them to the tree cursor |
 | `h` `l`, `Tab`, `Shift-Tab`, `X` `Z` `Ctrl-A` | Collapse or expand, fold the issue, fold the whole tree, expand all, collapse all, switch |
 | `p` `{` `}` | Go to the parent, the first sibling, the last sibling |
 | `o` `C` `r` `a` | Show open, closed, ready or all issues |
@@ -776,6 +778,7 @@ With a keyboard, the web UI takes the TUI's keys, with the same case-sensitive m
 | Board: `o` `i` `C`, `r`, `c` | Toggle open, in progress, closed; ready; the closed column |
 | Board: `s`, `v`, `e` | Group by status, priority or type; epic rows or rail; hide empty columns |
 | Board: `y`, `f`, `{` `}`, `Tab`, `Shift-Tab` | Copy the ID, show the branch, previous or next epic, step the lane's height or every lane's (epic rows and a phone fold them) |
+| Board: `Ctrl-D` `Ctrl-F` `PgDn`, `Ctrl-U` `Ctrl-B` `PgUp` | Move the cursor about a third of the board down or up its column |
 
 The browser keeps a few keys, so the web UI does not use them. `Ctrl-C` copies instead of quitting, and `Ctrl-W` closes the tab. `\` `<` `>` lay out TUI panes, which the web UI does not have. Chrome on Windows and Linux takes `Ctrl-N` for a new window: use the `+` button there.
 

@@ -2,7 +2,7 @@
 // the detail panel and the keys that work everywhere. Each key does what the
 // README key tables say it does in the terminal.
 
-import { expect, open, row, test } from "./harness";
+import { expect, open, row, SAMPLE, test } from "./harness";
 import type { Page } from "@playwright/test";
 
 const sel = (page: Page) => page.locator("#treeRows .row.sel");
@@ -454,5 +454,146 @@ test.describe("view keys", () => {
     await page.keyboard.press("t");
     await expect(row(page, "t-1").locator(".rc")).toHaveAttribute("style", "--d:1");
     await expect(row(page, "t-epic").locator("[data-chev]")).toBeVisible();
+  });
+});
+
+// PageDown and PageUp are the TUI's pgdown and pgup: the tree's Ctrl-F and
+// Ctrl-B, about a third of the board down or up a column, and a page of any
+// pane that has no row cursor.
+test.describe("page keys", () => {
+  /** inPane says whether an element shows whole inside the scrolling pane around it. */
+  const inPane = (page: Page, sel: string, pane: string) => page.locator(sel).evaluate((el, pane) => {
+    const r = el.getBoundingClientRect(), b = el.closest(pane)!.getBoundingClientRect();
+    return r.top >= b.top - 1 && r.bottom <= b.bottom + 1;
+  }, pane);
+  const scrollTop = (l: ReturnType<Page["locator"]>) => l.evaluate(el => el.scrollTop);
+
+  test.describe("in a long tree", () => {
+    test.use({ fixture: { issues: Array.from({ length: 60 }, (_, n) => ({ id: `m-${n + 1}`, title: `[m${n + 1}] Row ${n + 1}`, priority: 3 })) } });
+
+    test("PageDown and PageUp page the cursor as Ctrl-F and Ctrl-B do, and keep its row in view", async ({ page, project }) => {
+      await open(page, project);
+      const index = () => page.locator("#treeRows .row").evaluateAll(all => all.findIndex(r => r.classList.contains("sel")));
+      // A fresh page puts the cursor on the first row first, as j does.
+      await page.keyboard.press("PageDown");
+      await expect(sel(page)).toHaveAttribute("data-id", "m-1");
+      await page.keyboard.press("PageDown");
+      await expect(sel(page)).not.toHaveAttribute("data-id", "m-1");
+      const paged = await index();
+      expect(paged).toBeGreaterThan(3);
+      expect(paged).toBeLessThan(59);
+      expect(await inPane(page, "#treeRows .row.sel", "#treeList")).toBe(true);
+      await page.keyboard.press("PageDown");
+      const twice = await index();
+      expect(twice).toBeGreaterThan(paged);
+      expect(await inPane(page, "#treeRows .row.sel", "#treeList")).toBe(true);
+      await page.keyboard.press("PageUp");
+      const back = await index();
+      expect(back).toBeGreaterThan(0);
+      expect(back).toBeLessThan(twice);
+      await page.keyboard.press("PageUp");
+      await expect(sel(page)).toHaveAttribute("data-id", "m-1");
+      // Ctrl-F and Ctrl-B page by the same rows.
+      await page.keyboard.press("Control+f");
+      await expect(sel(page)).not.toHaveAttribute("data-id", "m-1");
+      const byCtrl = await sel(page).getAttribute("data-id");
+      await page.keyboard.press("Control+b");
+      await expect(sel(page)).toHaveAttribute("data-id", "m-1");
+      await page.keyboard.press("PageDown");
+      await expect(sel(page)).toHaveAttribute("data-id", byCtrl!);
+      await page.keyboard.press("PageUp");
+      await expect(sel(page)).toHaveAttribute("data-id", "m-1");
+    });
+  });
+
+  test.describe("on a board whose blocked cell scrolls", () => {
+    const opens = [1, 2, 3, 4, 5].map(n => ({ id: `t-o${n}`, title: `[o${n}] Open ${n}`, parent: "t-epic", priority: 3 }));
+    const blocked = Array.from({ length: 12 }, (_, n) => ({ id: `t-b${n + 1}`, title: `[b${n + 1}] Blocked ${n + 1}`, parent: "t-epic", status: "blocked", priority: 3 }));
+    test.use({ fixture: { issues: [...SAMPLE, ...opens, ...blocked] } });
+
+    test("PageDown, Ctrl-D and Ctrl-F move the cursor a third of the board down its column, PageUp, Ctrl-U and Ctrl-B up, and the card stays in view", async ({ page, project }) => {
+      await open(page, project);
+      await page.keyboard.press("b");
+      await expect(page.locator("#vBoard")).toBeVisible();
+      const column = page.locator('#wboard .wcell[data-dcol="blocked"] [data-card]');
+      const index = () => column.evaluateAll(all => all.findIndex(c => c.classList.contains("sel")));
+      const first = page.locator('#wboard [data-card="t-3"]');
+      // b brings the tree's cursor along as the first epic cell, and the epic rail pages as a column of its own.
+      await page.keyboard.press("PageDown");
+      await expect(page.locator('#wboard .wepic[data-epic="none"]')).toHaveClass(/sel/);
+      await page.keyboard.press("PageUp");
+      await expect(page.locator('#wboard .wepic[data-epic="t-epic"]')).toHaveClass(/sel/);
+      for (const id of ["t-2", "t-1", "t-3"]) {
+        await page.keyboard.press("l");
+        await expect(page.locator(`#wboard [data-card="${id}"]`)).toHaveClass(/sel/);
+      }
+      // The blocked cell holds thirteen cards in a Compact lane, so it scrolls to keep the cursor's card in view.
+      await page.keyboard.press("PageDown");
+      const paged = await index();
+      expect(paged).toBeGreaterThan(2);
+      expect(paged).toBeLessThan(12);
+      expect(await inPane(page, '#wboard .wcell[data-dcol="blocked"] [data-card].sel', ".wbox")).toBe(true);
+      await page.keyboard.press("PageDown");
+      expect(await index()).toBeGreaterThan(paged);
+      expect(await inPane(page, '#wboard .wcell[data-dcol="blocked"] [data-card].sel', ".wbox")).toBe(true);
+      await page.keyboard.press("PageUp");
+      await page.keyboard.press("PageUp");
+      await expect(first).toHaveClass(/sel/);
+      expect(await inPane(page, '#wboard [data-card="t-3"]', ".wbox")).toBe(true);
+      for (const [down, up] of [["Control+d", "Control+u"], ["Control+f", "Control+b"]]) {
+        await page.keyboard.press(down);
+        await expect(column.nth(paged)).toHaveClass(/sel/);
+        await page.keyboard.press(up);
+        await expect(first).toHaveClass(/sel/);
+      }
+    });
+  });
+
+  test.describe("with a long detail", () => {
+    const LONG = Array.from({ length: 60 }, (_, n) => `Paragraph ${n + 1} of a description long enough that the detail scrolls.`).join("\n\n");
+    test.use({ fixture: { issues: [{ id: "d-long", title: "[long] A long read", priority: 0, description: LONG }, ...SAMPLE] } });
+
+    test("PageDown pages the tree beside a side panel, and scrolls a detail that covers the list, or a sheet, by a page", async ({ page, project }) => {
+      await open(page, project);
+      await cursorTo(page, "d-long");
+      await page.keyboard.press("Enter");
+      const d = page.locator(".detail"), body = page.locator("#dbody");
+      await expect(d).toHaveAttribute("data-id", "d-long");
+      await expect.poll(() => body.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(400);
+      // Beside the list the tree keeps its cursor, so the keys page it and the panel follows.
+      await page.keyboard.press("PageDown");
+      await expect(sel(page)).not.toHaveAttribute("data-id", "d-long");
+      await expect(d).toHaveAttribute("data-id", (await sel(page).getAttribute("data-id"))!);
+      await page.keyboard.press("PageUp");
+      await expect(sel(page)).toHaveAttribute("data-id", "d-long");
+      await expect(d).toHaveAttribute("data-id", "d-long");
+      // At full width the detail covers the list, so the keys scroll its text by a page and the cursor stays.
+      await page.keyboard.press("\\");
+      await expect(d).toHaveClass(/full/);
+      await expect.poll(() => body.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(400);
+      const h = await body.evaluate(el => el.clientHeight);
+      await page.keyboard.press("PageDown");
+      const top = await scrollTop(body);
+      expect(top).toBeGreaterThan(h / 2);
+      expect(top).toBeLessThanOrEqual(h);
+      await expect(sel(page)).toHaveAttribute("data-id", "d-long");
+      await expect(d).toHaveAttribute("data-id", "d-long");
+      await page.keyboard.press("PageDown");
+      expect(await scrollTop(body)).toBeGreaterThan(top);
+      await page.keyboard.press("PageUp");
+      await page.keyboard.press("PageUp");
+      expect(await scrollTop(body)).toBe(0);
+      // A sheet scrolls the same way, as far as it has rows past its edge.
+      await page.keyboard.press("?");
+      await expect(sheet(page)).toHaveAttribute("aria-label", "Keys");
+      const mb = page.locator("#sheetHost .mb");
+      const room = await mb.evaluate(el => [el.clientHeight, el.scrollHeight - el.clientHeight]);
+      await page.keyboard.press("PageDown");
+      const sheetTop = await scrollTop(mb);
+      expect(sheetTop).toBeGreaterThanOrEqual(Math.min(room[1], room[0] / 2));
+      expect(sheetTop).toBeLessThanOrEqual(room[0]);
+      await page.keyboard.press("Escape");
+      await expect(sheet(page)).toHaveCount(0);
+    });
   });
 });
