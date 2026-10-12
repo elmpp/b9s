@@ -155,14 +155,19 @@ async function smoothSample(page: Page, action: () => Promise<void>): Promise<{ 
       __b9sFrames?: number[];
       __b9sFrameReq?: number;
       __b9sLongTasks?: number[];
+      __b9sLongTaskSampleStart?: number;
       __b9sLongTaskObserver?: PerformanceObserver;
     };
+    const sampleStart = performance.now();
     w.__b9sFrames = [];
     w.__b9sLongTasks = [];
+    w.__b9sLongTaskSampleStart = sampleStart;
     try {
       w.__b9sLongTaskObserver?.disconnect();
       w.__b9sLongTaskObserver = new PerformanceObserver(list => {
-        for (const e of list.getEntries()) w.__b9sLongTasks?.push(e.duration);
+        for (const e of list.getEntries()) {
+          if (e.startTime >= sampleStart) w.__b9sLongTasks?.push(e.duration);
+        }
       });
       w.__b9sLongTaskObserver.observe({ type: "longtask", buffered: true });
     } catch { /* WebKit has no longtask observer */ }
@@ -180,14 +185,23 @@ async function smoothSample(page: Page, action: () => Promise<void>): Promise<{ 
       __b9sFrames?: number[];
       __b9sFrameReq?: number;
       __b9sLongTasks?: number[];
+      __b9sLongTaskSampleStart?: number;
       __b9sLongTaskObserver?: PerformanceObserver;
     };
     if (w.__b9sFrameReq) cancelAnimationFrame(w.__b9sFrameReq);
-    w.__b9sLongTaskObserver?.disconnect();
+    const sampleStart = w.__b9sLongTaskSampleStart ?? 0;
+    const observer = w.__b9sLongTaskObserver;
+    if (observer) {
+      for (const e of observer.takeRecords()) {
+        if (e.startTime >= sampleStart) w.__b9sLongTasks?.push(e.duration);
+      }
+      observer.disconnect();
+    }
     const frames = w.__b9sFrames || [];
     const longTaskMs = (w.__b9sLongTasks || []).reduce((a, b) => a + b, 0);
     w.__b9sFrames = undefined;
     w.__b9sLongTasks = undefined;
+    w.__b9sLongTaskSampleStart = undefined;
     const intervals: number[] = [];
     for (let n = 1; n < frames.length; n++) intervals.push(frames[n] - frames[n - 1]);
     intervals.sort((a, b) => a - b);
