@@ -19,8 +19,8 @@ import {
 import * as api from "./api";
 import { memoryKey } from "./memory";
 import { D, eff, get, kids, laneOf, pool } from "./data";
-import { detailKids, ensureVisible, render, renderBoard, siblings } from "./render";
-import { S, saveBoardFolded, saveChips, treeRows } from "./state";
+import { detailKids, ensureVisible, railShown, render, renderBoard, revealBoardCursor, siblings } from "./render";
+import { S, saveBoardFolded, saveChips, stepLanes, treeRows } from "./state";
 import { $, copyText, store } from "./util";
 
 /**
@@ -328,6 +328,13 @@ function boardKey(k: string): boolean {
     }
     case "e": S.board.hideEmpty = !S.board.hideEmpty; render(); toast(S.board.hideEmpty ? "Empty columns hidden" : "Empty columns shown"); return true;
     case "S-Tab": {
+      // The epic rail steps the height of every lane on the board; lane rows and a phone's boxes fold every lane.
+      if (railShown()) {
+        stepLanes([...document.querySelectorAll<HTMLElement>("#wboard .wepic[data-epic]")].map(e => e.dataset.epic!));
+        renderBoard();
+        revealBoardCursor();
+        return true;
+      }
       const lanes = [...new Set(pool().map(i => laneOf(i) || "none"))];
       if (lanes.every(l => S.board.laneFold.has(l))) S.board.laneFold.clear(); else lanes.forEach(l => S.board.laneFold.add(l));
       renderBoard();
@@ -339,7 +346,7 @@ function boardKey(k: string): boolean {
       const at = lanes.indexOf(c ? laneOf(c) || "none" : lanes[0]);
       const to = lanes[Math.max(0, Math.min(lanes.length - 1, at + (k === "{" ? -1 : 1)))];
       const first = cards.find(x => (laneOf(get(x)!) || "none") === to);
-      if (first) { S.cursor = first; renderBoard(); }
+      if (first) { S.cursor = first; renderBoard(); revealBoardCursor(); }
       return true;
     }
   }

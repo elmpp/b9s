@@ -340,7 +340,7 @@ export const GESTURES: [string, string, string][] = [
   ["Long-press a row", "mark; tap more rows", "Space"], ["Long-press while marking", "mark the range", "Ctrl-Space"], ["Pull down on tree", "reload", "Ctrl-R"],
   ["Swipe ← → on detail", "next / previous sibling", "n p"], ["Scroll the detail up / tap its head", "full height / switch", "\\"], ["Pull the detail down", "half height / close", ""], ["Drag handle up / down", "full height / close", "Esc"], ["Tap a relation", "go there; ‹ goes back", ""],
   ["Tap a column header on the board", "fold the column, or open it again", "z"], ["Tap Z unfold, or ⚙ › Unfold all", "unfold all", "Z"],
-  ["Tap a lane header's title", "fold its lane", "Tab"],
+  ["Tap a lane header's title", "fold its lane", "Tab"], ["Tap the arrow in an epic cell", "step its lane: compact, open, full", "Tab"],
   ["Long-press a card, drag", "drop it on a column", ""], ["Right-click a row, a card or an epic", "context menu with the swipe actions; Menu or Shift-F10 for the cursor row (desktop)", ""],
   ["Tap project name", "project sheet", "1-9 0"], ["Tap the ● dot", "source health", "D"],
   ["Swipe down on header", "hide or show chips", "Ctrl-E"], ["Tap F", "follow live changes", "F"],
@@ -358,7 +358,8 @@ export const KEYS: [string, string][] = [
   ["L, A, P", "put labels, assignees or projects on 1-9"], ["Ctrl-E H, D", "hide the header, source health"],
   ["Ctrl-R, F5", "reload"], ["Detail: n p, c, \\", "next or previous sibling, copy as Markdown, full size or back"],
   ["Board: h j k l, z Z", "move, fold the column, unfold all"], ["Board: o i C, r, c", "toggle open, in progress, closed; ready; closed column"],
-  ["Board: s, v, e", "group by, epic rows or rail, hide empty columns"], ["Board: y, f, { }, Tab", "copy ID, branch, previous or next epic, fold the lane"],
+  ["Board: s, v, e", "group by, epic rows or rail, hide empty columns"], ["Board: y, f, { }", "copy ID, branch, previous or next epic"],
+  ["Board: Tab, Shift-Tab", "step the cursor's lane, or every lane, through compact, open and full; on epic rows, fold it"],
 ];
 
 const keyTable = () => `<table class="gtable">${KEYS.map(([k, a]) => `<tr><td><kbd>${esc(k)}</kbd></td><td>${esc(a)}</td></tr>`).join("")}</table>`;

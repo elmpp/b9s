@@ -3,7 +3,7 @@
 // detail as a side panel that leaves the board in view.
 
 import { expect, open, SAMPLE, test, type Project } from "./harness";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 const col = (page: Page, k: string) => page.locator(`#wboard .wcell[data-dcol="${k}"]`);
 const card = (page: Page, id: string) => page.locator(`#wboard [data-card="${id}"]`);
@@ -187,19 +187,42 @@ test("v switches between the epic rail and epic rows, and the choice stays", asy
   await expect(epic(page, "t-epic")).toBeVisible();
 });
 
-test("an epic cell opens the epic, and its arrow folds the lane", async ({ page, project }) => {
+test("an epic cell opens the epic, and its arrow steps the lane through Compact, Open and Full", async ({ page, project }) => {
   await board(page, project);
   await epic(page, "t-epic").locator(".t").click();
   await expect(page.locator(".detail")).toHaveAttribute("data-id", "t-epic");
   await page.keyboard.press("Escape");
   await expect(page.locator(".detail")).toHaveCount(0);
-  await epic(page, "t-epic").locator("[data-lane]").click();
-  await expect(card(page, "t-2")).toHaveCount(0);
-  await expect(epic(page, "t-epic")).toContainText("▸");
+  const step = epic(page, "t-epic").locator("[data-lane]");
+  const boxed = (id: string) => page.locator(`#wboard .wbox [data-card="${id}"]`);
+  // Compact, the default: each cell holds its cards in a box that scrolls, so the epic cell sets the lane's height.
+  await expect(step).toHaveAttribute("aria-label", "Compact lane");
+  await expect(step).toHaveAttribute("title", /^Open: /);
+  await expect(step).toHaveText("▸");
+  for (const id of ["t-1", "t-2", "t-3"]) await expect(boxed(id)).toHaveCount(1);
+  // Open: the open and in progress cells show every card and set the height, and the blocked cell still scrolls.
+  await step.click();
+  await expect(step).toHaveAttribute("aria-label", "Open lane");
+  await expect(step).toHaveAttribute("title", /^Full: /);
+  await expect(step).toHaveText("▿");
+  await expect(boxed("t-1")).toHaveCount(0);
+  await expect(boxed("t-2")).toHaveCount(0);
+  await expect(boxed("t-3")).toHaveCount(1);
+  // Full: nothing scrolls.
+  await step.click();
+  await expect(step).toHaveAttribute("aria-label", "Full lane");
+  await expect(step).toHaveAttribute("title", /^Compact: /);
+  await expect(step).toHaveText("▾");
+  await expect(boxed("t-3")).toHaveCount(0);
+  await step.click();
+  await expect(step).toHaveAttribute("aria-label", "Compact lane");
+  await expect(boxed("t-2")).toHaveCount(1);
+  // Every lane has a height of its own.
+  await expect(epic(page, "none").locator("[data-lane]")).toHaveAttribute("aria-label", "Compact lane");
   await expect(card(page, "t-5")).toBeVisible();
 });
 
-test("h from the first column selects the epic; Enter opens it and Tab folds its lane", async ({ page, project }) => {
+test("h from the first column selects the epic; Enter opens it and Tab steps its lane", async ({ page, project }) => {
   await board(page, project);
   await card(page, "t-2").click();
   await page.keyboard.press("Escape");
@@ -219,9 +242,11 @@ test("h from the first column selects the epic; Enter opens it and Tab folds its
   await expect(page.locator(".detail")).toHaveAttribute("data-id", "t-epic");
   await page.keyboard.press("Escape");
   await expect(page.locator(".detail")).toHaveCount(0);
+  const step = epic(page, "t-epic").locator("[data-lane]");
   await page.keyboard.press("Tab");
-  await expect(card(page, "t-2")).toHaveCount(0);
+  await expect(step).toHaveAttribute("aria-label", "Open lane");
   await page.keyboard.press("Tab");
+  await expect(step).toHaveAttribute("aria-label", "Full lane");
   await expect(card(page, "t-2")).toBeVisible();
 });
 
@@ -326,8 +351,13 @@ test("\\ or the panel's button switches the detail between a side panel and the 
 test.describe("a lane taller than its epic cell", () => {
   test.use({ fixture: { issues: [...SAMPLE, ...[6, 7, 8, 9].map(n => ({ id: `t-${n}`, title: `[${n}] Task ${n}`, parent: "t-epic", priority: 3 }))] } });
 
-  test("the epic cell spans the whole lane", async ({ page, project }) => {
+  test("in a Full lane the epic cell spans the whole lane", async ({ page, project }) => {
     await board(page, project);
+    const step = epic(page, "t-epic").locator("[data-lane]");
+    await step.click();
+    await expect(step).toHaveAttribute("aria-label", "Open lane");
+    await step.click();
+    await expect(step).toHaveAttribute("aria-label", "Full lane");
     const eb = (await epic(page, "t-epic").boundingBox())!;
     const last = (await card(page, "t-9").boundingBox())!;
     expect(last.y + last.height).toBeGreaterThan(eb.y + 120);
@@ -335,6 +365,74 @@ test.describe("a lane taller than its epic cell", () => {
     // The next lane's epic starts below it, so the cell fills its own row only.
     const none = (await epic(page, "none").boundingBox())!;
     expect(none.y).toBeGreaterThanOrEqual(eb.y + eb.height - 1);
+  });
+});
+
+test.describe("a lane with more blocked cards than open cards", () => {
+  const opens = [1, 2, 3, 4, 5].map(n => ({ id: `t-o${n}`, title: `[o${n}] Open ${n}`, parent: "t-epic", priority: 3 }));
+  const blocked = Array.from({ length: 12 }, (_, n) => ({ id: `t-b${n + 1}`, title: `[b${n + 1}] Blocked ${n + 1}`, parent: "t-epic", status: "blocked", priority: 3 }));
+  test.use({ fixture: { issues: [...SAMPLE, ...opens, ...blocked] } });
+
+  test("Compact scrolls at the epic's height, Open shows every open card, Full every card, and j scrolls a cell", async ({ page, project }) => {
+    await board(page, project);
+    const step = epic(page, "t-epic").locator("[data-lane]");
+    // The epic lane is the first row; the No epic lane holds only the loose chore.
+    const cell = (k: string) => col(page, k).first();
+    const box = (k: string) => cell(k).locator(".wbox");
+    const bottom = async (l: Locator) => { const b = (await l.boundingBox())!; return b.y + b.height; };
+    const scrolls = (k: string) => box(k).evaluate(b => b.scrollHeight > b.clientHeight + 1);
+    // A card is in view when its scrolling cell shows all of it.
+    const inView = (id: string) => card(page, id).evaluate(c => {
+      const r = c.getBoundingClientRect(), b = c.closest(".wbox")!.getBoundingClientRect();
+      return r.top >= b.top - 1 && r.bottom <= b.bottom + 1;
+    });
+
+    // Compact: the epic cell sets the lane's height, and the open and blocked cells scroll inside it.
+    const compact = (await epic(page, "t-epic").boundingBox())!;
+    expect(Math.abs(await bottom(box("blocked")) - (compact.y + compact.height))).toBeLessThanOrEqual(1);
+    expect(await scrolls("open")).toBe(true);
+    expect(await scrolls("blocked")).toBe(true);
+    // The edge with more cards past it fades.
+    await expect(box("blocked")).toHaveClass(/\bdown\b/);
+    await expect(box("blocked")).not.toHaveClass(/\bup\b/);
+
+    // Open: every open card shows, and the blocked cell scrolls at the open cell's height.
+    await step.click();
+    await expect(step).toHaveAttribute("aria-label", "Open lane");
+    await expect(box("open")).toHaveCount(0);
+    const lastOpen = await bottom(card(page, "t-o5"));
+    expect(lastOpen).toBeLessThanOrEqual(await bottom(cell("open")));
+    expect(await bottom(box("blocked"))).toBeGreaterThanOrEqual(lastOpen);
+    expect(await scrolls("blocked")).toBe(true);
+    expect((await epic(page, "t-epic").boundingBox())!.height).toBeGreaterThan(compact.height);
+
+    // Full: nothing in the lane scrolls, and the epic cell spans its last blocked card.
+    await step.click();
+    await expect(step).toHaveAttribute("aria-label", "Full lane");
+    await expect(page.locator('#wboard .wbox[data-box^="t-epic "]')).toHaveCount(0);
+    expect(await bottom(epic(page, "t-epic"))).toBeGreaterThanOrEqual(await bottom(card(page, "t-b12")) - 2);
+
+    // Back in Compact, j walks down the blocked cell, which scrolls to keep the cursor's card in view.
+    await step.click();
+    await expect(step).toHaveAttribute("aria-label", "Compact lane");
+    await page.keyboard.press("j");
+    await expect(card(page, "t-2")).toHaveClass(/sel/);
+    await page.keyboard.press("l");
+    await expect(card(page, "t-1")).toHaveClass(/sel/);
+    await page.keyboard.press("l");
+    await expect(card(page, "t-3")).toHaveClass(/sel/);
+    for (const id of ["t-b1", "t-b2", "t-b3", "t-b4", "t-b5", "t-b6", "t-b7", "t-b8"]) {
+      await page.keyboard.press("j");
+      await expect(card(page, id)).toHaveClass(/sel/);
+      await expect.poll(() => inView(id)).toBe(true);
+    }
+    const scrolled = await box("blocked").evaluate(b => b.scrollTop);
+    expect(scrolled).toBeGreaterThan(0);
+    await expect(box("blocked")).toHaveClass(/\bup\b/);
+    // A redraw keeps a cell's scroll: here the cursor moves to another cell.
+    await page.keyboard.press("h");
+    await expect(card(page, "t-1")).toHaveClass(/sel/);
+    expect(await box("blocked").evaluate(b => b.scrollTop)).toBe(scrolled);
   });
 });
 

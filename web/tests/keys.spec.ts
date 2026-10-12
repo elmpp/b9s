@@ -403,17 +403,24 @@ test.describe("board keys", () => {
     await expect(page.locator('#wboard [data-card="t-5"]')).toBeVisible();
   });
 
-  test("Tab folds the cursor's lane and Shift-Tab folds every lane", async ({ page, project }) => {
+  test("Tab steps the height of the cursor's lane and Shift-Tab of every lane", async ({ page, project }) => {
     await board(page, project);
     await page.locator('#wboard [data-card="t-2"]').click();
     await page.keyboard.press("Escape");
     await expect(page.locator(".detail")).toHaveCount(0);
+    const height = (l: string) => page.locator(`#wboard .wepic[data-epic="${l}"] [data-lane]`);
     await page.keyboard.press("Tab");
-    await expect(page.locator('#wboard .wepic[data-epic="t-epic"]')).toContainText("▸");
-    await page.keyboard.press("Tab");
+    await expect(height("t-epic")).toHaveAttribute("aria-label", "Open lane");
+    await expect(height("none")).toHaveAttribute("aria-label", "Compact lane");
+    // Lanes at different heights all go back to Compact, and from one height they step together.
     await page.keyboard.press("Shift+Tab");
-    await expect(page.locator('#wboard [data-card="t-5"]')).toHaveCount(0);
+    for (const l of ["t-epic", "none"]) await expect(height(l)).toHaveAttribute("aria-label", "Compact lane");
     await page.keyboard.press("Shift+Tab");
+    for (const l of ["t-epic", "none"]) await expect(height(l)).toHaveAttribute("aria-label", "Open lane");
+    await page.keyboard.press("Shift+Tab");
+    for (const l of ["t-epic", "none"]) await expect(height(l)).toHaveAttribute("aria-label", "Full lane");
+    await page.keyboard.press("Shift+Tab");
+    for (const l of ["t-epic", "none"]) await expect(height(l)).toHaveAttribute("aria-label", "Compact lane");
     await expect(page.locator('#wboard [data-card="t-5"]')).toBeVisible();
   });
 });

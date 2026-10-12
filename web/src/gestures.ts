@@ -10,8 +10,8 @@ import {
 import { adoptCursor, onKey } from "./keys";
 import { memoryBack } from "./memory";
 import { canGoBack } from "./nav";
-import { appW, colOf, ensureVisible, fullH, halfH, openCols, render, renderBoard, renderSearch, siblings } from "./render";
-import { S, chipRowVisible } from "./state";
+import { appW, colOf, ensureVisible, fullH, halfH, markCellEdges, openCols, railShown, render, renderBoard, renderSearch, revealBoardCursor, siblings } from "./render";
+import { S, chipRowVisible, stepLanes } from "./state";
 import { $, desktop, haptic, observeSize, split, store } from "./util";
 
 export const SHORT = 0.2, LONG = 0.55, LP_MS = 450, EDGE = 24;
@@ -340,6 +340,8 @@ let B: BoardGesture | null = null;
 function bindBoard(): void {
   const v = $("#vBoard"), app = $("#app");
   document.addEventListener("touchmove", e => { if (DRAG) e.preventDefault(); }, { passive: false });
+  // A scroll event does not bubble, so the board's host takes a scrolling cell's on the way down.
+  v.addEventListener("scroll", e => { const box = e.target as HTMLElement; if (box.classList?.contains("wbox")) markCellEdges(box); }, { capture: true, passive: true });
   v.addEventListener("pointerdown", e => {
     if (e.button > 0) return;
     const t = e.target as HTMLElement;
@@ -376,7 +378,9 @@ function bindBoard(): void {
     if (b.lane) {
       const l = b.lane.dataset.lane!;
       if (b.lopen) { openDetail(l); return; }
-      if (S.board.laneFold.has(l)) S.board.laneFold.delete(l); else S.board.laneFold.add(l);
+      // An epic cell's button steps its lane's height; a lane header folds the lane.
+      if (b.epic) stepLanes([l]);
+      else if (S.board.laneFold.has(l)) S.board.laneFold.delete(l); else S.board.laneFold.add(l);
       renderBoard();
       return;
     }
@@ -569,10 +573,11 @@ const MOVES: Record<string, [number, number]> = {
 
 /**
  * boardKey gives the wide board the TUI's keys. h and l land on the card
- * nearest in height in the next column that has cards, so a move keeps to
- * the same epic lane where it can. In the epic rail, h from the first column
- * selects the lane's epic, and l from an epic goes to the lane's card in the
- * first column that has one. With the detail open, it follows the cursor.
+ * nearest in height in the next column that has cards, of the cursor's lane
+ * when that column has one, so a move keeps to the lane. In the epic rail,
+ * h from the first column selects the lane's epic, l from an epic goes to
+ * the lane's card in the first column that has one, and Tab steps the
+ * lane's height. With the detail open, it follows the cursor.
  */
 function boardKey(key: string): boolean {
   if (key === "Z") { void act("unfoldall"); return true; }
@@ -589,8 +594,15 @@ function boardKey(key: string): boolean {
     // The cursor's card may be inside the folded lane, so the lane comes from the id, not the DOM.
     if (!S.cursor || S.board.lanes === "off" || (S.cursor !== "none" && !get(S.cursor))) return false;
     const l = laneKey(S.cursor);
-    if (S.board.laneFold.has(l)) S.board.laneFold.delete(l); else S.board.laneFold.add(l);
+    if (!railShown()) {
+      if (S.board.laneFold.has(l)) S.board.laneFold.delete(l); else S.board.laneFold.add(l);
+      renderBoard();
+      return true;
+    }
+    // A shorter lane can leave the cursor's card scrolled out of its cell.
+    stepLanes([l]);
     renderBoard();
+    revealBoardCursor();
     return true;
   }
   if (key === "z") {
@@ -623,14 +635,16 @@ function boardKey(key: string): boolean {
     if (!cur || ci < 0) next = grid[0][0];
     else if (d[0] < 0 && ci === 0) next = epics.find(e => e.dataset.epic === laneKey(S.cursor!)) ?? cur;
     else if (d[0]) {
-      const to = clamp(grid, ci + d[0]), y = cur.getBoundingClientRect().top;
-      next = to.reduce((a, c) => (Math.abs(c.getBoundingClientRect().top - y) < Math.abs(a.getBoundingClientRect().top - y) ? c : a));
+      const to = clamp(grid, ci + d[0]), y = cur.getBoundingClientRect().top, l = laneKey(S.cursor!);
+      // A scrolling cell holds cards past its lane's edges, level with other lanes, so the cursor's own lane comes first.
+      const own = to.filter(c => laneKey(c.dataset.card!) === l);
+      next = (own.length ? own : to).reduce((a, c) => (Math.abs(c.getBoundingClientRect().top - y) < Math.abs(a.getBoundingClientRect().top - y) ? c : a));
     } else next = clamp(grid[ci], grid[ci].indexOf(cur) + d[1]);
   }
   const id = (next.dataset.card || next.dataset.epic)!;
   S.cursor = id;
   if (S.detail && id !== "none") { S.detail.stack = [id]; render(); } else renderBoard();
-  document.querySelector<HTMLElement>(`#wboard [data-card="${CSS.escape(id)}"], #wboard [data-epic="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  revealBoardCursor();
   return true;
 }
 
@@ -645,7 +659,7 @@ function onSizeChange(): void {
   const show = () => {
     if (!S.cursor) return;
     if (S.view === "tree") ensureVisible(S.cursor);
-    else if (S.view === "board") document.querySelector(`#vBoard [data-card="${CSS.escape(S.cursor)}"], #vBoard [data-epic="${CSS.escape(S.cursor)}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    else if (S.view === "board") revealBoardCursor();
   };
   show();
   // Rows are content-visibility: auto, and the ones off screen in the old class keep that class's row

@@ -5,7 +5,7 @@
 import * as api from "./api";
 import type { Issue } from "./api.gen";
 import { D, ancestors, blocksOf, descendants, eff, get, isReady, kids, laneOf, openBlockers, pool, progress, projectOf, shortId, type Item } from "./data";
-import { DEFAULT_CHIPS, PC, S, SORTS, chipRowVisible, matches, queryString, stOf, textMatches, treeRows, tyOf, type TreeRow } from "./state";
+import { DEFAULT_CHIPS, PC, S, SORTS, chipRowVisible, laneHeight, matches, nextLaneHeight, queryString, stOf, textMatches, treeRows, tyOf, type LaneHeight, type TreeRow } from "./state";
 import { syncHistory } from "./nav";
 import { renderMermaidBlocks } from "./mermaid";
 import { renderMemory, renderMemoryDetail } from "./memory";
@@ -293,6 +293,9 @@ function colColor(k: string): string {
 /** lanesShown says whether cards sit under epic lane headers, so a card's epic is already in view. */
 const lanesShown = () => S.board.lanes !== "off" && S.board.group !== "type";
 
+/** railShown says whether the board draws the epic rail, whose lanes step through their heights (LaneHeight) rather than fold. */
+export const railShown = (): boolean => split() && S.board.lanes === "rail" && lanesShown();
+
 /**
  * parentLineHTML names a card's direct parent when its lane header names only
  * the epic above it, so a grandchild does not read as a child of the epic.
@@ -445,12 +448,23 @@ function epicCountsHTML(f: EpicFacts): string {
 }
 
 /**
+ * LANE_HEIGHTS give the epic cell's button for each height of its lane: the
+ * glyph and the label say how tall the lane is, the title what the next
+ * step makes it.
+ */
+const LANE_HEIGHTS: Record<LaneHeight, { glyph: string; label: string; step: string }> = {
+  compact: { glyph: "▸", label: "Compact lane", step: "Compact: as tall as the epic" },
+  open: { glyph: "▿", label: "Open lane", step: "Open: every open and in progress card" },
+  full: { glyph: "▾", label: "Full lane", step: "Full: every card" },
+};
+
+/**
  * epicCellHTML is one epic in the rail's first column, the terminal's epic
  * cell: title, first sentence, progress over every issue below the epic,
- * what is moving, and who owns it by when.
+ * what is moving, and who owns it by when. Its button steps the lane's height.
  */
 function epicCellHTML(l: string, n: number): string {
-  const f0 = S.board.laneFold.has(l), e = get(l);
+  const e = get(l), h = laneHeight(l), now = LANE_HEIGHTS[h];
   const label = l === "none" ? "No epic" : `${shortId(l)} ${e ? e.t : l}`;
   let body = "";
   if (e) {
@@ -464,12 +478,48 @@ function epicCellHTML(l: string, n: number): string {
     if (meta) body += `<div class="em">${meta}</div>`;
   } else body = `<div class="ec">${n} issue${n === 1 ? "" : "s"}</div>`;
   return `<div class="wepic lt ${S.cursor === l ? "sel" : ""}" data-epic="${esc(l)}" tabindex="0" aria-label="${esc(label)}, ${n} issues">`
-    + `<div class="eh"><button data-lane="${esc(l)}" aria-expanded="${!f0}" aria-label="${f0 ? "Unfold" : "Fold"} lane">${f0 ? "▸" : "▾"}</button>${l === "none" ? "<span>none</span>" : `<span class="ei">${esc(shortId(l))}</span>`}<span class="t">${esc(l === "none" ? "No epic" : e ? e.t : l)}</span></div>`
+    + `<div class="eh"><button data-lane="${esc(l)}" aria-label="${now.label}" title="${LANE_HEIGHTS[nextLaneHeight(h)].step} (Tab)">${now.glyph}</button>${l === "none" ? "<span>none</span>" : `<span class="ei">${esc(shortId(l))}</span>`}<span class="t">${esc(l === "none" ? "No epic" : e ? e.t : l)}</span></div>`
     + body + `</div>`;
 }
 
 function optsTab(): string {
   return `<button class="tab" data-act="boardopts" style="color:var(--muted)">⚙ ${S.board.group}${S.board.lanes !== "off" ? " · lanes " + S.board.lanes : ""}</button>`;
+}
+
+/**
+ * railCell is a lane's cell in one column of the epic rail. A cell that must
+ * not set its lane's height holds its cards in a box out of the flow, which
+ * scrolls: every cell of a Compact lane, whose height the epic cell sets,
+ * and in an Open lane every cell but the open and in progress ones, which
+ * set it. A folded column stays an empty rail.
+ */
+function railCell(k: string, lane: string, h: LaneHeight, arr: Item[]): string {
+  if (S.board.folded.has(k)) return `<div class="wcell rail lt" data-dcol="${esc(k)}"></div>`;
+  const scrolls = arr.length > 0 && (h === "compact" || (h === "open" && k !== "open" && k !== "in_progress"));
+  return scrolls
+    ? `<div class="wcell lt wsc" data-dcol="${esc(k)}"><div class="wbox" data-box="${esc(lane + " " + k)}">${cellCards(arr)}</div></div>`
+    : `<div class="wcell lt" data-dcol="${esc(k)}">${cellCards(arr)}</div>`;
+}
+
+/** cellEdges watches the scroll boxes of the board drawn last, so each marks its edges once laid out, and again when its size changes. */
+let cellEdges: ResizeObserver | null = null;
+
+/**
+ * markCellEdges says which edges of a scrolling cell have cards past them,
+ * and app.css fades those edges: macOS hides the scroll bar until a scroll
+ * starts, so nothing else shows that the cell holds more.
+ */
+export function markCellEdges(box: HTMLElement): void {
+  const y = box.scrollTop;
+  box.classList.toggle("up", y >= 1);
+  box.classList.toggle("down", y < box.scrollHeight - box.clientHeight - 1);
+}
+
+/** revealBoardCursor scrolls the cursor's card or epic cell into view, inside its cell's box as well. */
+export function revealBoardCursor(): void {
+  if (!S.cursor) return;
+  const id = CSS.escape(S.cursor);
+  document.querySelector(`#vBoard [data-card="${id}"], #vBoard [data-epic="${id}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 /**
@@ -494,10 +544,9 @@ function renderWideBoard(v: HTMLElement): void {
   const rail = S.board.lanes === "rail" && lanes;
   let rows = "";
   if (rail) {
-    const hidden = (k: string, arr: Item[]) => `<div class="wcell lt" data-dcol="${esc(k)}">${!folded(k) && arr.length ? `<span class="hid">${arr.length} hidden</span>` : ""}</div>`;
     for (const [l, arr] of laneKeys(cols.filter(([k]) => !folded(k)).flatMap(([k]) => per.get(k)!))) {
-      const inLane = (k: string) => per.get(k)!.filter(i => (laneOf(i) || "none") === l);
-      rows += epicCellHTML(l, arr.length) + cols.map(([k]) => (S.board.laneFold.has(l) ? hidden(k, inLane(k)) : cell(k, inLane(k)).replace('class="wcell', 'class="wcell lt'))).join("");
+      const h = laneHeight(l);
+      rows += epicCellHTML(l, arr.length) + cols.map(([k]) => railCell(k, l, h, per.get(k)!.filter(i => (laneOf(i) || "none") === l))).join("");
     }
   } else if (S.board.lanes === "rows" && lanes) {
     for (const [l, arr] of laneKeys(cols.filter(([k]) => !folded(k)).flatMap(([k]) => per.get(k)!))) {
@@ -509,12 +558,21 @@ function renderWideBoard(v: HTMLElement): void {
   if (!total) rows += `<div class="empty wempty">No cards match <b>${esc(queryString() || "the filter")}</b>.</div>`;
   const tools = optsTab()
     + (S.board.folded.size ? `<button class="tab unf" data-act="unfoldall">Z unfold</button>` : "")
-    + `<span class="whint">drag cards between columns · h j k l move · z folds · Tab folds a lane · v ${S.board.lanes === "rail" ? "epic rows" : "epic rail"}</span>`;
+    + `<span class="whint">drag cards between columns · h j k l move · z folds · Tab ${rail ? "steps a lane's height" : "folds a lane"} · v ${S.board.lanes === "rail" ? "epic rows" : "epic rail"}</span>`;
   const old = document.getElementById("wboard");
   const top = old ? old.scrollTop : 0, left = old ? old.scrollLeft : 0;
+  // A scrolling cell keeps its place through a redraw, as the board does: a cursor move, a live update and a drop all redraw it.
+  const cellTops = new Map<string, number>();
+  old?.querySelectorAll<HTMLElement>(".wbox").forEach(b => { if (b.scrollTop) cellTops.set(b.dataset.box!, b.scrollTop); });
   v.innerHTML = `<div class="tabs" id="tabs">${tools}</div><div class="bbody" id="bbody"><div class="wboard" id="wboard" style="grid-template-columns:${tmpl}">${rail ? `<div class="whead epich"><span>EPIC</span><b>${new Set(cols.flatMap(([k]) => per.get(k)!).map(i => laneOf(i) || "none")).size}</b></div>` : ""}${head}${rows}</div></div>`;
   const nb = document.getElementById("wboard")!;
   nb.scrollTop = top; nb.scrollLeft = left;
+  const boxes = nb.querySelectorAll<HTMLElement>(".wbox");
+  boxes.forEach(b => { const t = cellTops.get(b.dataset.box!); if (t) b.scrollTop = t; });
+  if (boxes.length) {
+    cellEdges ??= new ResizeObserver(entries => entries.forEach(e => markCellEdges(e.target as HTMLElement)));
+    boxes.forEach(b => cellEdges!.observe(b));
+  }
 }
 
 /**
@@ -554,6 +612,8 @@ function renderPhoneBoard(v: HTMLElement): void {
 
 export function renderBoard(): void {
   const v = $("#vBoard");
+  // The redraw replaces every scroll box, so the old ones need no more watching.
+  cellEdges?.disconnect();
   if (split()) renderWideBoard(v); else renderPhoneBoard(v);
 }
 

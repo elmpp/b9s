@@ -44,7 +44,10 @@ export const S = {
     folded: new Set<string>(store.get<string[]>("boardFolded", [])),
     // The side-by-side board opens on the TUI's epic rail; a phone's boxes read better with rows.
     lanes: store.get<"off" | "rows" | "rail">("boardLanes", split() ? "rail" : "rows"),
+    /** lanes folded to their header: the lane rows and a phone's boxes */
     laneFold: new Set<string>(),
+    /** the heights of the epic rail's lanes (laneHeight); a lane missing here is Compact */
+    laneHeight: new Map<string, LaneHeight>(),
     closedLimit: 50,
     hideEmpty: false,
   },
@@ -60,6 +63,38 @@ export function chipRowVisible(): boolean {
 }
 
 export function saveBoardFolded(): void { store.set("boardFolded", [...S.board.folded]); }
+
+/**
+ * LaneHeight is how tall a lane of the epic rail is: Compact is the epic
+ * cell's height, Open is tall enough for every open and in progress card,
+ * and Full for every card. A cell with more cards than its lane's height
+ * scrolls (render.ts railCell).
+ */
+export type LaneHeight = "compact" | "open" | "full";
+
+/** laneSteps are the heights a lane steps through. Only the status board has the open and in progress columns Open makes room for. */
+const laneSteps = (): LaneHeight[] => (S.board.group === "status" ? ["compact", "open", "full"] : ["compact", "full"]);
+
+export function laneHeight(lane: string): LaneHeight {
+  const h = S.board.laneHeight.get(lane);
+  return h && laneSteps().includes(h) ? h : "compact";
+}
+
+export function nextLaneHeight(h: LaneHeight): LaneHeight {
+  const steps = laneSteps();
+  return steps[(steps.indexOf(h) + 1) % steps.length];
+}
+
+/**
+ * stepLanes moves lanes to the next height together, as the epic cell's
+ * button, Tab and Shift-Tab do. Lanes at different heights all go back to
+ * Compact, so one more step moves them as one.
+ */
+export function stepLanes(lanes: string[]): void {
+  const now = new Set(lanes.map(laneHeight));
+  const to = now.size === 1 ? nextLaneHeight([...now][0]) : "compact";
+  lanes.forEach(l => S.board.laneHeight.set(l, to));
+}
 
 /** initialCols reads the second-line columns. A choice saved before the
  *  status column existed never had the chance to include it, so it gains
