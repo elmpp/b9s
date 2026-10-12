@@ -42,7 +42,7 @@ func closeRunes(s string) []tea.KeyMsg {
 func TestCloseDialogOffersCommentForSingleIssue(t *testing.T) {
 	m, _ := closeCommentModel(t, 0)
 	m, _ = closeKeys(t, m, closeRunes("K")...)
-	if !strings.Contains(m.View(), "[C] Comment") {
+	if !strings.Contains(m.View(), "[C] Comment and close") {
 		t.Fatalf("single close dialog must offer a comment, got:\n%s", m.View())
 	}
 }
@@ -53,6 +53,9 @@ func TestCloseWithCommentAddsCommentThenCloses(t *testing.T) {
 	m, _ = closeKeys(t, m, keys...)
 	if calls := readBdCallsUI(t, recordPath); len(calls) != 0 {
 		t.Fatalf("typing the comment must not run bd, calls = %q", calls)
+	}
+	if !strings.Contains(m.View(), "then closes the issue") || !strings.Contains(m.View(), "[Enter] Comment and close") {
+		t.Fatalf("comment step must say the issue closes after the comment, got:\n%s", m.View())
 	}
 	if !strings.Contains(m.View(), "yes, done") {
 		t.Fatalf("comment input must show the typed text, got:\n%s", m.View())
@@ -119,7 +122,7 @@ func TestBulkCloseDialogHasNoComment(t *testing.T) {
 		{ID: "bd-2", Title: "Two", Status: model.StatusOpen},
 	}, "")
 	m.issueConfirm = issueConfirmation{action: issueConfirmClose, ids: []string{"bd-1", "bd-2"}}
-	if strings.Contains(m.View(), "[C] Comment") {
+	if strings.Contains(m.View(), "[C] Comment and close") {
 		t.Fatal("bulk close must not offer a comment")
 	}
 }

@@ -4518,10 +4518,10 @@ func (m Model) renderIssueConfirm() string {
 	buttons := keyStyle.Render("[Y] "+confirmLabel) + "  " + textStyle.Render("[Esc] Cancel")
 	switch {
 	case m.issueConfirm.commenting:
-		warning = m.issueConfirm.comment.View()
-		buttons = keyStyle.Render("[Enter] Close") + "  " + textStyle.Render("[Esc] Cancel")
+		warning = "b9s adds this comment, then closes the issue.\n\n" + m.issueConfirm.comment.View()
+		buttons = keyStyle.Render("[Enter] Comment and close") + "  " + textStyle.Render("[Esc] Cancel")
 	case m.issueConfirm.action == issueConfirmClose && len(m.issueConfirm.ids) == 0:
-		buttons = keyStyle.Render("[Y] "+confirmLabel) + "  " + keyStyle.Render("[C] Comment") + "  " + textStyle.Render("[Esc] Cancel")
+		buttons = keyStyle.Render("[Y] "+confirmLabel) + "  " + keyStyle.Render("[C] Comment and close") + "  " + textStyle.Render("[Esc] Cancel")
 	}
 
 	content := titleStyle.Render(heading) + "\n\n" +

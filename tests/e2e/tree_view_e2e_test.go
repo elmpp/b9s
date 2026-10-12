@@ -440,9 +440,10 @@ func TestTreeViewCloseConfirmationAsksForComment(t *testing.T) {
 	}
 
 	containsAll(t, out, []string{
-		"[C] Comment",
+		"[C] Comment and close",
+		"then closes the issue",
 		"Comment: shipped",
-		"[Enter] Close",
+		"[Enter] Comment and close",
 	})
 }
 
