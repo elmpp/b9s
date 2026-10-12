@@ -76,6 +76,10 @@ type issueConfirmation struct {
 	// generation is the projectGeneration in effect when the confirmation was
 	// opened (bd-l66t); its y/Y path refuses through writeAllowedForGeneration.
 	generation uint64
+	// commenting is set once c/C turns a single-issue close into a comment
+	// prompt; comment then owns every key except Enter and Esc.
+	commenting bool
+	comment    textinput.Model
 }
 
 // SortMode represents the current list sorting mode (bv-3ita)
@@ -2469,8 +2473,34 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 			return m.cancelProjectSwitch(), nil
 		}
 
+		if m.issueConfirm.commenting {
+			switch msg.String() {
+			case "enter":
+				confirmation := m.issueConfirm
+				m.issueConfirm = issueConfirmation{}
+				if !m.writeAllowedForGeneration(confirmation.generation) {
+					return m, nil
+				}
+				return m, m.issueWriter.CloseIssueWithComment(confirmation.id, confirmation.comment.Value())
+			case "esc":
+				m.issueConfirm = issueConfirmation{}
+				return m, nil
+			}
+			var inputCmd tea.Cmd
+			m.issueConfirm.comment, inputCmd = m.issueConfirm.comment.Update(msg)
+			return m, inputCmd
+		}
+
 		if m.issueConfirm.action != issueConfirmNone {
 			switch msg.String() {
+			case "c", "C":
+				if m.issueConfirm.action == issueConfirmClose && len(m.issueConfirm.ids) == 0 {
+					m.issueConfirm.commenting = true
+					m.issueConfirm.comment = newCloseCommentInput()
+					return m, m.issueConfirm.comment.Focus()
+				}
+				m.issueConfirm = issueConfirmation{}
+				return m, nil
 			case "y", "Y":
 				confirmation := m.issueConfirm
 				m.issueConfirm = issueConfirmation{}
@@ -4203,6 +4233,16 @@ func (m *Model) resetHelpSearch() {
 	m.helpScroll = 0
 }
 
+// newCloseCommentInput is the one-line prompt for the comment a single-issue
+// close posts before closing.
+func newCloseCommentInput() textinput.Model {
+	ti := textinput.New()
+	ti.Prompt = "Comment: "
+	ti.Placeholder = "why is this done?"
+	ti.Width = 50
+	return ti
+}
+
 func newHelpSearchInput() textinput.Model {
 	ti := textinput.New()
 	ti.Prompt = "🔍 "
@@ -4475,10 +4515,19 @@ func (m Model) renderIssueConfirm() string {
 		subject = idStyle.Render(sanitizeTerminalLine(m.issueConfirm.id)) + "\n" + textStyle.Render(title)
 	}
 
+	buttons := keyStyle.Render("[Y] "+confirmLabel) + "  " + textStyle.Render("[Esc] Cancel")
+	switch {
+	case m.issueConfirm.commenting:
+		warning = m.issueConfirm.comment.View()
+		buttons = keyStyle.Render("[Enter] Close") + "  " + textStyle.Render("[Esc] Cancel")
+	case m.issueConfirm.action == issueConfirmClose && len(m.issueConfirm.ids) == 0:
+		buttons = keyStyle.Render("[Y] "+confirmLabel) + "  " + keyStyle.Render("[C] Comment") + "  " + textStyle.Render("[Esc] Cancel")
+	}
+
 	content := titleStyle.Render(heading) + "\n\n" +
 		subject + "\n\n" +
 		textStyle.Render(warning) + "\n\n" +
-		keyStyle.Render("[Y] "+confirmLabel) + "  " + textStyle.Render("[Esc] Cancel")
+		buttons
 
 	box := boxStyle.Render(content)
 

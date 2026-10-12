@@ -102,7 +102,7 @@ const contextHelpList = `## List View
 
 **Actions**
   y         Copy issue ID
-  K         Close issue (confirm)
+  K         Close issue (confirm, C to comment)
   Del       Delete issue (confirm)
   t/T       Time-travel
   U         Update b9s`

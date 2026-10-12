@@ -123,6 +123,24 @@ func (w *IssueWriter) CloseIssue(id, reason string) tea.Cmd {
 	return w.runBdCmd(BdOpClose, id, args)
 }
 
+// CloseIssueWithComment adds comment to id and then closes it, in that order,
+// so a failed comment leaves the issue open with nothing lost. An empty
+// comment closes without one.
+func (w *IssueWriter) CloseIssueWithComment(id, comment string) tea.Cmd {
+	if strings.TrimSpace(comment) == "" {
+		return w.CloseIssue(id, "")
+	}
+	addComment := w.AddComment(id, comment)
+	closeIssue := w.CloseIssue(id, "")
+	return func() tea.Msg {
+		msg := addComment()
+		if result, ok := msg.(BdResultMsg); !ok || !result.Success {
+			return msg
+		}
+		return closeIssue()
+	}
+}
+
 // DeleteIssue runs bd delete <id> --force
 func (w *IssueWriter) DeleteIssue(id string) tea.Cmd {
 	if !w.available {

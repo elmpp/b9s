@@ -421,6 +421,31 @@ func TestTreeViewShiftKShowsCloseConfirmation(t *testing.T) {
 	})
 }
 
+func TestTreeViewCloseConfirmationAsksForComment(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{
+			ID:        "close-1",
+			Title:     "Close from the TUI",
+			Status:    "open",
+			Priority:  2,
+			IssueType: "task",
+			CreatedAt: time.Now().Format(time.RFC3339),
+		},
+	})
+
+	out, err := runTreeTUI(t, tempDir, 2200, []keyStep{k("K"), k("c"), k("shipped")})
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+
+	containsAll(t, out, []string{
+		"[C] Comment",
+		"Comment: shipped",
+		"[Enter] Close",
+	})
+}
+
 func TestTreeViewCreatedSortNumberedChildren(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()
