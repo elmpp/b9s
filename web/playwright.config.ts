@@ -23,10 +23,12 @@ const sizes = [
   { name: "wide-2560", use: { ...devices["Desktop Chrome"], viewport: { width: 2560, height: 1440 } } },
 ];
 const perfBaseDependencies = ["pixel", "iphone", "desktop", "desktop-safari", "desktop-firefox", "ipad", ...sizes.map(size => size.name)];
+const webkitPerfTimeout = process.env.CI ? 90000 : 30000;
 const perfProjects = [
   { name: "pixel-perf", use: devices["Pixel 7"], dependencies: perfBaseDependencies },
-  { name: "iphone-perf", use: devices["iPhone 14"], dependencies: [...perfBaseDependencies, "pixel-perf"] },
-  { name: "tablet-perf", use: devices["iPad Mini landscape"], dependencies: [...perfBaseDependencies, "iphone-perf"] },
+  // b9m-vdp.4.19: CI WebKit records budgets without enforcing them, so its perf tests run every sample on a slow runner.
+  { name: "iphone-perf", use: devices["iPhone 14"], dependencies: [...perfBaseDependencies, "pixel-perf"], timeout: webkitPerfTimeout },
+  { name: "tablet-perf", use: devices["iPad Mini landscape"], dependencies: [...perfBaseDependencies, "iphone-perf"], timeout: webkitPerfTimeout },
   { name: "desktop-perf", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, dependencies: [...perfBaseDependencies, "tablet-perf"] },
 ];
 
@@ -64,11 +66,12 @@ export default defineConfig({
     { name: "ipad", use: { ...devices["iPad Pro 11"] }, testMatch: /(wide|keys)\.spec/ },
     // desktop.spec.ts covers the desktop and wide classes; at 1440 px the three desktop browsers run it already.
     ...sizes.map(size => ({ ...size, testMatch: size.name === "desktop-1920" || size.name === "wide-2560" ? /(shell|desktop|board-detail|accessibility)\.spec/ : /(shell|board-detail|accessibility)\.spec/ })),
-    ...perfProjects.map(({ name, use, dependencies }) => ({
+    ...perfProjects.map(({ name, use, dependencies, timeout }) => ({
       name,
       use,
       testMatch: /perf\.spec/,
       dependencies,
+      ...(timeout ? { timeout } : {}),
     })),
     // The spec launches the browsers and devices it measures itself; one
     // worker at a time keeps the timings from sharing the CPU. Its output
