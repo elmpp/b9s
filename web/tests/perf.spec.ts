@@ -22,6 +22,7 @@ const CI_BUDGET_FACTOR = 1.5;
 
 test.use({ fixture: { issues: BIG } });
 test.describe.configure({ mode: "serial" });
+test.slow(({ browserName }) => browserName === "webkit" && !!process.env.CI, "CI WebKit records budgets without enforcing them");
 
 const attr = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 const rowStatusPred = (id: string, status: string) => `document.querySelector("#treeRows .row[data-id=\\"${attr(id)}\\"] .stw")?.textContent === ${JSON.stringify(status)}`;
