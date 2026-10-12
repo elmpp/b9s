@@ -45,15 +45,20 @@ function rounded(values: number[]): string {
   return values.map(v => String(Math.round(v))).join(", ");
 }
 
-function expectMedianWithinBudget(label: string, values: number[], budget: number): number {
+function expectMedianWithinBudget(label: string, values: number[], budget: number, browserName: string): number {
   const value = median(values);
-  const usesCIAllowance = value > budget && !!process.env.CI;
+  // CI WebKit is not a real iPhone; the operator decided on 2026-10-12 to record it without enforcing.
+  const skipsCIWebKitEnforcement = !!process.env.CI && browserName === "webkit";
+  const usesCIAllowance = !skipsCIWebKitEnforcement && value > budget && !!process.env.CI;
   // The raw budgets stay fixed. CI gets a narrow allowance only after the
   // median misses the local budget, which filters slow-runner outliers.
   const limit = usesCIAllowance ? budget * CI_BUDGET_FACTOR : budget;
   const allowance = usesCIAllowance ? `, CI allowance ${CI_BUDGET_FACTOR}x` : "";
-  test.info().annotations.push({ type: "perf", description: `${label} median ${Math.round(value)} ms from [${rounded(values)}]${allowance}` });
-  expect(value, `${label} median ${Math.round(value)} ms from samples [${rounded(values)}]`).toBeLessThanOrEqual(limit);
+  const enforcement = skipsCIWebKitEnforcement ? ", not enforced on WebKit in CI" : "";
+  test.info().annotations.push({ type: "perf", description: `${label} median ${Math.round(value)} ms from [${rounded(values)}]${allowance}${enforcement}` });
+  if (!skipsCIWebKitEnforcement) {
+    expect(value, `${label} median ${Math.round(value)} ms from samples [${rounded(values)}]`).toBeLessThanOrEqual(limit);
+  }
   return value;
 }
 
@@ -193,13 +198,13 @@ async function smoothSample(page: Page, action: () => Promise<void>): Promise<{ 
 
 type SmoothSample = Awaited<ReturnType<typeof smoothSample>>;
 
-test("1000 issue reads meet load and tap feedback budgets", async ({ page, project }) => {
+test("1000 issue reads meet load and tap feedback budgets", async ({ page, project, browserName }) => {
   const loadSamples = await samples("load", async () => {
     const t0 = Date.now();
     await open(page, project);
     return Date.now() - t0;
   });
-  const loadMs = expectMedianWithinBudget("load", loadSamples, BUDGET.loadMs);
+  const loadMs = expectMedianWithinBudget("load", loadSamples, BUDGET.loadMs, browserName);
   expect(await page.locator("#treeRows .row").count()).toBeGreaterThan(600);
 
   const detailId = await firstOpenLeaf(page);
@@ -209,7 +214,7 @@ test("1000 issue reads meet load and tap feedback budgets", async ({ page, proje
     await expect(page.locator(".detail")).toHaveCount(0);
     return value;
   });
-  const detailMs = expectMedianWithinBudget("detail feedback", detailSamples, BUDGET.tapFeedbackMs);
+  const detailMs = expectMedianWithinBudget("detail feedback", detailSamples, BUDGET.tapFeedbackMs, browserName);
 
   const renderSamples = await samples("full render", () => page.evaluate(async () => {
     const chip = document.querySelector<HTMLElement>('[data-chip="closed"]')!;
@@ -218,23 +223,23 @@ test("1000 issue reads meet load and tap feedback budgets", async ({ page, proje
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
     return performance.now() - t;
   }));
-  expectMedianWithinBudget("full render", renderSamples, BUDGET.fullRenderMs);
+  expectMedianWithinBudget("full render", renderSamples, BUDGET.fullRenderMs, browserName);
   const chipSamples = await samples("chip feedback", async () => {
     const count = await page.locator("#treeRows .row").count();
     return feedbackMs(page, `document.querySelectorAll("#treeRows .row").length !== ${count}`, () => page.locator('#chips [data-chip="closed"]').click());
   });
-  const chipMs = expectMedianWithinBudget("chip feedback", chipSamples, BUDGET.tapFeedbackMs);
+  const chipMs = expectMedianWithinBudget("chip feedback", chipSamples, BUDGET.tapFeedbackMs, browserName);
 
   const boardSamples = await samples("board feedback", async () => {
     await page.locator('#bar [data-view="tree"]').click();
     await expect(page.locator("#vTree")).toBeVisible();
     return feedbackMs(page, `!document.getElementById("vBoard")?.hidden && !!document.querySelector("#vBoard [data-card]")`, () => page.locator('#bar [data-view="board"]').click());
   });
-  const boardMs = expectMedianWithinBudget("board feedback", boardSamples, BUDGET.tapFeedbackMs);
+  const boardMs = expectMedianWithinBudget("board feedback", boardSamples, BUDGET.tapFeedbackMs, browserName);
   test.info().annotations.push({ type: "perf", description: `summary load ${Math.round(loadMs)} ms, detail ${Math.round(detailMs)} ms, chip ${Math.round(chipMs)} ms, board ${Math.round(boardMs)} ms` });
 });
 
-test("project switch meets the measured budget", async ({ page }) => {
+test("project switch meets the measured budget", async ({ page, browserName }) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "b9s-perf-projects-"));
   const first = path.join(root, "first");
   const second = path.join(root, "second", ".beads");
@@ -256,14 +261,14 @@ test("project switch meets the measured budget", async ({ page }) => {
         "last",
       );
     });
-    const switchMs = expectMedianWithinBudget("project switch", switchSamples, BUDGET.projectSwitchMs);
+    const switchMs = expectMedianWithinBudget("project switch", switchSamples, BUDGET.projectSwitchMs, browserName);
     test.info().annotations.push({ type: "perf", description: `summary project switch ${Math.round(switchMs)} ms` });
   } finally {
     stopProject(project);
   }
 });
 
-test("write and live updates meet feedback and round-trip budgets", async ({ page, project }) => {
+test("write and live updates meet feedback and round-trip budgets", async ({ page, project, browserName }) => {
   await open(page, project);
   const writeIds: string[] = [];
   const before = await page.locator("#treeList").evaluate(el => el.scrollTop);
@@ -280,8 +285,8 @@ test("write and live updates meet feedback and round-trip budgets", async ({ pag
     const writeFetchMs = await lastWriteFetchMs(page);
     if (Number.isFinite(writeFetchMs)) writeFetchSamples.push(writeFetchMs);
   }
-  const feedback = expectMedianWithinBudget("write feedback", feedbackSamples, BUDGET.tapFeedbackMs);
-  if (writeFetchSamples.length) expectMedianWithinBudget("write round trip", writeFetchSamples, BUDGET.writeRoundTripMs);
+  const feedback = expectMedianWithinBudget("write feedback", feedbackSamples, BUDGET.tapFeedbackMs, browserName);
+  if (writeFetchSamples.length) expectMedianWithinBudget("write round trip", writeFetchSamples, BUDGET.writeRoundTripMs, browserName);
   expect(Math.abs((await page.locator("#treeList").evaluate(el => el.scrollTop)) - before)).toBeLessThan(80);
 
   let current = BIG.map(i => writeIds.includes(i.id) ? { ...i, status: "in_progress" } : i);
@@ -296,11 +301,11 @@ test("write and live updates meet feedback and round-trip budgets", async ({ pag
     await expect(row(page, liveId).locator(".stw")).toHaveText("in progress", { timeout: 5000 });
     liveSamples.push(Date.now() - liveStarted);
   }
-  const liveMs = expectMedianWithinBudget("live update", liveSamples, BUDGET.liveUpdateMs);
+  const liveMs = expectMedianWithinBudget("live update", liveSamples, BUDGET.liveUpdateMs, browserName);
   test.info().annotations.push({ type: "perf", description: `write feedback ${Math.round(feedback)} ms, live ${liveMs} ms` });
 });
 
-test("scroll and drag stay inside frame budgets", async ({ page, project }) => {
+test("scroll and drag stay inside frame budgets", async ({ page, project, browserName }) => {
   await open(page, project);
   const list = page.locator("#treeList");
   await list.hover();
@@ -316,7 +321,7 @@ test("scroll and drag stay inside frame budgets", async ({ page, project }) => {
     }
   }));
   scrollSamples.forEach(scroll => expect(scroll.frames).toBeGreaterThan(4));
-  expectMedianWithinBudget("scroll long tasks", scrollSamples.map(s => s.longTaskMs), BUDGET.longTaskMs);
+  expectMedianWithinBudget("scroll long tasks", scrollSamples.map(s => s.longTaskMs), BUDGET.longTaskMs, browserName);
 
   const dragSamples: SmoothSample[] = [];
   const dragIds: string[] = [];
@@ -326,6 +331,6 @@ test("scroll and drag stay inside frame budgets", async ({ page, project }) => {
     dragSamples.push(await smoothSample(page, () => swipe(page, dragId, 0.15)));
   }
   dragSamples.forEach(drag => expect(drag.frames).toBeGreaterThan(2));
-  expectMedianWithinBudget("drag long tasks", dragSamples.map(s => s.longTaskMs), BUDGET.longTaskMs);
+  expectMedianWithinBudget("drag long tasks", dragSamples.map(s => s.longTaskMs), BUDGET.longTaskMs, browserName);
   test.info().annotations.push({ type: "perf", description: `summary scroll p95 ${Math.round(median(scrollSamples.map(s => s.frameP95)))} ms, drag p95 ${Math.round(median(dragSamples.map(s => s.frameP95)))} ms` });
 });
