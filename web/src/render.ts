@@ -489,25 +489,29 @@ function optsTab(): string {
 /**
  * railCell is a lane's cell in one column of the epic rail. A cell that must
  * not set its lane's height holds its cards in a box out of the flow, which
- * scrolls: every cell of a Compact lane, whose height the epic cell sets,
+ * clips them: every cell of a Compact lane, whose height the epic cell sets,
  * and in an Open lane every cell but the open and in progress ones, which
- * set it. A folded column stays an empty rail.
+ * set it. Only the box that holds the cursor's card scrolls (cur), so the
+ * wheel over any other cell scrolls the board. A folded column stays an
+ * empty rail.
  */
 function railCell(k: string, lane: string, h: LaneHeight, arr: Item[]): string {
   if (S.board.folded.has(k)) return `<div class="wcell rail lt" data-dcol="${esc(k)}"></div>`;
-  const scrolls = arr.length > 0 && (h === "compact" || (h === "open" && k !== "open" && k !== "in_progress"));
-  return scrolls
-    ? `<div class="wcell lt wsc" data-dcol="${esc(k)}"><div class="wbox" data-box="${esc(lane + " " + k)}">${cellCards(arr)}</div></div>`
+  const boxed = arr.length > 0 && (h === "compact" || (h === "open" && k !== "open" && k !== "in_progress"));
+  const cur = boxed && arr.some(i => i.id === S.cursor) ? " cur" : "";
+  return boxed
+    ? `<div class="wcell lt wsc" data-dcol="${esc(k)}"><div class="wbox${cur}" data-box="${esc(lane + " " + k)}">${cellCards(arr)}</div></div>`
     : `<div class="wcell lt" data-dcol="${esc(k)}">${cellCards(arr)}</div>`;
 }
 
-/** cellEdges watches the scroll boxes of the board drawn last, so each marks its edges once laid out, and again when its size changes. */
+/** cellEdges watches the cell boxes of the board drawn last, so each marks its edges once laid out, and again when its size changes. */
 let cellEdges: ResizeObserver | null = null;
 
 /**
- * markCellEdges says which edges of a scrolling cell have cards past them,
- * and app.css fades those edges: macOS hides the scroll bar until a scroll
- * starts, so nothing else shows that the cell holds more.
+ * markCellEdges says which edges of a cell's box have cards past them, and
+ * app.css fades those edges: only the box that holds the cursor's card has a
+ * scroll bar, and macOS hides even that one until a scroll starts, so
+ * nothing else shows that a cell holds more.
  */
 export function markCellEdges(box: HTMLElement): void {
   const y = box.scrollTop;
@@ -561,7 +565,8 @@ function renderWideBoard(v: HTMLElement): void {
     + `<span class="whint">drag cards between columns · h j k l move · z folds · Tab ${rail ? "steps a lane's height" : "folds a lane"} · v ${S.board.lanes === "rail" ? "epic rows" : "epic rail"}</span>`;
   const old = document.getElementById("wboard");
   const top = old ? old.scrollTop : 0, left = old ? old.scrollLeft : 0;
-  // A scrolling cell keeps its place through a redraw, as the board does: a cursor move, a live update and a drop all redraw it.
+  // A cell keeps its place through a redraw, as the board does: a cursor move, a live update and a drop all redraw it.
+  // A box that clips its cards still takes a scrollTop, so a cell the cursor has left shows the cards it was scrolled to.
   const cellTops = new Map<string, number>();
   old?.querySelectorAll<HTMLElement>(".wbox").forEach(b => { if (b.scrollTop) cellTops.set(b.dataset.box!, b.scrollTop); });
   v.innerHTML = `<div class="tabs" id="tabs">${tools}</div><div class="bbody" id="bbody"><div class="wboard" id="wboard" style="grid-template-columns:${tmpl}">${rail ? `<div class="whead epich"><span>EPIC</span><b>${new Set(cols.flatMap(([k]) => per.get(k)!).map(i => laneOf(i) || "none")).size}</b></div>` : ""}${head}${rows}</div></div>`;
@@ -612,7 +617,7 @@ function renderPhoneBoard(v: HTMLElement): void {
 
 export function renderBoard(): void {
   const v = $("#vBoard");
-  // The redraw replaces every scroll box, so the old ones need no more watching.
+  // The redraw replaces every cell box, so the old ones need no more watching.
   cellEdges?.disconnect();
   if (split()) renderWideBoard(v); else renderPhoneBoard(v);
 }

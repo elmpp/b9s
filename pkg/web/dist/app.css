@@ -205,14 +205,16 @@
   .wepic .ep i { display: block; height: 100%; background: var(--muted); }
   .wepic .en { color: var(--dim); font-variant-numeric: tabular-nums; }
   .wepic .ec { grid-column: 1 / -1; color: var(--muted); }
-  /* A lane is never shorter than three one-line cards, so a short epic cell, No epic above all, still shows a few before its cells scroll. */
+  /* A lane is never shorter than three one-line cards, so a short epic cell, No epic above all, still shows a few before its cells clip the rest. */
   .wepic { min-height: 9.2rem; }
-  /* A cell that must not set its lane's height holds its cards in a box out of the flow, which scrolls (render.ts railCell). The insets are the cell's padding. */
+  /* A cell that must not set its lane's height holds its cards in a box out of the flow (render.ts railCell). The insets are the cell's padding. */
   .wcell.wsc { position: relative; min-height: 0; }
-  .wbox { position: absolute; inset: 10px 0 4px; overflow: hidden auto; --fade: min(32px, 20%); scroll-padding-block: var(--fade); }
+  .wbox { position: absolute; inset: 10px 0 4px; overflow: hidden; --fade: min(32px, 20%); scroll-padding-block: var(--fade); }
+  /* Only the box that holds the cursor's card scrolls and has a scroll bar. Every other box clips its cards behind the fades, so the wheel or a trackpad over it scrolls the board and never catches in a cell on the way through the epics. */
+  .wbox.cur { overflow-y: auto; }
   /* The last card's margin would let a box that holds every card scroll by it, and fade an edge with nothing past it. */
   .wbox > .card:last-child { margin-bottom: 0; }
-  /* macOS hides scroll bars until a scroll starts, so an edge with more cards past it fades (render.ts markCellEdges), over a card's height where the box has room. The scroll padding keeps the cursor's card out of the fade. A mask reads only alpha, so --ink stands for any opaque colour. */
+  /* Only the cursor's box has a scroll bar, and macOS hides that one until a scroll starts, so an edge of any box with more cards past it fades (render.ts markCellEdges), over a card's height where the box has room. The scroll padding keeps the cursor's card out of the fade. A mask reads only alpha, so --ink stands for any opaque colour. */
   .wbox.up { -webkit-mask-image: linear-gradient(var(--transparent), var(--ink) var(--fade)); mask-image: linear-gradient(var(--transparent), var(--ink) var(--fade)); }
   .wbox.down { -webkit-mask-image: linear-gradient(var(--ink) calc(100% - var(--fade)), var(--transparent)); mask-image: linear-gradient(var(--ink) calc(100% - var(--fade)), var(--transparent)); }
   .wbox.up.down { -webkit-mask-image: linear-gradient(var(--transparent), var(--ink) var(--fade), var(--ink) calc(100% - var(--fade)), var(--transparent)); mask-image: linear-gradient(var(--transparent), var(--ink) var(--fade), var(--ink) calc(100% - var(--fade)), var(--transparent)); }
