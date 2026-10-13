@@ -2,9 +2,9 @@
 plan_slug: 2026-10-11-responsive-web
 phase: implementation-plan
 rig: b9s-alpha
-rig_root: /Users/andrevanderheijden/gascity/rigs/b9s-alpha
-artifact_root: /Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/plans
-requirements_file: /Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/plans/2026-10-11-responsive-web/requirements.md
+rig_root: ~/gascity/rigs/b9s-alpha
+artifact_root: docs/plans
+requirements_file: docs/plans/2026-10-11-responsive-web/requirements.md
 epic: b9m-vdp
 status: approved
 created_at: 2026-10-11T08:18:14Z

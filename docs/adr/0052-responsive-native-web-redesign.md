@@ -23,16 +23,16 @@ References:
 
 - [docs/plans/2026-10-11-responsive-web/requirements.md](../plans/2026-10-11-responsive-web/requirements.md)
 - [docs/plans/2026-10-11-responsive-web/implementation-plan.md](../plans/2026-10-11-responsive-web/implementation-plan.md)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/index.html](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/index.html)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-tree.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-tree.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-detail.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-detail.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-board.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-board.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-search.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-search.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-edit.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-phone-edit.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-tablet-portrait.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-tablet-portrait.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-tablet-landscape.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-tablet-landscape.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-desktop.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-desktop.png)
-- [/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-wide.png](/Users/andrevanderheijden/gascity/rigs/b9s-alpha/docs/mockups/responsive-web/shots/a-wide.png)
+- [docs/mockups/responsive-web/index.html](../mockups/responsive-web/index.html)
+- [docs/mockups/responsive-web/shots/a-phone-tree.png](../mockups/responsive-web/shots/a-phone-tree.png)
+- [docs/mockups/responsive-web/shots/a-phone-detail.png](../mockups/responsive-web/shots/a-phone-detail.png)
+- [docs/mockups/responsive-web/shots/a-phone-board.png](../mockups/responsive-web/shots/a-phone-board.png)
+- [docs/mockups/responsive-web/shots/a-phone-search.png](../mockups/responsive-web/shots/a-phone-search.png)
+- [docs/mockups/responsive-web/shots/a-phone-edit.png](../mockups/responsive-web/shots/a-phone-edit.png)
+- [docs/mockups/responsive-web/shots/a-tablet-portrait.png](../mockups/responsive-web/shots/a-tablet-portrait.png)
+- [docs/mockups/responsive-web/shots/a-tablet-landscape.png](../mockups/responsive-web/shots/a-tablet-landscape.png)
+- [docs/mockups/responsive-web/shots/a-desktop.png](../mockups/responsive-web/shots/a-desktop.png)
+- [docs/mockups/responsive-web/shots/a-wide.png](../mockups/responsive-web/shots/a-wide.png)
 
 ## Decision
 

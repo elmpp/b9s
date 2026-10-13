@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -321,6 +322,61 @@ func TestNoTrackedFileContainsTheAuthorsHomeDirectory(t *testing.T) {
 		t.Skipf("git grep unavailable: %v", err)
 	}
 	t.Fatalf("tracked files contain the home directory %s:\n%s", home, out)
+}
+
+// homePathPattern matches a macOS or Linux home directory with its user name.
+// The check above sees only the home of the machine running it, so on CI it
+// cannot see the author's; this one sees every user's.
+const homePathERE = `(/Users|/home)/([A-Za-z0-9._-]+)/`
+
+var homePathPattern = regexp.MustCompile(homePathERE)
+
+// placeholderHomeUsers are the user names the docs and tests use in example
+// paths; they name no real machine.
+var placeholderHomeUsers = map[string]bool{"me": true, "user": true, "dev": true, "runner": true}
+
+// leakedHomePaths returns the home paths in text whose user name is not a
+// placeholder.
+func leakedHomePaths(text string) []string {
+	var leaks []string
+	for _, m := range homePathPattern.FindAllStringSubmatch(text, -1) {
+		if !placeholderHomeUsers[m[2]] {
+			leaks = append(leaks, m[0])
+		}
+	}
+	return leaks
+}
+
+func TestLeakedHomePathsKeepsPlaceholders(t *testing.T) {
+	// Joined at run time, so this file does not trip the repository check below.
+	users, home := "/Users/", "/home/"
+	text := "rig_root: " + users + "alice/gascity/rigs/b9s-alpha\npath: " + users + "me/src/b9s\n" + home + "user/file.txt " + home + "bob/x"
+	got := leakedHomePaths(text)
+	want := []string{users + "alice/", home + "bob/"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("leakedHomePaths = %v, want %v", got, want)
+	}
+}
+
+// Beads exports under .beads are issue data, not published docs or code.
+func TestNoTrackedFileContainsAnyUsersHomeDirectory(t *testing.T) {
+	repoRoot := filepath.Join("..", "..")
+	out, err := exec.Command("git", "-C", repoRoot, "grep", "-nIE", homePathERE, "--", ".", ":!vendor", ":!.beads").Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return
+		}
+		t.Skipf("git grep unavailable: %v", err)
+	}
+	var bad []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if len(leakedHomePaths(line)) > 0 {
+			bad = append(bad, line)
+		}
+	}
+	if len(bad) > 0 {
+		t.Fatalf("tracked files contain a user's home directory:\n%s", strings.Join(bad, "\n"))
+	}
 }
 
 // Compiled executables in the source tree go stale against the code and carry
