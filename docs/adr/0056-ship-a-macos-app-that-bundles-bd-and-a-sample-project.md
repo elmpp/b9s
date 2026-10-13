@@ -52,7 +52,9 @@ sequenceDiagram
 
 - **A script app bundle in a DMG** (chosen): no Xcode project, built by one
   shell script from what the repo already has, testable with stubs. Dialogs are
-  plain `osascript`, which looks basic.
+  plain `osascript`, which looks basic. The bundle's executable is a small
+  universal Go binary that runs the launcher script: with the script itself as
+  the executable, macOS on Apple silicon asks for Rosetta before it opens.
 - **A `.pkg` installer inside the DMG**: installs the commands without a
   password prompt later. But it runs as root, so it cannot create a sample
   project in the user's home cleanly, and an installer is a heavier step for a

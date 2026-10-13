@@ -46,7 +46,8 @@ Logs go to `~/Library/Logs/B9s`, state to `~/Library/Application Support/B9s`.
 
 | File | Becomes | Role |
 |---|---|---|
-| `launcher.sh` | `Contents/MacOS/B9s` | The app's executable: the dialogs, through `osascript` |
+| `stub/` | `Contents/MacOS/B9s` | The app's executable: a universal Go binary that runs the launcher. A script there makes macOS ask for Rosetta on Apple silicon, so the build refuses one |
+| `launcher.sh` | `Contents/Resources/launcher` | The dialogs, through `osascript` |
 | `b9s-app.sh` | `Contents/Resources/b9s-app` | Everything without a screen: `sample`, `web`, `terminal-cmd`, `cli-status`, `install-cli` |
 | `Info.plist.in` | `Contents/Info.plist` | Bundle metadata, version filled in at build |
 | `ReadMe.txt` | `Read Me.txt` in the DMG | Install steps for the person who downloaded it |
@@ -93,5 +94,9 @@ The Go tests cover the sample import (once, never with the shell's Beads server
 settings, nothing left behind on failure), the command links, the web server
 reuse, quoting of paths with spaces and quotes, skipping tools the user already
 has, and the launcher installing the commands without a question.
-They do not cover Gatekeeper or a real dialog; check those by hand on a Mac
-before publishing a DMG.
+They do not cover Gatekeeper or a real dialog; check those by hand on a clean
+Mac before publishing a DMG. A [Tart](https://tart.run) VM from
+`ghcr.io/cirruslabs/macos-sequoia-vanilla` works: it has no Rosetta, Homebrew or
+`/usr/local/bin`. Its Gatekeeper is off, so switch it on first
+(`sudo spctl --global-enable`), and mark the copied DMG as downloaded with a
+`com.apple.quarantine` attribute.

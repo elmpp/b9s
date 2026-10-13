@@ -1,9 +1,10 @@
 #!/bin/bash
-# B9s.app's executable. It asks the questions in native dialogs and leaves the
+# B9s.app's launcher, run by the bundle's executable (stub/main.go) from
+# Contents/Resources. It asks the questions in native dialogs and leaves the
 # work to b9s-app, so the behaviour stays testable without a screen.
 set -u
 
-resources=$(cd "$(dirname "$0")/../Resources" && pwd -P)
+resources=$(cd "$(dirname "$0")" && pwd -P)
 app=$resources/b9s-app
 support=$HOME/Library/Application\ Support/B9s
 mkdir -p "$support"

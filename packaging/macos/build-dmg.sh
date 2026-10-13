@@ -52,6 +52,11 @@ for arch in arm64 amd64; do
 		-o "$work/b9s-$arch" ./cmd/b9s
 done
 lipo -create -output "$work/b9s" "$work/b9s-arm64" "$work/b9s-amd64"
+for arch in arm64 amd64; do
+	CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go -C "$root" build -trimpath -ldflags "-s -w" \
+		-o "$work/stub-$arch" ./packaging/macos/stub
+done
+lipo -create -output "$work/stub" "$work/stub-arm64" "$work/stub-amd64"
 
 step "bd $BD_VERSION from $BD_REPO, universal"
 base=https://github.com/$BD_REPO/releases/download/v$BD_VERSION
@@ -78,7 +83,20 @@ short=${VERSION%%-*}
 sed -e "s/@VERSION@/$VERSION/" -e "s/@SHORT_VERSION@/$short/" \
 	"$src/Info.plist.in" >"$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >/dev/null
-install -m 0755 "$src/launcher.sh" "$app/Contents/MacOS/B9s"
+install -m 0755 "$work/stub" "$app/Contents/MacOS/B9s"
+install -m 0755 "$src/launcher.sh" "$app/Contents/Resources/launcher"
+# macOS asks for Rosetta before opening an app whose main executable is not a
+# native binary for this Mac, so a script or a one-architecture build must not ship.
+archs=" $(lipo -archs "$app/Contents/MacOS/B9s" 2>/dev/null || true) "
+for arch in arm64 x86_64; do
+	case $archs in
+	*" $arch "*) ;;
+	*)
+		echo "build-dmg: Contents/MacOS/B9s must hold arm64 and x86_64, has:${archs:- no Mach-O}" >&2
+		exit 1
+		;;
+	esac
+done
 install -m 0755 "$src/b9s-app.sh" "$app/Contents/Resources/b9s-app"
 install -m 0755 "$work/b9s" "$work/bd" "$app/Contents/Resources/bin/"
 cp "$root/examples/sample-project/.beads/issues.jsonl" "$app/Contents/Resources/sample-project/.beads/"

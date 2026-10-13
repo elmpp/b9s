@@ -4,11 +4,13 @@
 package macos
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -319,6 +321,33 @@ case $script in
 esac
 `
 
+var (
+	stubOnce sync.Once
+	stubPath string
+	stubErr  error
+)
+
+// buildStub compiles the app's main executable once per test run.
+func buildStub(t *testing.T) string {
+	t.Helper()
+	stubOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "b9s-app-stub")
+		if err != nil {
+			stubErr = err
+			return
+		}
+		stubPath = filepath.Join(dir, "B9s")
+		out, err := exec.Command("go", "build", "-o", stubPath, "./stub").CombinedOutput()
+		if err != nil {
+			stubErr = fmt.Errorf("go build ./stub: %v\n%s", err, out)
+		}
+	})
+	if stubErr != nil {
+		t.Fatal(stubErr)
+	}
+	return stubPath
+}
+
 // launchApp lays out a B9s.app around the real launcher and b9s-app scripts
 // and runs it with osascript and open stubbed.
 func (e *appEnv) launchApp(answers ...string) (string, error) {
@@ -337,7 +366,12 @@ func (e *appEnv) launchApp(answers ...string) (string, error) {
 		}
 		writeExec(e.t, to, string(b))
 	}
-	copyExec("launcher.sh", filepath.Join(app, "MacOS", "B9s"))
+	copyExec("launcher.sh", filepath.Join(res, "launcher"))
+	stub, err := os.ReadFile(buildStub(e.t))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	writeExec(e.t, filepath.Join(app, "MacOS", "B9s"), string(stub))
 	copyExec("b9s-app.sh", filepath.Join(res, "b9s-app"))
 	copyExec(filepath.Join(e.bin, "bd"), filepath.Join(res, "bin", "bd"))
 	copyExec(filepath.Join(e.bin, "b9s"), filepath.Join(res, "bin", "b9s"))
@@ -385,5 +419,36 @@ func TestLauncherInstallsTheToolsWithoutAskingThenOpensTheBrowser(t *testing.T) 
 	scripts, _ := os.ReadFile(e.callsLog + ".osascript")
 	if n := strings.Count(string(scripts), "display dialog"); n != 1 {
 		t.Fatalf("first launch showed %d dialogs, want only the project one:\n%s", n, scripts)
+	}
+}
+
+// The bundle's main executable must be a native binary: macOS asks for
+// Rosetta before it opens an app whose executable is a script.
+func TestStubRunsTheLauncherWithItsArguments(t *testing.T) {
+	tmp, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := filepath.Join(tmp, "B9s's App.app", "Contents")
+	for _, d := range []string{"MacOS", "Resources"} {
+		if err := os.MkdirAll(filepath.Join(contents, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stub, err := os.ReadFile(buildStub(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeExec(t, filepath.Join(contents, "MacOS", "B9s"), string(stub))
+	writeExec(t, filepath.Join(contents, "Resources", "launcher"),
+		"#!/bin/bash\nprintf '%s|' \"$0\" \"$@\"\n")
+
+	out, err := exec.Command(filepath.Join(contents, "MacOS", "B9s"), "-psn_0_1", "two words").CombinedOutput()
+	if err != nil {
+		t.Fatalf("stub: %v\n%s", err, out)
+	}
+	want := filepath.Join(contents, "Resources", "launcher") + "|-psn_0_1|two words|"
+	if string(out) != want {
+		t.Fatalf("stub ran %q, want %q", out, want)
 	}
 }
