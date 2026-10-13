@@ -25,6 +25,8 @@ What it is not: b9s is not a tracker and stores nothing of its own. It reads you
 
 ## Install
 
+**On a Mac, for developers and product owners alike:** download `B9s-<version>.dmg` from the [release](https://github.com/vanderheijden86/b9s/releases/latest), drag B9s to Applications and open it. The app carries b9s and `bd`, so it needs nothing else installed. The first launch creates an editable sample project in `~/B9s`, offers to install the `b9s` and `bd` commands, and opens the project in your browser or in Terminal. [packaging/macos](packaging/macos/README.md) says what it does and how to build it.
+
 With Homebrew on macOS or Linux:
 
 ```bash
@@ -48,7 +50,7 @@ sudo rpm -i b9s_<version>_linux_amd64.rpm    # Fedora, RHEL
 
 From source, with [Go 1.25 or later](https://go.dev/dl/): `git clone https://github.com/vanderheijden86/b9s.git && cd b9s && make install`.
 
-b9s makes every write through the Beads `bd` command, and reads embedded Dolt projects through it too, so `bd` must be on your `PATH`. **b9s is tested with bd 1.2.2 through 1.3.0.** A newer bd usually works. [docs/testing.md](docs/testing.md#bd-releases) says how to check one.
+b9s makes every write through the Beads `bd` command, and reads embedded Dolt projects through it too, so `bd` must be on your `PATH`. **b9s is tested with bd 1.2.2 through 1.3.1.** A newer bd usually works. [docs/testing.md](docs/testing.md#bd-releases) says how to check one.
 
 **Tried it?** Tell me what worked and what did not in the [feedback thread](https://github.com/vanderheijden86/b9s/discussions/12). To get an email when a release ships, use Watch → Custom → Releases on the repository.
 

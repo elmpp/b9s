@@ -186,7 +186,7 @@ tar -xzf /tmp/bd-v1.3.0/*.tar.gz -C /tmp/bd-v1.3.0
 PATH=/tmp/bd-v1.3.0:$PATH go test ./pkg/web -run BDContract -count=1 -v
 ```
 
-Change the version in the README's install section when a release passes or fails. bd 1.2.2 and 1.3.0 passed on 2026-09-28. bd prints a warning about duplicate binaries on `PATH`, which is harmless here.
+Change the version in the README's install section when a release passes or fails. bd 1.2.2 and 1.3.0 passed on 2026-09-28, bd 1.3.1 (the version B9s.app bundles) on 2026-10-13. bd prints a warning about duplicate binaries on `PATH`, which is harmless here.
 
 ## Writing tests
 

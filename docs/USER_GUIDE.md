@@ -37,6 +37,8 @@ BEADS_DIR=/path/to/repo/.beads b9s
 
 In a linked git worktree b9s finds the `.beads` directory of the main checkout by itself.
 
+On a Mac with B9s.app installed from the DMG, opening the app starts the sample project in `~/B9s/Sample Project`, in the browser or in Terminal. The browser's project list shows every Beads project directly under `~/B9s`, so a product owner can keep a checkout there and open it without a terminal.
+
 `--filter` starts with a [query](#search) applied and `--repo` keeps only the issues whose ID starts with a prefix:
 
 ```bash

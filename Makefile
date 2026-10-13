@@ -2,7 +2,7 @@
 #
 # Build with SQLite FTS5 (full-text search) support enabled
 
-.PHONY: build install clean test web web-dev web-types web-e2e book
+.PHONY: build install clean test web web-dev web-types web-e2e book dmg
 
 # Enable FTS5 for full-text search in SQLite exports
 export CGO_CFLAGS := -DSQLITE_ENABLE_FTS5
@@ -58,3 +58,8 @@ web-e2e:
 book:
 	cd docs/book && pandoc 00-metadata.yaml [0-9][0-9]-*.md --from markdown --to epub3 \
 	  --toc --toc-depth=1 --number-sections --css=style.css -o how-b9s-works.epub
+
+# The macOS download: B9s.app with b9s, bd and the sample project, in a DMG
+# under dist/macos. See packaging/macos/build-dmg.sh for signing variables.
+dmg:
+	packaging/macos/build-dmg.sh
