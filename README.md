@@ -5,15 +5,17 @@
 
 **See what every agent is doing in your [Beads](https://github.com/steveyegge/beads) project, and change it, from your terminal, your phone or any browser.** b9s shows the issues as a tree, a board and a dependency graph, follows changes from `bd` or another agent as they happen, and makes every write through the `bd` CLI. No new tracker: your Beads project as it is.
 
+![b9s in a terminal: moving through the issue tree of a sample web shop, opening an issue in the detail pane, then the board with its epic rail, and back to the tree](docs/demo-tui.gif)
+
+| Phone | Tablet | Desktop |
+|:---:|:---:|:---:|
+| <img src="docs/demo-web-phone.gif" alt="b9s web on a phone: an issue opens in a sheet, then the board as stacked boxes, then back to the tree" width="200"> | <img src="docs/demo-web-tablet.gif" alt="b9s web on a tablet: issues open beside the tree, then the board with its epic rail, then back to the tree" width="320"> | <img src="docs/demo-web-desktop.gif" alt="b9s web on a desktop browser: the tree with the detail beside it, then the board with its epic rail, then back to the tree" width="320"> |
+
 **Try it in your browser, no install:** [demo.b9s.osen.co](https://demo.b9s.osen.co) opens a made-up web shop, with epics split into features and tasks, that anyone can edit. It resets every 30 minutes.
 
 **Or watch the 90-second demo:** the tree and the board in a terminal, then the same project on a phone over Tailscale.
 
 https://github.com/user-attachments/assets/ccc8ebc9-4daf-4867-8c41-3f91df364f42
-
-| Terminal | Phone | Tablet | Desktop |
-|:---:|:---:|:---:|:---:|
-| ![b9s in a terminal, the issue tree of the sample web shop: epics, features and tasks](docs/screenshot.png) | <img src="docs/screenshot-web-phone.png" alt="b9s web on a phone, with dense rows, status chips and bottom navigation" width="160"> | <img src="docs/screenshot-web-tablet.png" alt="b9s web on a tablet, with the issue list and detail visible together" width="220"> | ![b9s web on a desktop browser, with a sidebar and the board split into epic swimlanes](docs/screenshot-web-desktop.png) |
 
 [Install](#install) · [First five minutes](#first-five-minutes) · [What you can do](#what-you-can-do) · [Phone and browser](#phone-and-browser) · [Documentation](#documentation) · [Contributing](#contributing)
 
