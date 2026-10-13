@@ -23,7 +23,10 @@ type appEnv struct {
 	bin      string
 	cliDir   string
 	callsLog string
-	extra    []string
+	// userBin stands in for a directory on the user's login-shell PATH, such
+	// as Homebrew's, where they may have installed bd or b9s themselves.
+	userBin string
+	extra   []string
 }
 
 const bdStub = `#!/bin/bash
@@ -58,8 +61,9 @@ func newAppEnv(t *testing.T) *appEnv {
 		bin:      filepath.Join(dir, "app bin"),
 		cliDir:   filepath.Join(dir, "cli"),
 		callsLog: filepath.Join(dir, "calls"),
+		userBin:  filepath.Join(dir, "user bin"),
 	}
-	for _, d := range []string{e.home, e.bin, e.cliDir} {
+	for _, d := range []string{e.home, e.bin, e.cliDir, e.userBin} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -96,6 +100,7 @@ func (e *appEnv) run(args ...string) (string, error) {
 		"B9S_APP_SUPPORT_DIR=" + filepath.Join(e.home, "support"),
 		"B9S_APP_LOG_DIR=" + filepath.Join(e.home, "logs"),
 		"B9S_APP_CLI_DIR=" + e.cliDir,
+		"B9S_APP_USER_PATH=" + e.userBin + ":" + e.cliDir,
 		"B9S_APP_WEB_WAIT_SECONDS=5",
 		"BEADS_DOLT_SERVER_HOST=10.0.0.1",
 		"STUB_CALLS=" + e.callsLog,
@@ -154,33 +159,64 @@ func TestFailedSampleImportLeavesNothingBehind(t *testing.T) {
 	}
 }
 
-func TestInstallCLIKeepsToolsItDidNotInstall(t *testing.T) {
+func TestInstallCLILinksBothToolsOnACleanMac(t *testing.T) {
 	e := newAppEnv(t)
 	if out, _ := e.run("cli-status"); out != "missing" {
 		t.Fatalf("cli-status before install = %q", out)
 	}
-	theirs := filepath.Join(e.cliDir, "bd")
-	writeExec(t, theirs, "#!/bin/sh\n")
+	if out, err := e.run("install-cli"); err != nil {
+		t.Fatalf("install-cli: %v\n%s", err, out)
+	}
+	for _, tool := range []string{"b9s", "bd"} {
+		if target, err := os.Readlink(filepath.Join(e.cliDir, tool)); err != nil || target != filepath.Join(e.bin, tool) {
+			t.Fatalf("%s link = %q, %v", tool, target, err)
+		}
+	}
+	if out, _ := e.run("cli-status"); out != "installed" {
+		t.Fatalf("cli-status after install = %q", out)
+	}
+	if out, err := e.run("install-cli"); err != nil || !strings.Contains(out, "bd: already linked") {
+		t.Fatalf("second install-cli: %v %q", err, out)
+	}
+}
+
+func TestInstallCLISkipsAToolTheUserAlreadyHas(t *testing.T) {
+	e := newAppEnv(t)
+	writeExec(t, filepath.Join(e.userBin, "bd"), "#!/bin/sh\n")
 
 	out, err := e.run("install-cli")
 	if err != nil {
 		t.Fatalf("install-cli: %v\n%s", err, out)
 	}
-	if target, err := os.Readlink(filepath.Join(e.cliDir, "b9s")); err != nil || target != filepath.Join(e.bin, "b9s") {
-		t.Fatalf("b9s link = %q, %v", target, err)
+	if _, err := os.Lstat(filepath.Join(e.cliDir, "bd")); err == nil {
+		t.Fatal("linked a second bd beside the one the user already has")
 	}
-	if info, err := os.Lstat(theirs); err != nil || info.Mode()&os.ModeSymlink != 0 {
-		t.Fatalf("the user's own bd was replaced: %v", err)
+	if !strings.Contains(out, "bd: already installed at "+filepath.Join(e.userBin, "bd")) {
+		t.Fatalf("install-cli output does not name the existing bd: %q", out)
 	}
-	if out, _ := e.run("cli-status"); out != "partial" {
-		t.Fatalf("cli-status after install = %q", out)
+	if _, err := os.Readlink(filepath.Join(e.cliDir, "b9s")); err != nil {
+		t.Fatalf("b9s not linked: %v", err)
 	}
-	if out, err := e.run("install-cli"); err != nil || !strings.Contains(out, "b9s: already linked") {
-		t.Fatalf("second install-cli: %v %q", err, out)
+	if out, _ := e.run("cli-status"); out != "installed" {
+		t.Fatalf("cli-status = %q", out)
 	}
 }
 
-func TestInstallCLIAsksForAdminWhenTheDirectoryIsNotWritable(t *testing.T) {
+func TestInstallCLIKeepsAFileItDidNotPutThere(t *testing.T) {
+	e := newAppEnv(t)
+	theirs := filepath.Join(e.cliDir, "bd")
+	if err := os.WriteFile(theirs, []byte("not a program"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := e.run("install-cli"); err != nil {
+		t.Fatalf("install-cli: %v\n%s", err, out)
+	}
+	if b, _ := os.ReadFile(theirs); string(b) != "not a program" {
+		t.Fatal("install-cli replaced a file it did not create")
+	}
+}
+
+func TestInstallCLIAsksForAdminOnlyWhenItMustLink(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root can write anywhere")
 	}
@@ -193,6 +229,12 @@ func TestInstallCLIAsksForAdminWhenTheDirectoryIsNotWritable(t *testing.T) {
 	exit, ok := err.(*exec.ExitError)
 	if !ok || exit.ExitCode() != 3 {
 		t.Fatalf("install-cli on a read-only directory: %v, want exit 3", err)
+	}
+
+	writeExec(t, filepath.Join(e.userBin, "bd"), "#!/bin/sh\n")
+	writeExec(t, filepath.Join(e.userBin, "b9s"), "#!/bin/sh\n")
+	if out, err := e.run("install-cli"); err != nil {
+		t.Fatalf("install-cli with nothing to link: %v %q, want no admin prompt", err, out)
 	}
 }
 
@@ -315,6 +357,7 @@ func (e *appEnv) launchApp(answers ...string) (string, error) {
 		"B9S_APP_SUPPORT_DIR=" + filepath.Join(e.home, "support"),
 		"B9S_APP_LOG_DIR=" + filepath.Join(e.home, "logs"),
 		"B9S_APP_CLI_DIR=" + e.cliDir,
+		"B9S_APP_USER_PATH=" + e.userBin + ":" + e.cliDir,
 		"B9S_APP_WEB_WAIT_SECONDS=5",
 		"STUB_CALLS=" + e.callsLog,
 	}
@@ -325,28 +368,22 @@ func (e *appEnv) launchApp(answers ...string) (string, error) {
 	return string(out), err
 }
 
-func TestLauncherAsksOnceAboutToolsThenOpensTheBrowser(t *testing.T) {
+func TestLauncherInstallsTheToolsWithoutAskingThenOpensTheBrowser(t *testing.T) {
 	e := newAppEnv(t)
-	if out, err := e.launchApp("Install", "Browser"); err != nil {
+	if out, err := e.launchApp("Browser"); err != nil {
 		t.Fatalf("first launch: %v\n%s", err, out)
 	}
 	calls := strings.Join(e.calls(), "\n")
 	if !strings.Contains(calls, "open_http://127.0.0.1:7997/pair?token=stub") {
 		t.Fatalf("the browser was not opened on the pairing link:\n%s", calls)
 	}
-	if _, err := os.Readlink(filepath.Join(e.cliDir, "bd")); err != nil {
-		t.Fatalf("Install did not link bd: %v", err)
-	}
-
-	// The second launch must not ask about the tools again: its only dialog
-	// is the project one, answered here with Quit.
-	_ = os.Remove(e.callsLog + ".answers")
-	_ = os.Remove(e.callsLog + ".osascript")
-	if out, err := e.launchApp("Quit"); err != nil {
-		t.Fatalf("second launch: %v\n%s", err, out)
+	for _, tool := range []string{"b9s", "bd"} {
+		if _, err := os.Readlink(filepath.Join(e.cliDir, tool)); err != nil {
+			t.Fatalf("launch did not link %s: %v", tool, err)
+		}
 	}
 	scripts, _ := os.ReadFile(e.callsLog + ".osascript")
 	if n := strings.Count(string(scripts), "display dialog"); n != 1 {
-		t.Fatalf("second launch showed %d dialogs, want 1:\n%s", n, scripts)
+		t.Fatalf("first launch showed %d dialogs, want only the project one:\n%s", n, scripts)
 	}
 }

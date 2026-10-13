@@ -5,9 +5,10 @@
 #   b9s-app sample        create the sample project if it is missing, print its path
 #   b9s-app web           start b9s web for the sample (or reuse it), print the URL to open
 #   b9s-app terminal-cmd  print the shell command that opens b9s on the sample
-#   b9s-app cli-status    print "linked", "partial" or "missing" for the command-line tools
-#   b9s-app install-cli   link b9s and bd into the CLI directory (exit 3: needs
-#                         admin, exit 4: the app still runs from the DMG)
+#   b9s-app cli-status    print "installed", or "missing" when b9s or bd is not on
+#                         the user's PATH
+#   b9s-app install-cli   link b9s and bd into the CLI directory, unless the user
+#                         has them (exit 3: needs admin, exit 4: runs from the DMG)
 #
 # Every location can be moved with an environment variable, which is how the
 # tests run it against a temporary home with stub binaries.
@@ -136,16 +137,52 @@ ours() {
 	[ -L "$1" ] && [ "$(readlink "$1")" = "$BIN_DIR/$(basename "$1")" ]
 }
 
-cli_status() {
-	linked=0
-	for tool in b9s bd; do
-		ours "$CLI_DIR/$tool" && linked=$((linked + 1))
+# user_path prints the PATH of the user's own shell. A Finder launch inherits
+# only /usr/bin:/bin:/usr/sbin:/sbin, which misses Homebrew and ~/.local/bin.
+# The common install folders follow, for a shell profile that fails to load.
+user_path() {
+	if [ -n "${B9S_APP_USER_PATH:-}" ]; then
+		printf '%s\n' "$B9S_APP_USER_PATH"
+		return
+	fi
+	# -i reads .zshrc too, where ~/.local/bin is often added. The alarm stops a
+	# profile that waits for input.
+	login=$(perl -e 'alarm 10; exec @ARGV' "${SHELL:-/bin/zsh}" -lic 'printf "\n%s\n" "$PATH"' \
+		</dev/null 2>/dev/null | tail -n 1)
+	printf '%s:/opt/homebrew/bin:/usr/local/bin:%s/.local/bin:%s/go/bin:%s/bin\n' \
+		"$login" "$HOME" "$HOME" "$HOME"
+}
+
+# installed_elsewhere prints the first $1 on the user's PATH that this app did
+# not link, and fails when there is none. The PATH is read once per run:
+# starting the user's shell costs a second or more.
+installed_elsewhere() {
+	[ -n "${user_path_cache:-}" ] || user_path_cache=$(user_path)
+	IFS=: read -r -a dirs <<<"$user_path_cache"
+	for d in "${dirs[@]}"; do
+		[ -n "$d" ] && [ "$d" != "$BIN_DIR" ] || continue
+		if [ -x "$d/$1" ] && [ ! -d "$d/$1" ] && ! ours "$d/$1"; then
+			printf '%s\n' "$d/$1"
+			return 0
+		fi
 	done
-	case $linked in
-	2) echo linked ;;
-	0) echo missing ;;
-	*) echo partial ;;
-	esac
+	return 1
+}
+
+# needs_link reports whether $1 is neither linked by this app nor installed by
+# the user some other way.
+needs_link() {
+	! ours "$CLI_DIR/$1" && ! installed_elsewhere "$1" >/dev/null
+}
+
+cli_status() {
+	for tool in b9s bd; do
+		if needs_link "$tool"; then
+			echo missing
+			return
+		fi
+	done
+	echo installed
 }
 
 # movable_bundle reports whether the app runs from a place that goes away: the
@@ -158,28 +195,39 @@ movable_bundle() {
 	esac
 }
 
-# install_cli links each tool unless a different one already sits at that
-# name: a bd from Homebrew or a b9s from go install belongs to the user, and
-# replacing it would downgrade or upgrade it behind their back.
+# install_cli links each tool the user does not have yet. A bd from Homebrew
+# or a b9s from go install belongs to the user: linking a second copy would
+# shadow it or be shadowed by it, depending on PATH order. The app itself
+# always runs its bundled tools, so an older copy of the user's does no harm.
 install_cli() {
 	if movable_bundle; then
 		echo "b9s-app: move B9s to Applications first: the tools would be linked into $BIN_DIR, which disappears" >&2
 		exit 4
 	fi
-	if [ ! -d "$CLI_DIR" ] || [ ! -w "$CLI_DIR" ]; then
-		mkdir -p "$CLI_DIR" 2>/dev/null || true
-		[ -w "$CLI_DIR" ] || exit 3
-	fi
+	# Filled here, because each $(installed_elsewhere) below is a subshell.
+	user_path_cache=$(user_path)
+	todo=()
 	for tool in b9s bd; do
 		target=$CLI_DIR/$tool
 		if ours "$target"; then
 			echo "$tool: already linked"
+		elif existing=$(installed_elsewhere "$tool"); then
+			echo "$tool: already installed at $existing"
 		elif [ -e "$target" ] || [ -L "$target" ]; then
 			echo "$tool: kept the existing $target"
 		else
-			ln -s "$BIN_DIR/$tool" "$target"
-			echo "$tool: linked $target"
+			todo+=("$tool")
 		fi
+	done
+	[ ${#todo[@]} -gt 0 ] || return 0
+
+	if [ ! -d "$CLI_DIR" ] || [ ! -w "$CLI_DIR" ]; then
+		mkdir -p "$CLI_DIR" 2>/dev/null || true
+		[ -w "$CLI_DIR" ] || exit 3
+	fi
+	for tool in "${todo[@]}"; do
+		ln -s "$BIN_DIR/$tool" "$CLI_DIR/$tool"
+		echo "$tool: linked $CLI_DIR/$tool"
 	done
 }
 

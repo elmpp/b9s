@@ -15,7 +15,7 @@ the browser, without installing anything else or opening a terminal.
 
  first open of B9s.app
    1. creates ~/B9s/Sample Project        (bd init --from-jsonl, embedded Dolt)
-   2. asks once: install the b9s and bd commands into /usr/local/bin?
+   2. installs bd and b9s into /usr/local/bin, unless the user has them
    3. asks: open the project in the Browser or in Terminal?
         Browser  ─▶ b9s web on 127.0.0.1:7997, opened on its pairing link
         Terminal ─▶ Terminal.app running b9s in the sample folder
@@ -30,13 +30,17 @@ the browser, without installing anything else or opening a terminal.
   listens on port 7997, not `b9s web`'s 7979, to stay clear of a server you
   started by hand. The server keeps running after the app quits; the next open
   reuses it. The project list shows every Beads project directly under `~/B9s`.
-- **The commands** are links into the app bundle. The app never replaces a
-  `b9s` or `bd` it did not install (from Homebrew, say), and it does not offer
-  the links while it runs from the DMG, because they would point into a disk
-  image that is ejected later.
+- **The commands** are links into the app bundle, made without a question
+  because b9s needs Beads. macOS asks for the password when `/usr/local/bin`
+  belongs to root. The app skips a tool the user already has anywhere on their
+  shell's PATH (Homebrew, `~/.local/bin`, `go install`) and never replaces a
+  file it did not create. The app itself always runs its bundled tools, so an
+  older `bd` of the user's does no harm. From the DMG it links nothing, because
+  the links would point into a disk image that is ejected later; it asks the
+  user to drag B9s to Applications first. A launch that could not install the
+  commands tries again on the next launch.
 
 Logs go to `~/Library/Logs/B9s`, state to `~/Library/Application Support/B9s`.
-Delete `cli-asked` there to be asked about the commands again.
 
 ## Files
 
@@ -87,6 +91,7 @@ make dmg                                  # then mount the DMG and open B9s.app
 
 The Go tests cover the sample import (once, never with the shell's Beads server
 settings, nothing left behind on failure), the command links, the web server
-reuse, quoting of paths with spaces and quotes, and the launcher's dialog flow.
+reuse, quoting of paths with spaces and quotes, skipping tools the user already
+has, and the launcher installing the commands without a question.
 They do not cover Gatekeeper or a real dialog; check those by hand on a Mac
 before publishing a DMG.

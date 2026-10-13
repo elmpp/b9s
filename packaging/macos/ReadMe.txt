@@ -4,8 +4,9 @@ B9s: Beads issues for developers and product owners
 1. Drag B9s to Applications.
 2. Open B9s from Applications. On a build without a Developer ID signature,
    macOS asks once: right-click B9s, choose Open, then Open again.
-3. B9s creates a sample project in the B9s folder of your home folder, offers
-   to install the b9s and bd commands, and opens the project in your browser
+3. B9s installs Beads (the bd command) and the b9s command, unless you have
+   them already. macOS may ask for your password. B9s then creates a sample
+   project in the B9s folder of your home folder and opens it in your browser
    or in Terminal.
 
 The browser view suits planning and review. The terminal view suits

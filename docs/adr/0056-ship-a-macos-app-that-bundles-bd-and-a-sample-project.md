@@ -23,8 +23,9 @@ project of one's own.
 
 **Publish a DMG holding B9s.app: a script-based app bundle that carries universal
 `b9s` and `bd` binaries, creates an editable sample project in `~/B9s` on first
-launch, offers to link both commands into `/usr/local/bin`, and opens the
-project in the browser (`b9s web`) or in Terminal (`b9s`).**
+launch, links both commands into `/usr/local/bin` without a question unless the
+user already has them, and opens the project in the browser (`b9s web`) or in
+Terminal (`b9s`).**
 
 ```mermaid
 sequenceDiagram
@@ -36,7 +37,8 @@ sequenceDiagram
     User->>App: open
     App->>Setup: sample
     Setup->>bd: init --from-jsonl (embedded), first launch only
-    App->>User: install the commands? (asked once, not from the DMG)
+    App->>Setup: install-cli, only for a tool missing from the user's PATH
+    Note over App: not from the DMG, the links would dangle
     App->>User: Browser or Terminal?
     User->>App: Browser
     App->>Setup: web
@@ -63,6 +65,10 @@ sequenceDiagram
 
 ## Consequences
 
+- Beads is not optional for b9s, so the app installs `bd` instead of asking.
+  A `bd` the user already has wins, even an older one: the app runs its own
+  copy, and a second `bd` on `PATH` would make which one runs depend on `PATH`
+  order.
 - A product owner can go from download to an editable board without a
   terminal, and a developer gets working `b9s` and `bd` commands from the same
   download. Both look at the same issues through the same `bd` writes.

@@ -25,7 +25,7 @@ What it is not: b9s is not a tracker and stores nothing of its own. It reads you
 
 ## Install
 
-**On a Mac, for developers and product owners alike:** download `B9s-<version>.dmg` from the [release](https://github.com/vanderheijden86/b9s/releases/latest), drag B9s to Applications and open it. The app carries b9s and `bd`, so it needs nothing else installed. The first launch creates an editable sample project in `~/B9s`, offers to install the `b9s` and `bd` commands, and opens the project in your browser or in Terminal. [packaging/macos](packaging/macos/README.md) says what it does and how to build it.
+**On a Mac, for developers and product owners alike:** download `B9s-<version>.dmg` from the [release](https://github.com/vanderheijden86/b9s/releases/latest), drag B9s to Applications and open it. The app carries b9s and `bd`, so it needs nothing else installed. The first launch creates an editable sample project in `~/B9s`, installs the `bd` (Beads) and `b9s` commands unless you already have them, and opens the project in your browser or in Terminal. [packaging/macos](packaging/macos/README.md) says what it does and how to build it.
 
 With Homebrew on macOS or Linux:
 
