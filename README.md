@@ -25,7 +25,7 @@ What it is not: b9s is not a tracker and stores nothing of its own. It reads you
 
 ## Install
 
-**On a Mac, for developers and product owners alike:** download `B9s-<version>.dmg` from the [release](https://github.com/vanderheijden86/b9s/releases/latest), drag B9s to Applications and open it. The app carries b9s and `bd`, so it needs nothing else installed. The first launch creates an editable sample project in `~/B9s`, installs the `bd` (Beads) and `b9s` commands unless you already have them, and opens the project in your browser or in Terminal. [packaging/macos](packaging/macos/README.md) says what it does and how to build it.
+**On a Mac, for developers and product owners alike:** download `B9s-<version>.dmg` from the [release](https://github.com/vanderheijden86/b9s/releases/latest), drag B9s to Applications and open it. The app carries b9s and `bd`, so it needs nothing else installed. The first launch creates an editable sample project in `~/B9s`, installs the `bd` (Beads) and `b9s` commands unless you already have them, and opens it in your browser, where Add a project hands your own repository to your AI to set up. [packaging/macos](packaging/macos/README.md) says what it does and how to build it.
 
 With Homebrew on macOS or Linux:
 
@@ -136,6 +136,8 @@ tailscale serve --bg 7979  # publishes it to your tailnet over HTTPS
 ```
 
 Open the printed link once on each device: it sets a cookie for 90 days, and the server stays on loopback, so nothing outside your tailnet can reach it. With `qrencode` installed, the link also prints as a QR code. On a phone, swipe a row right to start it and left to close it, long-press to mark, and drag a card between columns, which stack as foldable boxes. A tablet shows the list and the detail side by side. A desktop adds a sidebar, a detail pane and a right-click menu, and takes the terminal's keys. A LAN address works too, over plain HTTP, for a network you trust. [Phone and browser](docs/USER_GUIDE.md#phone-and-browser) has the steps, the gestures and the risks.
+
+To bring in another repository, choose Add a project in the project sheet. B9s gives your AI (Claude Code, Codex or Cursor) a short prompt that runs `b9s onboard`, and ticks off each setup step as it lands. `b9s onboard --check` shows the same checklist in a terminal. A plan without code gets its own folder in `~/B9s`. [ADR 0057](docs/adr/0057-onboard-a-project-through-the-users-own-ai.md) says why B9s leaves the setup to your AI.
 
 ## Documentation
 

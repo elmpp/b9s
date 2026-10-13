@@ -16,10 +16,19 @@ the browser, without installing anything else or opening a terminal.
  first open of B9s.app
    1. creates ~/B9s/Sample Project        (bd init --from-jsonl, embedded Dolt)
    2. installs bd and b9s into /usr/local/bin, unless the user has them
-   3. asks: open the project in the Browser or in Terminal?
-        Browser  ─▶ b9s web on 127.0.0.1:7997, opened on its pairing link
-        Terminal ─▶ Terminal.app running b9s in the sample folder
+   3. asks once: Quit, Open the sample, or Add your project…
+        Open the sample    ─▶ b9s web on 127.0.0.1:7997, opened on its pairing link
+        Add your project…  ─▶ the same, on #/add: the add-a-project flow
+
+ every later open
+   opens the browser view without a question
 ```
+
+- **Adding a project** hands a repository to the user's own AI (Claude Code,
+  Codex or Cursor) with a three-line prompt that runs `b9s onboard`, and ticks
+  off each setup step it sees land; a plan without code becomes
+  `~/B9s/<name>`. [ADR 0057](../../docs/adr/0057-onboard-a-project-through-the-users-own-ai.md)
+  says why. Terminal users choose Open in Terminal on any project.
 
 - **The sample** is the 52-issue web shop from
   [`examples/sample-project`](../../examples/sample-project/README.md), imported

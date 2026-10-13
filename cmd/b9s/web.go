@@ -161,6 +161,8 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 		Public:       *public,
 		Banner:       *banner,
 		BannerLink:   *bannerLink,
+		Host:         onboardHost(*public),
+		PlansRoot:    plansRoot(*projectsRoot),
 		Projects: func() []config.Project {
 			cfg, err := config.Load()
 			if err != nil {
@@ -396,4 +398,26 @@ func recentFromTarget(target datasource.OpenTarget) config.RecentProject {
 		return recent
 	}
 	return config.RecentProject{Name: target.Name, Path: target.Dir}
+}
+
+// plansRoot is where a plan without code gets its folder: the projects root,
+// whose checkouts the project sheet lists already, or ~/B9s.
+func plansRoot(projectsRoot string) string {
+	if projectsRoot != "" {
+		return projectsRoot
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, "B9s")
+}
+
+// onboardHost lets the browser add projects on this computer. A public
+// server never reaches the machine's folders.
+func onboardHost(public bool) web.OnboardHost {
+	if public {
+		return nil
+	}
+	return web.LocalHost{}
 }

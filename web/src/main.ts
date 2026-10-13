@@ -6,6 +6,7 @@ import { D } from "./data";
 import { applyTextSize, closeSheet, refresh, setRetryLive, setText, toast } from "./actions";
 import { busy, bindAll } from "./gestures";
 import { bindHistory, openHash, parseHash, startHistory } from "./nav";
+import { addLink, openAdd } from "./onboard";
 import { ensureVisible, render, renderBanner, renderStale, revealInTree } from "./render";
 import { S } from "./state";
 import { $, esc, store } from "./util";
@@ -115,6 +116,7 @@ async function boot(): Promise<void> {
     bindHistory(render, closeSheet);
     // The view first, so the list does not flash the tree; the issue once loaded.
     const link = parseHash();
+    const add = addLink();
     if (link) S.view = link.v;
     await refresh();
     // The link's place is the entry the app opened on, not a step after it.
@@ -122,6 +124,8 @@ async function boot(): Promise<void> {
     startHistory();
     render();
     bootEl.hidden = true;
+    // The app launcher opens #/add for "Add your project".
+    if (add) openAdd();
     startLive();
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {

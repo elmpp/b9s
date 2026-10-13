@@ -6,7 +6,7 @@ set -u
 
 resources=$(cd "$(dirname "$0")" && pwd -P)
 app=$resources/b9s-app
-support=$HOME/Library/Application\ Support/B9s
+support=${B9S_APP_SUPPORT_DIR:-$HOME/Library/Application Support/B9s}
 mkdir -p "$support"
 
 # dialog shows a message with buttons and prints the one clicked. Text reaches
@@ -60,21 +60,20 @@ EOF
 	;;
 esac
 
-choice=$(dialog "Open the sample project. The browser view suits planning and review, the terminal view suits developers." "Quit" "Terminal" "Browser")
-case $choice in
-Browser)
-	url=$("$app" web 2>&1) || fail "$url"
-	open "$url"
-	;;
-Terminal)
-	cmd=$("$app" terminal-cmd 2>&1) || fail "$cmd"
-	osascript - "$cmd" <<'EOF' >/dev/null
-on run argv
-	tell application "Terminal"
-		activate
-		do script (item 1 of argv)
-	end tell
-end run
-EOF
-	;;
-esac
+# The first launch asks once where to start. Both answers open the browser
+# view, which offers Open in Terminal on every project; every later launch
+# opens it without a question.
+welcomed=$support/welcomed
+page=
+if [ ! -e "$welcomed" ]; then
+	choice=$(dialog "B9s is ready. The sample project is in ~/B9s. Look around in the sample, or bring in your own project now." "Quit" "Open the sample" "Add your project…")
+	case $choice in
+	"Open the sample") ;;
+	"Add your project…") page="#/add" ;;
+	*) exit 0 ;;
+	esac
+	touch "$welcomed"
+fi
+
+url=$("$app" web 2>&1) || fail "$url"
+open "$url$page"

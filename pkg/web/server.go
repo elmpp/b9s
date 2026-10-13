@@ -53,6 +53,14 @@ type Options struct {
 	// MaxStreams caps open event streams; zero means no cap. Public mode
 	// defaults it to publicMaxStreams.
 	MaxStreams int
+	// Host runs the Add a project flow's actions on this computer: the
+	// folder picker, Terminal and bd init. Nil turns those actions off.
+	Host OnboardHost
+	// RepoRoots are the folders searched for repositories; nil searches
+	// onboard.DefaultRoots.
+	RepoRoots []string
+	// PlansRoot is the folder a plan without code is created in; empty turns plans off.
+	PlansRoot string
 }
 
 // Server is the b9s web HTTP handler.
@@ -133,6 +141,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/events", s.paired(s.handleEvents))
 	s.mux.HandleFunc("GET /api/projects", s.paired(s.handleProjects))
 	s.mux.HandleFunc("POST /api/projects/open", s.paired(s.csrf(s.handleOpenProject)))
+	s.onboardRoutes()
 	s.mux.HandleFunc("POST /api/reload", s.paired(s.csrf(s.limited(s.handleReload))))
 	s.mux.HandleFunc("POST /api/write", s.paired(s.csrf(s.limited(s.handleWrite))))
 	noAPI := func(w http.ResponseWriter, r *http.Request) {

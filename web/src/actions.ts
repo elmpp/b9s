@@ -8,6 +8,7 @@ import { D, descendants, eff, get, kids, load, openBlockers, pool, shortId, type
 import { boardCols, ensureVisible, fullIssue, openCols, render, renderBoard, renderSearch, revealInTree, siblings, treeList } from "./render";
 import { PC, S, SORTS, SORT_HELP, ST, TY, defaultDetailSize, queryString, saveBoardFolded, saveChips, stOf, type Sheet, type SortKey } from "./state";
 import { syncSoon } from "./nav";
+import { onboardAction, onboardBody } from "./onboard";
 import { $, $opt, copyText, esc, fmtDate, haptic, split, store } from "./util";
 
 /* ================= toast ================= */
@@ -284,18 +285,22 @@ export function applySuggestion(s: string): void {
 
 /* ================= projects and reload ================= */
 
-export async function switchProject(key: string): Promise<void> {
+export const switchProject = (key: string): Promise<boolean> => enterProject(() => api.openProject(key));
+
+/** enterProject runs open, which makes the server read another project, then shows that project from the top. */
+export async function enterProject(open: () => Promise<unknown>): Promise<boolean> {
   try {
-    await api.openProject(key);
+    await open();
   } catch (e) {
     toast("Could not open project: " + (e instanceof Error ? e.message : String(e)));
-    return;
+    return false;
   }
   Object.assign(S, { focus: null, detail: null, cursor: null, marking: false, graph: [], qres: null });
   S.marks.clear(); S.folded.clear();
   await refresh().catch(e => toast("Reload failed: " + (e instanceof Error ? e.message : String(e))));
   treeList().scrollTop = 0;
   toast(D.project.all ? "All projects" : "Project " + D.project.name);
+  return true;
 }
 
 export async function reload(): Promise<void> {
@@ -329,7 +334,7 @@ export function closeSheet(): void {
   syncSoon();
 }
 
-const opt = (a: string, g: string, x: string, sub: string, extra: { val?: string | number; cls?: string; color?: string; key?: string } = {}) =>
+export const opt = (a: string, g: string, x: string, sub: string, extra: { val?: string | number; cls?: string; color?: string; key?: string } = {}) =>
   `<button class="opt ${extra.cls || ""}" data-sa="${a}"${extra.val != null ? ` data-val="${esc(extra.val)}"` : ""}${extra.color ? ` style="--sc:${extra.color}"` : ""}><span class="g ${extra.color ? "dotg" : ""}" aria-hidden="true">${g}</span><span class="x">${x}${sub ? `<small>${sub}</small>` : ""}</span>${extra.key ? `<span class="key">${esc(extra.key)}</span>` : ""}</button>`;
 
 const SETTABLE = ["open", "in_progress", "blocked", "deferred", "review", "closed"];
@@ -436,7 +441,9 @@ function sheetBody(sh: Sheet): [string, string, string] {
       const rows = projectList.map(p => opt("proj", p.slot ? String(p.slot) : "·", esc(p.name),
         p.reach && p.reach !== "ok" ? esc(p.reach) : `${p.open} open · ${p.in_progress} in progress · ${p.ready} ready${p.blocked ? " · " + p.blocked + " blocked" : ""}`,
         { val: p.key, key: p.slot ? String(p.slot) : "", cls: p.active && !D.project.all ? "cur" : "" })).join("");
-      return ["Projects", "What b9s can read from here", rows + opt("proj", "0", "All projects", "one tree, grouped by project", { val: "*", key: "0", cls: D.project.all ? "cur" : "" })];
+      return ["Projects", "What b9s can read from here", rows + opt("proj", "0", "All projects", "one tree, grouped by project", { val: "*", key: "0", cls: D.project.all ? "cur" : "" })
+        + (D.project.all ? "" : opt("obtermhere", "›_", "Open in Terminal", "b9s in " + esc(D.project.name) + "'s folder"))
+        + opt("obadd", "+", "Add a project", "a code repository, or a plan without code")];
     }
     case "health": {
       const h = D.health;
@@ -485,7 +492,7 @@ function sheetBody(sh: Sheet): [string, string, string] {
     }
     case "help": return ["Gestures", "No gesture starts in the outer 24 px: both OSes use the edges for back and home.", gestureTable()];
   }
-  return ["", "", ""];
+  return onboardBody(sh) || ["", "", ""];
 }
 
 export function renderSheet(): void {
@@ -632,6 +639,7 @@ export async function sheetAction(a: string, val: string | undefined): Promise<v
     case "lanes": S.board.lanes = val as typeof S.board.lanes; store.set("boardLanes", val); renderSheet(); render(); break;
     case "closedcol": if (S.st.has("closed")) S.st.delete("closed"); else S.st.add("closed"); saveChips(); renderSheet(); render(); break;
     case "unfoldall": S.board.folded.clear(); saveBoardFolded(); renderSheet(); render(); break;
+    default: await onboardAction(a, val);
   }
 }
 

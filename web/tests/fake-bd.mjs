@@ -10,6 +10,16 @@ import path from "node:path";
 const args = process.argv.slice(2);
 const dir = path.join(process.cwd(), ".beads");
 const file = path.join(dir, "issues.jsonl");
+// bd init makes a project b9s reads as JSONL: metadata.json without a Dolt mode.
+if (args[0] === "init") {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "metadata.json"), "{}\n");
+  if (!fs.existsSync(file)) fs.writeFileSync(file, "");
+}
+if (!fs.existsSync(dir)) {
+  process.stderr.write("fake bd: no .beads here\n");
+  process.exit(1);
+}
 fs.appendFileSync(path.join(dir, "bd-calls.log"), JSON.stringify(args) + "\n");
 
 if (process.env.FAKE_BD_FAIL && args[0] === process.env.FAKE_BD_FAIL) {
@@ -47,6 +57,8 @@ function setStatus(i, status) {
 }
 
 switch (args[0]) {
+  case "init": break;
+  case "count": process.stdout.write(issues.length + "\n"); process.exit(0);
   case "update":
     for (const id of ids) {
       const i = need(id);

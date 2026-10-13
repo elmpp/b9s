@@ -334,6 +334,14 @@
   .fbtns .pri { background: var(--text); color: var(--ink); border-color: var(--text); }
   .fbtns .danger { background: var(--red); color: var(--ink); border-color: var(--red); }
   .cmd { margin: 6px 16px; padding: 8px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text-soft); font-size: 0.923rem; overflow-x: auto; white-space: pre; user-select: text; -webkit-user-select: text; }
+  .obPrompt { white-space: pre-wrap; }
+  .opt.dim { opacity: .55; }
+  .form label.chk { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 0.923rem; color: var(--text-soft); }
+  .form label.chk input { width: auto; }
+  .gtable.obSteps td:first-child { width: 28px; padding-right: 0; color: var(--muted); }
+  .gtable.obSteps tr.done td:first-child { color: var(--green, var(--hi)); }
+  .gtable.obSteps td:last-child { color: var(--text-soft); }
+  .gtable.obSteps td small { display: block; color: var(--muted); }
   .gtable { width: 100%; border-collapse: collapse; font-size: 0.923rem; }
   .gtable td { padding: 7px 16px; border-top: 1px solid var(--row-rule); vertical-align: top; }
   .gtable td:first-child { color: var(--text); width: 46%; padding-right: 4px; }

@@ -176,3 +176,70 @@ export interface IssueMemoryLink {
   memory: MemoryGraphNode;
   outgoing: boolean;
 }
+
+export interface OnboardRepo {
+  name: string;
+  path: string;
+  has_beads: boolean;
+  modified: string;
+}
+
+export interface OnboardAgent {
+  id: string;
+  label: string;
+  installed: boolean;
+}
+
+export interface OnboardRepos {
+  repos: OnboardRepo[];
+  agents: OnboardAgent[];
+  local: boolean;
+}
+
+export interface OnboardStep {
+  id: string;
+  title: string;
+  done: boolean;
+  detail: string;
+}
+
+export interface OnboardCheck {
+  path: string;
+  name: string;
+  agent: string;
+  steps: OnboardStep[];
+  complete: boolean;
+  prompt: string;
+  teammate: string;
+  key: string;
+}
+
+export interface OnboardPathRequest {
+  path: string;
+}
+
+export interface OnboardTerminalRequest {
+  path?: string;
+  b9s?: boolean;
+}
+
+export interface OnboardStartRequest {
+  path: string;
+  agent: string;
+  prompt?: string;
+}
+
+export interface OnboardPlanRequest {
+  goal: string;
+  plan_only: boolean;
+  ask_first: boolean;
+  due?: string;
+}
+
+export interface OnboardCreatePlan {
+  name: string;
+}
+
+export interface OnboardText {
+  text: string;
+}

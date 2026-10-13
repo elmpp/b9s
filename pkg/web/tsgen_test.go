@@ -16,6 +16,8 @@ var tsTypes = []any{
 	ProjectEntry{}, ProjectList{}, OpenProjectRequest{}, QueryResult{},
 	WriteRequest{}, WriteResult{}, Session{}, Event{},
 	MemoryGraphResponse{}, MemoryGraphNode{}, MemoryGraphEdge{}, IssueMemoryLink{},
+	OnboardRepo{}, OnboardAgent{}, OnboardRepos{}, OnboardStep{}, OnboardCheck{},
+	OnboardPathRequest{}, OnboardTerminalRequest{}, OnboardStartRequest{}, OnboardPlanRequest{}, OnboardCreatePlan{}, OnboardText{},
 }
 
 var tsWriteOps = []WriteOp{OpStatus, OpClose, OpDelete, OpUpdate, OpCreate, OpComment, OpDefer}

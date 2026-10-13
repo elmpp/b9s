@@ -240,3 +240,88 @@ type Event struct {
 	Type    string `json:"type"`
 	Version uint64 `json:"version"`
 }
+
+// OnboardRepo is a git repository found on this computer for the Add a
+// project sheet. Modified is RFC 3339.
+type OnboardRepo struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	HasBeads bool   `json:"has_beads"`
+	Modified string `json:"modified"`
+}
+
+// OnboardAgent is one AI agent the hand-off can be written for.
+type OnboardAgent struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Installed bool   `json:"installed"`
+}
+
+// OnboardRepos lists the repositories and agents found on this computer.
+// Local is false when the browser is not on this computer, so it cannot
+// answer a folder picker or see a Terminal window.
+type OnboardRepos struct {
+	Repos  []OnboardRepo  `json:"repos"`
+	Agents []OnboardAgent `json:"agents"`
+	Local  bool           `json:"local"`
+}
+
+// OnboardStep is one line of the setup checklist (b9s onboard --check).
+type OnboardStep struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Done   bool   `json:"done"`
+	Detail string `json:"detail"`
+}
+
+// OnboardCheck is the setup checklist of one folder, with the texts the
+// hand-off shows. Key is set when the folder is already in the project list.
+type OnboardCheck struct {
+	Path     string        `json:"path"`
+	Name     string        `json:"name"`
+	Agent    string        `json:"agent"`
+	Steps    []OnboardStep `json:"steps"`
+	Complete bool          `json:"complete"`
+	Prompt   string        `json:"prompt"`
+	Teammate string        `json:"teammate"`
+	Key      string        `json:"key"`
+}
+
+// OnboardPathRequest names a folder on this computer.
+type OnboardPathRequest struct {
+	Path string `json:"path"`
+}
+
+// OnboardTerminalRequest opens Terminal in Path, or in the open project's
+// folder when Path is empty. B9s runs b9s there instead of leaving a shell.
+type OnboardTerminalRequest struct {
+	Path string `json:"path,omitempty"`
+	B9s  bool   `json:"b9s,omitempty"`
+}
+
+// OnboardStartRequest starts an agent in a folder. An empty Prompt sends the
+// setup prompt.
+type OnboardStartRequest struct {
+	Path   string `json:"path"`
+	Agent  string `json:"agent"`
+	Prompt string `json:"prompt,omitempty"`
+}
+
+// OnboardPlanRequest is the plan form: a goal in plain words.
+type OnboardPlanRequest struct {
+	Goal     string `json:"goal"`
+	PlanOnly bool   `json:"plan_only"`
+	AskFirst bool   `json:"ask_first"`
+	Due      string `json:"due,omitempty"`
+}
+
+// OnboardCreatePlan names a new project without code.
+type OnboardCreatePlan struct {
+	Name string `json:"name"`
+}
+
+// OnboardText is one text the browser shows or copies, such as a picked
+// folder or a built prompt.
+type OnboardText struct {
+	Text string `json:"text"`
+}

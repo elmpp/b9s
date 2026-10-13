@@ -402,9 +402,42 @@ func (e *appEnv) launchApp(answers ...string) (string, error) {
 	return string(out), err
 }
 
+func TestLauncherAddYourProjectOpensTheAddFlowAndAsksOnlyOnce(t *testing.T) {
+	e := newAppEnv(t)
+	if out, err := e.launchApp("Add your project…"); err != nil {
+		t.Fatalf("first launch: %v\n%s", err, out)
+	}
+	if calls := strings.Join(e.calls(), "\n"); !strings.Contains(calls, "open_http://127.0.0.1:7997/pair?token=stub#/add") {
+		t.Fatalf("the browser was not opened on the add flow:\n%s", calls)
+	}
+	if out, err := e.launchApp(); err != nil {
+		t.Fatalf("second launch: %v\n%s", err, out)
+	}
+	scripts, _ := os.ReadFile(e.callsLog + ".osascript")
+	if n := strings.Count(string(scripts), "display dialog"); n != 1 {
+		t.Fatalf("two launches showed %d dialogs, want the first one only:\n%s", n, scripts)
+	}
+	if calls := e.calls(); !strings.HasSuffix(calls[len(calls)-1], "open_http://127.0.0.1:7997/pair?token=stub") {
+		t.Fatalf("the second launch did not open the browser view:\n%s", strings.Join(calls, "\n"))
+	}
+}
+
+func TestLauncherQuitOpensNothingAndAsksAgainNextTime(t *testing.T) {
+	e := newAppEnv(t)
+	if out, err := e.launchApp("Quit"); err != nil {
+		t.Fatalf("launch: %v\n%s", err, out)
+	}
+	if calls := strings.Join(e.calls(), "\n"); strings.Contains(calls, "open_") {
+		t.Fatalf("Quit opened something:\n%s", calls)
+	}
+	if _, err := os.Stat(filepath.Join(e.home, "support", "welcomed")); err == nil {
+		t.Fatal("Quit marked the welcome as seen")
+	}
+}
+
 func TestLauncherInstallsTheToolsWithoutAskingThenOpensTheBrowser(t *testing.T) {
 	e := newAppEnv(t)
-	if out, err := e.launchApp("Browser"); err != nil {
+	if out, err := e.launchApp("Open the sample"); err != nil {
 		t.Fatalf("first launch: %v\n%s", err, out)
 	}
 	calls := strings.Join(e.calls(), "\n")
