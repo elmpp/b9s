@@ -1,6 +1,6 @@
 // The TUI's regular keys for a browser with a keyboard. Each key calls the
 // same action a tap or a gesture does, so a key and its gesture can never
-// disagree. README.md's key tables are the reference; keys with no meaning
+// disagree. docs/USER_GUIDE.md's key tables are the reference; keys with no meaning
 // in a browser (Ctrl-C quits, < > resize panes) are left out.
 //
 //   keydown ──▶ sheet open? ── only Esc, PageDown and PageUp
@@ -25,7 +25,7 @@ import { S, saveBoardFolded, saveChips, stepLanes, treeRows } from "./state";
 import { $, $opt, copyText, split, store } from "./util";
 
 /**
- * keyName spells a key the way the README does: "j", "C-a", "S-Tab", or
+ * keyName spells a key the way the user guide does: "j", "C-a", "S-Tab", or
  * returns "" for a Cmd or Alt chord, which stays with the browser. A Mac
  * keyboard has no Delete key, so Cmd-Backspace stands in for it, as in the Finder.
  */
