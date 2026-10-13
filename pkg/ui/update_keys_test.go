@@ -154,7 +154,7 @@ func TestUpdateMsgSetsUpdateAvailable(t *testing.T) {
 	}
 }
 
-func TestUppercaseUOpensAvailableUpdateFromTreeAndDetail(t *testing.T) {
+func TestUpdateCommandOpensAvailableUpdateFromTreeAndDetail(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		focus focus
@@ -166,10 +166,13 @@ func TestUppercaseUOpensAvailableUpdateFromTreeAndDetail(t *testing.T) {
 			m.updateURL = "https://example.com/release"
 			m.focused = tc.focus
 
-			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")})
-			m = updated.(Model)
+			command, err := ResolveCommand("update")
+			if err != nil {
+				t.Fatalf("ResolveCommand(update): %v", err)
+			}
+			m, _ = m.executeCommand(command)
 			if !m.showUpdateModal || m.focused != focusUpdateModal {
-				t.Fatalf("U must open the update modal from %v, got shown=%t focus=%v", tc.focus, m.showUpdateModal, m.focused)
+				t.Fatalf(":update must open the update modal from %v, got shown=%t focus=%v", tc.focus, m.showUpdateModal, m.focused)
 			}
 		})
 	}

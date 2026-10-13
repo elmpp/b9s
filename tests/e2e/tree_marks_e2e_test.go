@@ -30,6 +30,24 @@ func TestTreeViewSpaceMarksShowCount(t *testing.T) {
 	containsAll(t, out, []string{"2 marked"})
 }
 
+// m steps down after marking, as dired-mark does, so three presses mark
+// three rows. Marking in place would leave the count at one.
+func TestTreeViewRepeatedMMarksConsecutiveRows(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping PTY e2e test in -short mode")
+	}
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, makeMarkFixture())
+
+	out, err := runTreeTUI(t, tempDir, 1500, []keyStep{
+		k("m"), k("m"), k("m"),
+	})
+	if err != nil {
+		t.Fatalf("run tree TUI: %v", err)
+	}
+	containsAll(t, out, []string{"3 marked"})
+}
+
 func TestTreeViewShiftKConfirmsCloseOfMarkedIssues(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping PTY e2e test in -short mode")

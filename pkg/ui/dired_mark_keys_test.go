@@ -60,3 +60,75 @@ func TestUppercaseVMarksRangeFromPreviousMark(t *testing.T) {
 		t.Fatalf("V must mark the range, want %v got %v", want, got)
 	}
 }
+
+// Repeated m marks consecutive rows, as dired-mark does.
+func TestLowercaseMMarksAndAdvances(t *testing.T) {
+	m := newBulkMarkModel(t)
+
+	m, _ = pressBulkKey(t, m, runeKey("m"))
+	m, _ = pressBulkKey(t, m, runeKey("m"))
+
+	if got := m.tree.TreeMarkedIDs(); !reflect.DeepEqual(got, []string{"bd-1", "bd-2"}) {
+		t.Fatalf("m m must mark two consecutive rows, got %v", got)
+	}
+	if got := m.tree.GetSelectedID(); got != "bd-3" {
+		t.Fatalf("m must move the cursor to the next row, cursor on %q", got)
+	}
+}
+
+// m marks rather than toggles: pressed over a marked row it keeps the mark.
+func TestLowercaseMKeepsExistingMark(t *testing.T) {
+	m := markRows(t, newBulkMarkModel(t), "bd-1")
+	m.tree.SelectByID("bd-1")
+
+	m, _ = pressBulkKey(t, m, runeKey("m"))
+
+	if got := m.tree.TreeMarkedIDs(); !reflect.DeepEqual(got, []string{"bd-1"}) {
+		t.Fatalf("m over a marked row must keep it marked, got %v", got)
+	}
+}
+
+func TestLowercaseUUnmarksAndAdvances(t *testing.T) {
+	m := markRows(t, newBulkMarkModel(t), "bd-1", "bd-2", "bd-3")
+	m.tree.SelectByID("bd-1")
+
+	m, _ = pressBulkKey(t, m, runeKey("u"))
+	m, _ = pressBulkKey(t, m, runeKey("u"))
+
+	if got := m.tree.TreeMarkedIDs(); !reflect.DeepEqual(got, []string{"bd-3"}) {
+		t.Fatalf("u u must unmark two consecutive rows, got %v", got)
+	}
+	if got := m.tree.GetSelectedID(); got != "bd-3" {
+		t.Fatalf("u must move the cursor to the next row, cursor on %q", got)
+	}
+}
+
+// Backspace is dired's DEL: move up one row and unmark it.
+func TestBackspaceUnmarksRowAbove(t *testing.T) {
+	m := markRows(t, newBulkMarkModel(t), "bd-1", "bd-2")
+	m.tree.SelectByID("bd-3")
+
+	m, _ = pressBulkKey(t, m, tea.KeyMsg{Type: tea.KeyBackspace})
+
+	if got := m.tree.TreeMarkedIDs(); !reflect.DeepEqual(got, []string{"bd-1"}) {
+		t.Fatalf("backspace must unmark the row above, got %v", got)
+	}
+	if got := m.tree.GetSelectedID(); got != "bd-2" {
+		t.Fatalf("backspace must move the cursor up, cursor on %q", got)
+	}
+}
+
+func TestUppercaseUClearsMarks(t *testing.T) {
+	m := markRows(t, newBulkMarkModel(t), "bd-1", "bd-3")
+	m.updateAvailable = true
+	m.updateTag = "v9.9.9"
+
+	m, _ = pressBulkKey(t, m, runeKey("U"))
+
+	if got := m.tree.MarkedCount(); got != 0 {
+		t.Fatalf("U must clear every mark, %d remain", got)
+	}
+	if m.showUpdateModal {
+		t.Fatalf("U must not open the update dialog")
+	}
+}

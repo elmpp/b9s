@@ -206,13 +206,17 @@ The first match is placed in the upper third of the viewport, not at the bottom 
 
 | Keys | Action |
 |------|--------|
-| `Space`, `m` | Mark or unmark the issue under the cursor |
+| `Space` | Mark or unmark the issue under the cursor |
+| `m` | Mark the issue under the cursor and move to the next row |
 | `V`, `Ctrl-Space` | Mark the range from the nearest mark to the cursor |
-| `u` | Unmark the issue under the cursor |
+| `u` | Unmark the issue under the cursor and move to the next row |
+| `Backspace` | Move to the row above and unmark it |
 | `Ctrl-\`, `U` | Clear all marks |
 | `M` | Open Memories for the current graph workspace |
 
 `K` (close), `Delete` and `S` (set status) act on every marked issue, or on the cursor row when nothing is marked. Close and delete ask for confirmation first, and the confirmation lists the issues it covers. When the issue under the cursor disappears, the next issue takes its row.
+
+`m`, `u`, `Backspace` and `U` keep their Emacs dired meanings, so pressing `m` several times marks consecutive issues.
 
 `V` and `Ctrl-Space` do the same thing. macOS claims `Ctrl-Space` for input-source switching by default, so `V` is the key that always works.
 

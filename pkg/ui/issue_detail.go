@@ -44,7 +44,7 @@ func renderIssueDetail(item model.Issue, issueMap map[string]*model.Issue, t The
 		tag := sanitizeTerminalLine(update.Tag)
 		blocks = append(blocks, wrap.Render(
 			r.NewStyle().Foreground(t.Primary).Render("↑ "+tag+" available")+
-				muted.Render(" · press U to update")))
+				muted.Render(" · :update to install")))
 	}
 
 	// The header card: type, ID and age, the title, then status, priority

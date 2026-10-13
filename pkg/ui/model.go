@@ -2998,13 +2998,6 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 				m.rebuildPickerEntries()
 				return m, nil
 
-			case "U":
-				if m.focused == focusLabelPicker || m.tree.IsSortPopupOpen() || m.tree.IsColumnPopupOpen() {
-					break
-				}
-				m.showSelfUpdateModal()
-				return m, nil
-
 			case "R":
 				// Attachment picker over the selected issue's attachments
 				// (bd-t8j5.9). Skipped when a popup or the label filter
@@ -3861,20 +3854,33 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 			break
 		}
 		m.openStatusPicker()
-	case " ", "space", "m":
-		// Space marks as in k9s; m remains from the dired-style bindings (bd-cz0)
+	case " ", "space":
+		// Space toggles in place, as in k9s
 		m.tree.ToggleMark()
+	case "m":
+		// m, u, DEL and U keep Emacs dired's default meanings: m and u act on
+		// the row and step down, so repeated presses cover consecutive rows.
+		m.tree.MarkSelected()
+		m.tree.MoveDown()
+		m.syncTreeToDetail()
 	case "u":
-		// Unmark rather than toggle, as in dired
 		if id := m.tree.GetSelectedID(); id != "" {
 			m.tree.Unmark(id)
 		}
+		m.tree.MoveDown()
+		m.syncTreeToDetail()
+	case "backspace":
+		m.tree.MoveUp()
+		if id := m.tree.GetSelectedID(); id != "" {
+			m.tree.Unmark(id)
+		}
+		m.syncTreeToDetail()
 	case "ctrl+@", "V":
 		// Terminals send ctrl+space as NUL, which bubbletea names ctrl+@.
 		// macOS claims ctrl+space for input-source switching by default, so
 		// it often never arrives and V is the range key that always does.
 		m.tree.SpanMark()
-	case "ctrl+\\":
+	case "ctrl+\\", "U":
 		m.tree.UnmarkAll()
 	case "x":
 		// Toggle XRay drill-down mode (bd-0rc)
@@ -5098,8 +5104,9 @@ func (m *Model) renderHelpOverlay() string {
 		{"ctrl+o", "Occur (search filter)"},
 		{"x", "XRay drill-down"},
 		{"b/B", "Bookmark / cycle"},
-		{"Space/m", "Mark / unmark"},
-		{"u", "Unmark row"},
+		{"Space", "Mark / unmark"},
+		{"m / u", "Mark / unmark, next row"},
+		{"Bksp", "Unmark row above"},
 		{"^Space/V", "Mark range"},
 		{"^\\ / U", "Clear marks"},
 		{"M", "Memory wires, \\ detail"},

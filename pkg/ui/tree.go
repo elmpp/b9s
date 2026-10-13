@@ -4012,6 +4012,19 @@ func (t *TreeModel) ToggleMark() {
 	t.invalidateColumnLayout()
 }
 
+// MarkSelected marks the currently selected node, leaving a marked one marked.
+func (t *TreeModel) MarkSelected() {
+	node := t.SelectedNode()
+	if node == nil || node.Issue == nil {
+		return
+	}
+	if t.markedIDs == nil {
+		t.markedIDs = make(map[string]bool)
+	}
+	t.markedIDs[node.Issue.ID] = true
+	t.invalidateColumnLayout()
+}
+
 // UnmarkAll clears all marks.
 func (t *TreeModel) UnmarkAll() {
 	t.markedIDs = nil
