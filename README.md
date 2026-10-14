@@ -107,7 +107,7 @@ Each paragraph names the key to press and links to the [user guide](docs/USER_GU
 
 ### If you know k9s
 
-b9s takes its interaction model from k9s. The header with the logo and the project shortcuts, `Ctrl-E` to hide it. `:` for a command prompt with aliases such as `:epic`, `:bug` and `:project`. `/` for a filter that `Enter` keeps and `Esc` clears. `Space` to mark, with bulk actions on the marks. `Ctrl-F` and `Ctrl-B` to page. A bright full-row cursor, one line of key hints at the bottom, and plain-text tokens instead of emoji. Where k9s lists the pods in a namespace, b9s lists the issues in a project.
+b9s takes its interaction model from k9s. The header with the logo and the project shortcuts, `Ctrl-E` to hide it. `:` for a command prompt with aliases such as `:epic`, `:bug` and `:project`. `/` for a filter that `Enter` keeps and `Esc` clears, and `Ctrl-F` to make it a find that hides nothing, as `/` does in a k9s YAML view. `Space` to mark, with bulk actions on the marks. `PgDn` and `Ctrl-B` to page. A bright full-row cursor, one line of key hints at the bottom, and plain-text tokens instead of emoji. Where k9s lists the pods in a namespace, b9s lists the issues in a project.
 
 ## How it reads and writes
 

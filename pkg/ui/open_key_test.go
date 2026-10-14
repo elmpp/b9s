@@ -56,9 +56,10 @@ func TestOKeyOpensSelectedIssueInEveryView(t *testing.T) {
 	}
 }
 
-// Occur lives on ctrl+o in the tree: it shows only the matches of the last
-// search, and O no longer touches it.
-func TestTreeCtrlOTogglesOccur(t *testing.T) {
+// Occur lives on & in the tree, as less's &pattern shows only the matching
+// lines: it shows only the matches of the last search, and neither O nor
+// ctrl+o touches it.
+func TestTreeAmpersandTogglesOccur(t *testing.T) {
 	t.Setenv("B9S_TEST_MODE", "1")
 	t.Setenv("TMPDIR", t.TempDir())
 	m := detailFooterModel(t, "list")
@@ -79,11 +80,16 @@ func TestTreeCtrlOTogglesOccur(t *testing.T) {
 	}
 
 	m = pressKeys(m, tea.KeyMsg{Type: tea.KeyCtrlO})
-	if !m.tree.IsOccurMode() {
-		t.Fatalf("ctrl+o did not enter occur mode, status %q", m.statusMsg)
-	}
-	m = pressKeys(m, tea.KeyMsg{Type: tea.KeyCtrlO})
 	if m.tree.IsOccurMode() {
-		t.Fatal("ctrl+o again did not leave occur mode")
+		t.Fatal("ctrl+o entered occur mode; occur is on &")
+	}
+
+	m = pressKeys(m, runeKey("&"))
+	if !m.tree.IsOccurMode() {
+		t.Fatalf("& did not enter occur mode, status %q", m.statusMsg)
+	}
+	m = pressKeys(m, runeKey("&"))
+	if m.tree.IsOccurMode() {
+		t.Fatal("& again did not leave occur mode")
 	}
 }

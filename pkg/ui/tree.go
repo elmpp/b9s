@@ -363,6 +363,7 @@ type TreeModel struct {
 	assigneeFilter     string                  // "" = no assignee filter (bd-gs45.1)
 	identities         *identity.Registry      // resolves assignee aliases for the filter
 	issueQuery         IssueQuery              // Shared ID/title/facet query owned by Model
+	findMode           bool                    // The query marks hits and filters nothing
 	filterMatches      map[string]bool         // Issue IDs that match the filter
 	contextAncestors   map[string]bool         // Ancestor IDs shown for context (dimmed)
 	appliedFilterKey   string                  // filterKey whose context ancestors were last opened
@@ -1391,17 +1392,34 @@ func (t *TreeModel) SetAssigneeFilter(assignee string) {
 	t.ApplyFilter(t.currentFilter) // rebuild with all filters
 }
 
-// SetIssueQuery applies the shared cross-view query to the tree.
-func (t *TreeModel) SetIssueQuery(query IssueQuery) {
+// SetIssueQuery applies the shared cross-view query to the tree. In find mode
+// the query hides nothing: it only marks the hits n/N step through.
+func (t *TreeModel) SetIssueQuery(query IssueQuery, find bool) {
 	t.issueQuery = query
+	t.findMode = find
 	t.sharedQuery = true
 	t.searchMode = false
 	t.searchQuery = query.Raw()
 	t.ApplyFilter(t.currentFilter)
 	if len(t.searchMatches) > 0 {
+		// A filtered tree already expands the path to each hit; an unfiltered
+		// one may have the first hit folded away.
+		t.expandPathToNode(t.searchMatches[0])
+		t.rebuildFlatList()
 		t.SelectByID(t.searchMatches[0].Issue.ID)
 		t.revealCursorWithContext()
 	}
+}
+
+// IsFindMode reports whether the query marks hits without filtering.
+func (t *TreeModel) IsFindMode() bool { return t.findMode }
+
+// filterQuery is the part of the shared query that limits the rows.
+func (t *TreeModel) filterQuery() IssueQuery {
+	if t.findMode {
+		return IssueQuery{}
+	}
+	return t.issueQuery
 }
 
 // ApplyFilter sets the current filter and rebuilds the visible flat list (bd-e3w).
@@ -1411,7 +1429,7 @@ func (t *TreeModel) ApplyFilter(filter string) {
 		t.currentFilter = "all"
 	}
 	// When status, label, and assignee are all "show all", skip filtering
-	if t.currentFilter == "all" && t.labelFilter == "" && t.assigneeFilter == "" && t.issueQuery.Empty() {
+	if t.currentFilter == "all" && t.labelFilter == "" && t.assigneeFilter == "" && t.filterQuery().Empty() {
 		t.appliedFilterKey = ""
 		t.filterMatches = nil
 		t.contextAncestors = nil
@@ -1456,7 +1474,7 @@ func (t *TreeModel) ApplyFilter(filter string) {
 	// A text query keeps each hit's whole branch in view, so the subtree below
 	// a hit is context as well. A status, label or assignee filter without a
 	// query reveals nothing below its matches (bd-xkxb).
-	if !t.issueQuery.Empty() {
+	if !t.filterQuery().Empty() {
 		for id := range t.filterMatches {
 			t.markContextDescendants(t.issueMap[id])
 		}
@@ -1471,7 +1489,7 @@ func (t *TreeModel) ApplyFilter(filter string) {
 
 // filterKey names the combination of filters ApplyFilter applies.
 func (t *TreeModel) filterKey() string {
-	return strings.Join([]string{t.currentFilter, t.labelFilter, t.assigneeFilter, t.issueQuery.Raw()}, "\x00")
+	return strings.Join([]string{t.currentFilter, t.labelFilter, t.assigneeFilter, t.filterQuery().Raw()}, "\x00")
 }
 
 // refreshFilteredView recomputes the filter matches for freshly built nodes
@@ -1490,7 +1508,7 @@ func (t *TreeModel) nodeMatchesFilter(node *IssueTreeNode) bool {
 	if node == nil || node.Issue == nil {
 		return false
 	}
-	return t.issueQuery.Matches(*node.Issue) && t.passesScopeFilters(node.Issue)
+	return t.filterQuery().Matches(*node.Issue) && t.passesScopeFilters(node.Issue)
 }
 
 // passesScopeFilters checks the label, assignee and status filters, which
@@ -2043,11 +2061,16 @@ func (t *TreeModel) renderNodeWithLayout(node *IssueTreeNode, isSelected bool, l
 		title = title + strings.Repeat(" ", titleWidth-currentTitleWidth)
 	}
 
-	// A search hit keeps its normal colours: non-matching branches are hidden
+	// A filter hit keeps its normal colours: non-matching branches are hidden
 	// and branch context is dimmed, so the cursor is the only emphasis (bd-xkxb).
+	// Find mode hides and dims nothing, so the title is the only thing that
+	// tells a hit from the rows around it. Orange is the colour k9s marks find
+	// hits with; the theme's orange is the deferred status colour.
 	titleStyle := r.NewStyle()
 	if isSelected {
 		titleStyle = titleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#1A1A1A"}).Bold(true)
+	} else if t.findMode && t.searchMatchIDs[issue.ID] {
+		titleStyle = titleStyle.Foreground(t.theme.Deferred).Bold(true).Underline(true)
 	} else {
 		titleStyle = titleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#333333", Dark: "#E8E8E8"})
 	}
@@ -3140,7 +3163,7 @@ func (t *TreeModel) rebuildFlatList() {
 		t.rebuildFlatModeList()
 		return
 	}
-	if t.filterMatches != nil && (!t.issueQuery.Empty() || t.labelFilter != "" || t.assigneeFilter != "" || (t.currentFilter != "" && t.currentFilter != "all")) {
+	if t.filterMatches != nil && (!t.filterQuery().Empty() || t.labelFilter != "" || t.assigneeFilter != "" || (t.currentFilter != "" && t.currentFilter != "all")) {
 		t.rebuildFilteredFlatList()
 		// Occur narrows the filtered set further; it must not be dropped just
 		// because a label/assignee/status filter is also active (bd-oe1y).
@@ -3356,7 +3379,7 @@ func (t *TreeModel) IsFlatMode() bool {
 // IsListView reports whether rows are drawn as a flat list: the user chose it
 // with t, or the query names an issue type (ADR 0027).
 func (t *TreeModel) IsListView() bool {
-	return t.flatMode || t.issueQuery.HasTypePredicate()
+	return t.flatMode || t.filterQuery().HasTypePredicate()
 }
 
 // ToggleFlatMode toggles between flat-list and tree-hierarchy view.

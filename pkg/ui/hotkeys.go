@@ -29,9 +29,9 @@ var builtinKeys = []string{
 	"a", "A", "b", "B", "c", "C", "d", "D", "e", "E", "f", "F", "g", "H", "i", "I",
 	"J", "K", "L", "m", "M", "n", "N", "o", "O", "p", "P", "q", "r", "R", "s", "S",
 	"t", "T", "u", "U", "v", "V", "w", "W", "x", "X", "y", "Y", "z", "Z",
-	"[", "]", "{", "}", "\\", "<", ">", "|", "$", "delete",
+	"[", "]", "{", "}", "\\", "<", ">", "|", "$", "&", "delete",
 	"ctrl+a", "ctrl+b", "ctrl+d", "ctrl+e", "ctrl+f", "ctrl+n", "ctrl+p", "ctrl+r",
-	"ctrl+o", "ctrl+s", "ctrl+u", "ctrl+w", "ctrl+\\", "ctrl+@", "f1", "f2", "f3", "f4", "f5",
+	"ctrl+s", "ctrl+u", "ctrl+w", "ctrl+\\", "ctrl+@", "f1", "f2", "f3", "f4", "f5",
 }
 
 func isKnownKey(key string) bool {

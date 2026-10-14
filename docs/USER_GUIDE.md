@@ -82,7 +82,7 @@ The tree is always present. Every issue sits under its parent, and an issue with
 | `l` | Expand the issue, or go to its first child when it is already expanded |
 | `p` | Go to the parent |
 | `{` `}` | Go to the first or last sibling |
-| `Ctrl-F` `Ctrl-B`, `PgDn` `PgUp` | Page down and up |
+| `PgDn`, `Ctrl-B` `PgUp` | Page down and up |
 | `Ctrl-D` `Ctrl-U` | Half a page down and up |
 | `Home`, `End` `G` | Go to the top, the bottom |
 
@@ -171,7 +171,10 @@ Press `/` to query the loaded issues. The query field appears only while you typ
 | `Esc` | Clear the query |
 | `Tab` | Complete a field name, a value, a label or a word from the loaded issues |
 | `n`, `N` | Go to the next or previous match |
-| `Ctrl-O` | Occur: show only the matches. Press again to show the tree |
+| `Ctrl-F` | Switch between filter and find. Find hides nothing: the hits are underlined in orange and the field reads `find /` |
+| `&` | Occur: show only the matches. Press again to show the tree |
+
+`/` filters, as it does in a k9s table: issues without a hit leave the view. `Ctrl-F` makes the same query find, as `/` does in a k9s YAML view: every issue stays, `n` and `N` step through the hits and unfold the branch around each one. The mode lasts until you press `Ctrl-F` again, also through `Esc` and new queries. Status and type keys write into the query, so in find mode they mark issues instead of hiding the rest. `&` is the occur key from `less`. See [ADR 0057](adr/0057-find-with-ctrl-f-and-occur-on-ampersand.md).
 
 ### Plain words
 
@@ -833,7 +836,7 @@ From 1280 px, the desktop and wide classes, the rail is a sidebar with the proje
 | `Tab`, `Shift-Tab` | Step the height of the selected card's or epic's lane, or of every lane. On epic rows they fold or unfold the lane |
 | `v` | Switch between the epic rail and epic rows |
 | `j` `k`, `Down` `Up` | Move the cursor through the column |
-| `Ctrl-D` `Ctrl-F` `PgDn`, `Ctrl-U` `Ctrl-B` `PgUp` | Move the cursor about a third of the board down or up its column |
+| `Ctrl-D` `PgDn`, `Ctrl-U` `Ctrl-B` `PgUp` | Move the cursor about a third of the board down or up its column |
 | `Enter` | Open the detail panel. With it open, the cursor keys change the issue it shows |
 | `\` | Switch the detail between a side panel and the full width |
 | `z`, `Z` | Fold the cursor's column into a rail, unfold every column |
@@ -847,12 +850,12 @@ With a keyboard, the web UI takes the TUI's keys, with the same case-sensitive m
 
 | Keys | Effect |
 |------|--------|
-| `j` `k`, `Down` `Up`, `Ctrl-F` `Ctrl-B` `PgDn` `PgUp`, `Ctrl-D` `Ctrl-U`, `Home` `End` | Move the tree cursor, by a row, a page or half a page, or to the top or bottom |
+| `j` `k`, `Down` `Up`, `PgDn` `Ctrl-B` `PgUp`, `Ctrl-D` `Ctrl-U`, `Home` `End` | Move the tree cursor, by a row, a page or half a page, or to the top or bottom |
 | `PgDn` `PgUp` | Scroll a pane without a cursor by a page: a sheet, a Memory record, the detail as a phone's sheet or at full width, or the graph. Beside the list, the detail leaves them to the tree cursor |
 | `h` `l`, `Tab`, `Shift-Tab`, `X` `Z` `Ctrl-A` | Collapse or expand, fold the issue, fold the whole tree, expand all, collapse all, switch |
 | `p` `{` `}` | Go to the parent, the first sibling, the last sibling |
 | `o` `C` `r` `a` | Show open, closed, ready or all issues |
-| `/`, `n` `N`, `Ctrl-O` | Search, next or previous match, only the matches without their ancestors |
+| `/`, `n` `N`, `Ctrl-F`, `&` | Search, next or previous match, filter or find, only the matches without their ancestors |
 | `O` | Open the selected issue as a read-only Markdown file in `$VISUAL`, else `$EDITOR`, else the system default editor, in every view. b9s waits while a terminal editor runs |
 | `f`, `x` | Show only the cursor's branch or subtree; again undoes it |
 | `s`, `\|`, `v`, `F` | Sort, columns, wrap titles, follow live changes |
@@ -869,7 +872,7 @@ With a keyboard, the web UI takes the TUI's keys, with the same case-sensitive m
 | Board: `o` `i` `C`, `r`, `c` | Toggle open, in progress, closed; ready; the closed column |
 | Board: `s`, `v`, `e` | Group by status, priority or type; epic rows or rail; hide empty columns |
 | Board: `y`, `f`, `{` `}`, `Tab`, `Shift-Tab` | Copy the ID, show the branch, previous or next epic, step the lane's height or every lane's (epic rows and a phone fold them) |
-| Board: `Ctrl-D` `Ctrl-F` `PgDn`, `Ctrl-U` `Ctrl-B` `PgUp` | Move the cursor about a third of the board down or up its column |
+| Board: `Ctrl-D` `PgDn`, `Ctrl-U` `Ctrl-B` `PgUp` | Move the cursor about a third of the board down or up its column |
 
 The browser keeps a few keys, so the web UI does not use them. `Ctrl-C` copies instead of quitting, and `Ctrl-W` closes the tab. `\` `<` `>` lay out TUI panes, which the web UI does not have. Chrome on Windows and Linux takes `Ctrl-N` for a new window: use the `+` button there.
 

@@ -129,10 +129,10 @@ const contextHelpTree = `## Tree View
   o/c/r/a   Open/closed/ready/all
   s         Sort popup · C  Columns · /  Search
   f         Toggle highlighted branch
-  n/N       Next/prev match
+  n/N       Next/prev match · ^F  Filter/find
 
 **Modes**
-  O  Occur   x  XRay
+  &  Occur   x  XRay
   t  List    F  Follow
   b/B  Bookmark/cycle   m/M  Mark
 

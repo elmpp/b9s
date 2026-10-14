@@ -73,13 +73,14 @@ func TestTreeHomeAfterEndSelectsFirstNode(t *testing.T) {
 	}
 }
 
-// Right and Left already page the tree by a full viewport.
+// Right and Left already page the tree by a full viewport. Ctrl-F is not a
+// page key: it switches the search between filter and find (ADR 0057).
 func TestTreeFullPageKeys(t *testing.T) {
 	down := pressK9sKey(newK9sKeysModel(t), tea.KeyMsg{Type: tea.KeyRight})
 	if down.tree.cursor == 0 {
 		t.Fatal("Right did not page the fixture")
 	}
-	for _, key := range []tea.KeyType{tea.KeyCtrlF, tea.KeyPgDown} {
+	for _, key := range []tea.KeyType{tea.KeyPgDown} {
 		m := pressK9sKey(newK9sKeysModel(t), tea.KeyMsg{Type: key})
 		if m.tree.cursor != down.tree.cursor || m.tree.viewportOffset != down.tree.viewportOffset {
 			t.Errorf("%s: cursor %d offset %d, want a full page like Right: cursor %d offset %d",
@@ -200,7 +201,7 @@ func TestBoardCtrlFAndCtrlBPage(t *testing.T) {
 	if down.View() == board.View() {
 		t.Fatal("Ctrl-D did not page the board fixture")
 	}
-	for _, key := range []tea.KeyType{tea.KeyCtrlF, tea.KeyPgDown} {
+	for _, key := range []tea.KeyType{tea.KeyPgDown} {
 		if got := pressK9sKey(board, tea.KeyMsg{Type: key}); got.View() != down.View() {
 			t.Errorf("%s did not page the board down", tea.KeyMsg{Type: key})
 		}
@@ -219,7 +220,7 @@ func TestHelpCtrlFAndCtrlBScroll(t *testing.T) {
 		t.Fatal("? did not open help")
 	}
 	down := pressK9sKey(help, tea.KeyMsg{Type: tea.KeyCtrlD})
-	for _, key := range []tea.KeyType{tea.KeyCtrlF, tea.KeyPgDown} {
+	for _, key := range []tea.KeyType{tea.KeyPgDown} {
 		if got := pressK9sKey(help, tea.KeyMsg{Type: key}); got.helpScroll != down.helpScroll {
 			t.Errorf("%s scrolled help to %d, Ctrl-D scrolls to %d", tea.KeyMsg{Type: key}, got.helpScroll, down.helpScroll)
 		}

@@ -145,7 +145,7 @@ func TestTreeQueryHitRowKeepsItsNormalColours(t *testing.T) {
 	searched := NewTreeModel(DefaultTheme(renderer))
 	searched.Build(issues)
 	searched.SetColumnPreference(TreeColumnLaneStage, ColumnHide)
-	searched.SetIssueQuery(ParseIssueQuery("zephyr"))
+	searched.SetIssueQuery(ParseIssueQuery("zephyr"), false)
 
 	want := plain.renderNode(plain.issueMap["solo-1"], false, 10)
 	got := searched.renderNode(searched.issueMap["solo-1"], false, 10)

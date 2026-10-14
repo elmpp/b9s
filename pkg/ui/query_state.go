@@ -263,10 +263,34 @@ func issuePlainSearchValues(issue model.Issue) []string {
 }
 
 // QueryState owns the editable text and its finite input lifecycle.
+//
+// find decides what the query does to the views. Off, the query filters, as
+// / does in a k9s table. On, every issue stays visible and the query only
+// marks hits for highlighting and n/N, as / does in a k9s YAML or describe
+// view. It is independent of the text, so it outlives Clear.
 type QueryState struct {
 	mode  QueryMode
 	text  string
 	query IssueQuery
+	find  bool
+}
+
+// ToggleFind switches the query between filtering and finding.
+func (s *QueryState) ToggleFind() {
+	s.find = !s.find
+}
+
+// Find reports whether the query finds rather than filters.
+func (s QueryState) Find() bool {
+	return s.find
+}
+
+// FilterQuery is the query the views filter by: empty in find mode.
+func (s QueryState) FilterQuery() IssueQuery {
+	if s.find {
+		return IssueQuery{}
+	}
+	return s.query
 }
 
 func (s *QueryState) StartEditing() {
@@ -315,8 +339,10 @@ func (s QueryState) Query() IssueQuery {
 	return s.query
 }
 
+// Matches reports whether the query keeps issue in a filtered view. In find
+// mode it keeps every issue.
 func (s QueryState) Matches(issue model.Issue) bool {
-	return s.query.Matches(issue)
+	return s.FilterQuery().Matches(issue)
 }
 
 // WithInitialQuery applies the canonical issue query before the TUI starts.

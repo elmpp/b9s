@@ -2594,6 +2594,12 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 			m.setQueryText("")
 			return m, tea.Batch(cmds...)
 		}
+		// The query is shared by the tree, the list and the board, so its mode
+		// switch is global too. The graph and help views keep their own keys.
+		if msg.String() == "ctrl+f" && !treePopupOpen && !m.isGraphView && !m.showHelp && !m.showTutorial {
+			m.toggleQueryFind()
+			return m, tea.Batch(cmds...)
+		}
 
 		// Handle help overlay toggle
 		if msg.String() == "?" && m.list.FilterState() != list.Filtering {
@@ -3458,7 +3464,7 @@ func (m Model) handleBoardKeys(msg tea.KeyMsg) Model {
 		m.board.MoveToTop()
 	case "G", "end":
 		m.board.MoveToBottom()
-	case "ctrl+d", "ctrl+f", "pgdown":
+	case "ctrl+d", "pgdown":
 		m.board.PageDown(m.height / 3)
 	case "ctrl+u", "ctrl+b", "pgup":
 		m.board.PageUp(m.height / 3)
@@ -3752,12 +3758,12 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 	case "l":
 		m.tree.ExpandOrMoveToChild()
 		m.syncTreeToDetail()
-	// Home, End, Ctrl-F/PgDn and Ctrl-B/PgUp page as in k9s tables; g stays
+	// Home, End, PgDn and Ctrl-B/PgUp page as in k9s tables; g stays
 	// the dependency graph and Ctrl-D/Ctrl-U stay half pages
 	case "left", "ctrl+b", "pgup":
 		m.tree.PageBackwardFull()
 		m.syncTreeToDetail()
-	case "right", "ctrl+f", "pgdown":
+	case "right", "pgdown":
 		m.tree.PageForwardFull()
 		m.syncTreeToDetail()
 	case "home":
@@ -3899,8 +3905,9 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 		m.tree.ToggleFollowMode()
 	case "O":
 		m.openInEditor()
-	case "ctrl+o":
-		// Toggle occur mode (bd-sjs.2) - uses current search pattern
+	case "&":
+		// Toggle occur mode (bd-sjs.2) - uses current search pattern. & is
+		// less's key for showing only the matching lines.
 		if m.tree.IsOccurMode() {
 			m.tree.ExitOccurMode()
 			m.syncTreeToDetail()
@@ -3908,7 +3915,7 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 			m.tree.EnterOccurMode(m.tree.SearchQuery())
 			m.syncTreeToDetail()
 		} else {
-			m.statusMsg = "Search with / first, then ctrl+o for occur mode"
+			m.statusMsg = "Search with / first, then & for occur mode"
 			m.statusIsError = false
 		}
 	case "d":
@@ -5102,7 +5109,8 @@ func (m *Model) renderHelpOverlay() string {
 		{"f", "Toggle highlighted branch"},
 		{"n/N", "Next/prev match"},
 		{"O", "Open issue in editor"},
-		{"ctrl+o", "Occur (search filter)"},
+		{"&", "Occur: only the hits"},
+		{"ctrl+f", "Search: filter or find"},
 		{"x", "XRay drill-down"},
 		{"b/B", "Bookmark / cycle"},
 		{"Space", "Mark / unmark"},
@@ -5583,7 +5591,7 @@ func (m *Model) passesScopeFilters(issue model.Issue) bool {
 func (m *Model) setQueryText(text string) {
 	m.queryState.SetText(text)
 	m.applyFilter()
-	m.tree.SetIssueQuery(m.queryState.Query())
+	m.tree.SetIssueQuery(m.queryState.Query(), m.queryState.Find())
 	m.syncTreeToDetail()
 }
 
@@ -5636,6 +5644,8 @@ func (m Model) handleQueryKey(msg tea.KeyMsg) Model {
 		m.setQueryText(m.queryState.Text())
 	case "tab":
 		m.completeQuery()
+	case "ctrl+f":
+		m.toggleQueryFind()
 	default:
 		if runes := typedRunes(msg); len(runes) > 0 {
 			m.queryState.Append(runes...)
@@ -5643,6 +5653,19 @@ func (m Model) handleQueryKey(msg tea.KeyMsg) Model {
 		}
 	}
 	return m
+}
+
+// toggleQueryFind switches the shared query between filtering the views and
+// finding hits in them, and reapplies the current text.
+func (m *Model) toggleQueryFind() {
+	m.queryState.ToggleFind()
+	m.setQueryText(m.queryState.Text())
+	if m.queryState.Find() {
+		m.statusMsg = "Find: / marks hits, n/N steps through them, nothing is hidden"
+	} else {
+		m.statusMsg = "Filter: / hides issues without a hit"
+	}
+	m.statusIsError = false
 }
 
 func (m *Model) completeQuery() {
@@ -5766,7 +5789,7 @@ func (m *Model) filteredIssuesForActiveView() []model.Issue {
 // a matched epic loses every child reparented from elsewhere. A descendant
 // failing a scope filter takes its subtree with it, as in the tree.
 func (m *Model) boardIssuesForCurrentFilter() []model.Issue {
-	if m.queryState.Query().Empty() {
+	if m.queryState.FilterQuery().Empty() {
 		return m.filteredIssuesForActiveView()
 	}
 	children := make(map[string][]int)
@@ -7663,6 +7686,9 @@ func (m Model) renderUnifiedTitleBar(w int) string {
 		content += ":" + typed + "█"
 		suggestion = strings.TrimPrefix(m.commandPrompt.Suggestion(), strings.ToLower(strings.TrimSpace(typed)))
 	} else {
+		if m.queryState.Find() {
+			content += "find "
+		}
 		content += "/"
 		if queryText != "" {
 			content += " " + queryText
