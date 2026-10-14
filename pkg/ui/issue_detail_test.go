@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/vanderheijden86/b9s/internal/attachref"
 	"github.com/vanderheijden86/b9s/pkg/model"
@@ -41,7 +42,7 @@ func renderDetailFixture(t *testing.T, update *detailUpdateNotice) string {
 
 func TestRenderIssueDetail_HeaderShowsMetaWithoutTable(t *testing.T) {
 	out := renderDetailFixture(t, nil)
-	for _, want := range []string{"e5u3.9", "Build epic rail", "IN PROGRESS", "P1", "creator", "@alice", "assignee", "@BrownBear", "alice@example.com", "2026-09-25", "ui", "board"} {
+	for _, want := range []string{"bd-e5u3.9", "Build epic rail", "IN PROGRESS", "P1", "creator", "@alice", "assignee", "@BrownBear", "alice@example.com", "2026-09-25", "ui", "board"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("detail header missing %q:\n%s", want, out)
 		}
@@ -49,6 +50,24 @@ func TestRenderIssueDetail_HeaderShowsMetaWithoutTable(t *testing.T) {
 	for _, unwanted := range []string{"| ID |", "mailto:", "⭐", "⚡"} {
 		if strings.Contains(out, unwanted) {
 			t.Errorf("detail should not contain %q:\n%s", unwanted, out)
+		}
+	}
+}
+
+func TestIssueDetailViewportShowsFullID(t *testing.T) {
+	t.Setenv("B9S_TEST_MODE", "1")
+	issue := model.Issue{
+		ID: "project-name-iiem.2.3", Title: "Inspect the detail header",
+		Status: model.StatusOpen, IssueType: model.TypeTask,
+	}
+	m := NewModel([]model.Issue{issue}, "")
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = updated.(Model)
+	m = pressKeys(m, tea.KeyMsg{Type: tea.KeyEnter})
+	out := stripANSI(m.viewport.View())
+	for _, want := range []string{issue.ID, issue.Title} {
+		if !strings.Contains(out, want) {
+			t.Errorf("detail viewport missing %q:\n%s", want, out)
 		}
 	}
 }
@@ -142,7 +161,7 @@ func TestRenderIssueDetail_HeaderIsAHeavyBox(t *testing.T) {
 		t.Fatalf("header box not found:\n%s", strings.Join(lines, "\n"))
 	}
 	box := strings.Join(lines[top:bottom+1], "\n")
-	for _, want := range []string{"e5u3.9", "Build epic rail", "IN PROGRESS", "P1", "@alice", "@BrownBear"} {
+	for _, want := range []string{"bd-e5u3.9", "Build epic rail", "IN PROGRESS", "P1", "@alice", "@BrownBear"} {
 		if !strings.Contains(box, want) {
 			t.Errorf("box missing %q:\n%s", want, box)
 		}
