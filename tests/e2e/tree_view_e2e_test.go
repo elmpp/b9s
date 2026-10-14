@@ -961,6 +961,7 @@ func TestTreeViewToggleHighlightedBranchFilter(t *testing.T) {
 		k("j"),
 		k("f"),
 		k("f"),
+		k("f"),
 		k("K"),
 	})
 	if err != nil {
@@ -968,8 +969,11 @@ func TestTreeViewToggleHighlightedBranchFilter(t *testing.T) {
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "/ epic-a") {
+	if !strings.Contains(output, "/ branch:epic-a") {
 		t.Fatalf("first f did not show the accepted branch query:\n%s", truncateOutput(output, 2000))
+	}
+	if !strings.Contains(output, "/ branch:feature-a") {
+		t.Fatalf("second f did not step down to the feature:\n%s", truncateOutput(output, 2000))
 	}
 	confirmationStart := strings.LastIndex(output, "Close issue?")
 	if confirmationStart < 0 || !strings.Contains(output[confirmationStart:], "task-a") {

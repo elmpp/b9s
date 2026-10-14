@@ -28,7 +28,17 @@ const (
 	QueryFieldLabel    QueryField = "label"
 	QueryFieldAssignee QueryField = "assignee"
 	QueryFieldProject  QueryField = "project"
+	// QueryFieldBranch names one issue by its exact ID. The tree shows that
+	// issue's subtree as context, so the predicate limits the tree to one
+	// branch. A fuzzy ID cannot do this: hierarchical IDs contain each other,
+	// so bd-x.1 would also show bd-x.10 and every bd-x.1.N.
+	QueryFieldBranch QueryField = "branch"
 )
+
+// BranchQuery is the query that limits the tree to the branch of id.
+func BranchQuery(id string) string {
+	return string(QueryFieldBranch) + ":" + id
+}
 
 type issueQueryPredicate struct {
 	field   QueryField
@@ -155,6 +165,8 @@ func predicateMatchesIssue(predicate issueQueryPredicate, issue model.Issue) boo
 		return issueMatchesFuzzyText(issue, value)
 	case QueryFieldID:
 		return fuzzyTextMatch(issue.ID, value)
+	case QueryFieldBranch:
+		return strings.EqualFold(issue.ID, value)
 	case QueryFieldTitle:
 		return fuzzyTextMatch(issue.Title, value)
 	case QueryFieldStatus:

@@ -20,6 +20,20 @@ func TestIssueQueryPlainTextMatchesIDAndTitle(t *testing.T) {
 	}
 }
 
+func TestIssueQueryBranchMatchesOnlyTheExactID(t *testing.T) {
+	query := ParseIssueQuery("branch:Doc-25s.2")
+	for _, id := range []string{"doc-25s.2"} {
+		if !query.Matches(model.Issue{ID: id}) {
+			t.Errorf("branch:doc-25s.2 did not match %s", id)
+		}
+	}
+	for _, id := range []string{"doc-25s.2.1", "doc-25s.20", "doc-25s", "x-doc-25s.2"} {
+		if query.Matches(model.Issue{ID: id, Title: "doc-25s.2"}) {
+			t.Errorf("branch:doc-25s.2 matched %s", id)
+		}
+	}
+}
+
 func TestIssueQueryRejectsLongSparseSubsequence(t *testing.T) {
 	const raw = "assetdeasdfjsladkfjsadfjsadf"
 	issue := model.Issue{

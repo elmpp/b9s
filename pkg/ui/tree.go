@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -2561,20 +2562,29 @@ func (t *TreeModel) SelectedNode() *IssueTreeNode {
 	return nil
 }
 
-// SelectedBranchRootID returns the top-level ancestor of the selected node.
-// A standalone issue and a selected root both resolve to their own ID.
-func (t *TreeModel) SelectedBranchRootID() string {
+// SelectedBranchPathIDs returns the levels f steps through for the selected
+// node: its ancestors from the top-level root down, then the node itself when
+// it has children. A leaf adds nothing, because limiting the view to a single
+// row shows no branch. A standalone leaf resolves to itself alone.
+func (t *TreeModel) SelectedBranchPathIDs() []string {
 	node := t.SelectedNode()
-	if node == nil {
-		return ""
+	if node == nil || node.Issue == nil {
+		return nil
 	}
-	for node.Parent != nil {
-		node = node.Parent
+	var path []string
+	if len(node.Children) > 0 {
+		path = append(path, node.Issue.ID)
 	}
-	if node.Issue == nil {
-		return ""
+	for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
+		if ancestor.Issue != nil {
+			path = append(path, ancestor.Issue.ID)
+		}
 	}
-	return node.Issue.ID
+	if len(path) == 0 {
+		return []string{node.Issue.ID}
+	}
+	slices.Reverse(path)
+	return path
 }
 
 // MoveDown moves the cursor down in the flat list.

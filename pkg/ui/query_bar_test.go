@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -233,26 +234,40 @@ func TestTreeQuickFilterRemainsActiveWithCleanSearchBar(t *testing.T) {
 	}
 }
 
-func TestTreeFilterBranchShortcutUsesTopLevelParentID(t *testing.T) {
+func TestTreeFilterBranchShortcutCyclesDownTheParentPath(t *testing.T) {
 	issues := []model.Issue{
 		{ID: "epic-a", Title: "First epic", IssueType: model.TypeEpic, Status: model.StatusOpen},
-		childOf("feature-a", "Nested feature", "epic-a", model.TypeFeature, model.StatusOpen),
+		childOf("epic-a1", "Child epic", "epic-a", model.TypeEpic, model.StatusOpen),
+		childOf("feature-a", "Nested feature", "epic-a1", model.TypeFeature, model.StatusOpen),
 		childOf("task-a", "Nested task", "feature-a", model.TypeTask, model.StatusOpen),
+		childOf("leaf-x", "Leaf feature", "epic-a1", model.TypeFeature, model.StatusOpen),
+		childOf("feature-x", "Sibling feature", "epic-a", model.TypeFeature, model.StatusOpen),
 		{ID: "epic-b", Title: "Second epic", IssueType: model.TypeEpic, Status: model.StatusOpen},
 		childOf("task-b", "Other task", "epic-b", model.TypeTask, model.StatusOpen),
 		{ID: "standalone", Title: "Standalone task", IssueType: model.TypeTask, Status: model.StatusOpen},
 	}
 
+	type step struct {
+		query   string
+		visible []string
+	}
+	all := []string{"epic-a", "epic-a1", "feature-a", "task-a", "leaf-x", "feature-x", "epic-b", "task-b", "standalone"}
+	rootA := step{"branch:epic-a", []string{"epic-a", "epic-a1", "feature-a", "task-a", "leaf-x", "feature-x"}}
+	childA := step{"branch:epic-a1", []string{"epic-a", "epic-a1", "feature-a", "task-a", "leaf-x"}}
+	featureA := step{"branch:feature-a", []string{"epic-a", "epic-a1", "feature-a", "task-a"}}
+	cleared := step{"", all}
+
 	tests := []struct {
 		name       string
 		selectedID string
-		wantRootID string
-		wantIDs    []string
+		steps      []step
 	}{
-		{name: "nested task", selectedID: "task-a", wantRootID: "epic-a", wantIDs: []string{"epic-a", "feature-a", "task-a"}},
-		{name: "feature", selectedID: "feature-a", wantRootID: "epic-a", wantIDs: []string{"epic-a", "feature-a", "task-a"}},
-		{name: "top-level epic", selectedID: "epic-a", wantRootID: "epic-a", wantIDs: []string{"epic-a", "feature-a", "task-a"}},
-		{name: "standalone task", selectedID: "standalone", wantRootID: "standalone", wantIDs: []string{"standalone"}},
+		{name: "task under feature", selectedID: "task-a", steps: []step{rootA, childA, featureA, cleared}},
+		{name: "feature with children", selectedID: "feature-a", steps: []step{rootA, childA, featureA, cleared}},
+		{name: "leaf feature", selectedID: "leaf-x", steps: []step{rootA, childA, cleared}},
+		{name: "child epic", selectedID: "epic-a1", steps: []step{rootA, childA, cleared}},
+		{name: "top-level epic", selectedID: "epic-a", steps: []step{rootA, cleared}},
+		{name: "standalone task", selectedID: "standalone", steps: []step{{"branch:standalone", []string{"standalone"}}, cleared}},
 	}
 
 	for _, tt := range tests {
@@ -266,43 +281,93 @@ func TestTreeFilterBranchShortcutUsesTopLevelParentID(t *testing.T) {
 				t.Fatalf("could not select %q", tt.selectedID)
 			}
 
-			m = typeKeys(m, "f")
+			for i, want := range tt.steps {
+				m = typeKeys(m, "f")
 
-			if got := m.queryState.Text(); got != tt.wantRootID {
-				t.Fatalf("branch query = %q, want %q", got, tt.wantRootID)
-			}
-			if got := m.queryState.Mode(); got != QueryIdle {
-				t.Fatalf("query mode = %v, want accepted query", got)
-			}
-			bar := stripANSI(m.renderUnifiedTitleBar(100))
-			if !strings.Contains(bar, "/ "+tt.wantRootID) {
-				t.Fatalf("accepted query bar = %q, want root ID", bar)
-			}
-			if strings.Contains(bar, "█") {
-				t.Fatalf("accepted query bar = %q, want no editing cursor", bar)
-			}
-			gotIDs := treeVisibleIDs(&m.tree)
-			if strings.Join(gotIDs, ",") != strings.Join(tt.wantIDs, ",") {
-				t.Fatalf("visible branch = %v, want %v", gotIDs, tt.wantIDs)
-			}
-			if got := m.tree.GetSelectedID(); got != tt.selectedID {
-				t.Fatalf("first f selected %q, want original row %q", got, tt.selectedID)
-			}
-
-			m = typeKeys(m, "f")
-
-			if !m.queryState.Empty() || m.queryState.Text() != "" {
-				t.Fatalf("second f left branch query active: %q", m.queryState.Text())
-			}
-			if bar := m.renderUnifiedTitleBar(100); bar != "" {
-				t.Fatalf("second f left query bar visible: %q", stripANSI(bar))
-			}
-			if got := len(treeVisibleIDs(&m.tree)); got != len(issues) {
-				t.Fatalf("second f left %d visible issues, want all %d", got, len(issues))
-			}
-			if got := m.tree.GetSelectedID(); got != tt.selectedID {
-				t.Fatalf("second f selected %q, want original row %q", got, tt.selectedID)
+				if got := m.queryState.Text(); got != want.query {
+					t.Fatalf("press %d: branch query = %q, want %q", i+1, got, want.query)
+				}
+				bar := stripANSI(m.renderUnifiedTitleBar(100))
+				if want.query == "" {
+					if bar != "" {
+						t.Fatalf("press %d: query bar still visible: %q", i+1, bar)
+					}
+				} else {
+					if got := m.queryState.Mode(); got != QueryIdle {
+						t.Fatalf("press %d: query mode = %v, want accepted query", i+1, got)
+					}
+					if !strings.Contains(bar, "/ "+want.query) || strings.Contains(bar, "█") {
+						t.Fatalf("press %d: query bar = %q, want accepted %q", i+1, bar, want.query)
+					}
+				}
+				gotIDs := treeVisibleIDs(&m.tree)
+				wantIDs := append([]string(nil), want.visible...)
+				sort.Strings(gotIDs)
+				sort.Strings(wantIDs)
+				if strings.Join(gotIDs, ",") != strings.Join(wantIDs, ",") {
+					t.Fatalf("press %d: visible = %v, want %v", i+1, gotIDs, want.visible)
+				}
+				if got := m.tree.GetSelectedID(); got != tt.selectedID {
+					t.Fatalf("press %d: selected %q, want original row %q", i+1, got, tt.selectedID)
+				}
 			}
 		})
+	}
+}
+
+// The ids repeat the dell-gb10 tree in which a feature's level kept showing a
+// sibling feature: 25s.2.1 is a child of 25s.1, and its id contains 25s.2.
+func TestTreeFilterBranchShortcutHidesIssuesWhoseIDContainsTheLevel(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "doc-25s", Title: "Prefill the defect form", IssueType: model.TypeEpic, Status: model.StatusOpen},
+		childOf("doc-25s.1", "Clean photo dataset", "doc-25s", model.TypeFeature, model.StatusOpen),
+		childOf("doc-25s.2.1", "Honest defect test set", "doc-25s.1", model.TypeTask, model.StatusClosed),
+		childOf("doc-25s.2.2", "Remove non-defect photos", "doc-25s.1", model.TypeTask, model.StatusOpen),
+		childOf("doc-25s.2", "Defect test runs", "doc-25s", model.TypeFeature, model.StatusOpen),
+		childOf("doc-e21.11", "Test infra defect recognition", "doc-25s.2", model.TypeTask, model.StatusClosed),
+		childOf("doc-e21.11.3", "Tune prompt form-v2", "doc-25s.2", model.TypeTask, model.StatusClosed),
+	}
+	m := NewModel(issues, "")
+	m.tree.Build(issues)
+	m.tree.ExpandAll()
+	m.focused = focusTree
+	m.treeViewActive = true
+	if !m.tree.SelectByID("doc-e21.11.3") {
+		t.Fatal("could not select doc-e21.11.3")
+	}
+
+	m = typeKeys(m, "f", "f")
+
+	if got := m.queryState.Text(); got != "branch:doc-25s.2" {
+		t.Fatalf("second f query = %q, want branch:doc-25s.2", got)
+	}
+	gotIDs := treeVisibleIDs(&m.tree)
+	sort.Strings(gotIDs)
+	want := "doc-25s,doc-25s.2,doc-e21.11,doc-e21.11.3"
+	if strings.Join(gotIDs, ",") != want {
+		t.Fatalf("second f visible = %v, want %s", gotIDs, want)
+	}
+}
+
+func TestTreeFilterBranchShortcutRestartsAtRootAfterAnotherQuery(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "epic-a", Title: "First epic", IssueType: model.TypeEpic, Status: model.StatusOpen},
+		childOf("feature-a", "Nested feature", "epic-a", model.TypeFeature, model.StatusOpen),
+		childOf("task-a", "Nested task", "feature-a", model.TypeTask, model.StatusOpen),
+	}
+	m := NewModel(issues, "")
+	m.tree.Build(issues)
+	m.tree.ExpandAll()
+	m.focused = focusTree
+	m.treeViewActive = true
+	m.setQueryText("Nested")
+	if !m.tree.SelectByID("task-a") {
+		t.Fatal("could not select task-a")
+	}
+
+	m = typeKeys(m, "f")
+
+	if got := m.queryState.Text(); got != "branch:epic-a" {
+		t.Fatalf("f after a typed query = %q, want branch:epic-a", got)
 	}
 }

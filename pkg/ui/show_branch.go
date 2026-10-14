@@ -8,8 +8,9 @@ import (
 )
 
 // ShowBranchMsg asks b9s to select an issue and limit the view to its
-// top-level branch, as f does for the cursor. It arrives from outside the
-// program (the control socket) as well as from the :branch command.
+// top-level branch, as the first f does for the cursor. It arrives from
+// outside the program (the control socket) as well as from the :branch
+// command.
 type ShowBranchMsg struct{ ID string }
 
 // ShowKnownBranchMsg is ShowBranchMsg for guessed ids, such as the words of a
@@ -111,9 +112,9 @@ func (m *Model) showBranch(id string) bool {
 	if !ok {
 		return false
 	}
-	if m.queryState.Text() != root {
+	if m.queryState.Text() != BranchQuery(root) {
 		m.queryState.StartEditing()
-		m.setQueryText(root)
+		m.setQueryText(BranchQuery(root))
 		m.queryState.Accept()
 	}
 	if !m.tree.SelectByID(id) {

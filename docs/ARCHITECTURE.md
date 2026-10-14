@@ -170,6 +170,8 @@ The root model owns one query string and parses it into an immutable `IssueQuery
 
 Plain words match issue IDs, titles and labels fuzzily and nothing else, so every hit is explained by data visible in its row. Predicates target `id`, `title`, `status`, `priority`, `type`, `label`, `assignee` and `project`. Values within one field combine with OR, fields and negations with AND, and priority is exact so `p1` never matches `p10`. An incomplete predicate adds no constraint. See [ADR 0002](adr/0002-use-global-fuzzy-matching-with-a-focused-search-field.md) and [ADR 0004](adr/0004-limit-plain-fuzzy-search-to-primary-fields.md).
 
+`branch:<id>` matches one issue by its exact ID, and the tree adds that issue's subtree as context. `f`, `:branch` and `b9s ctl branch` write it, so a level such as `bd-x.1` never pulls in `bd-x.10` or a reparented `bd-x.1.N`. See [ADR 0056](adr/0056-limit-the-branch-filter-with-an-exact-branch-predicate.md).
+
 The query runs against the loaded issues in memory. There is no round trip to the store, so results update on every keystroke.
 
 ## Writes go through bd

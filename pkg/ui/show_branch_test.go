@@ -38,8 +38,8 @@ func TestShowBranchMsg_TreeSelectsCollapsedIssueAndFiltersToItsBranch(t *testing
 
 	m, _ = sendMsg(t, m, ShowBranchMsg{ID: "task-a"})
 
-	if got := m.queryState.Text(); got != "epic-a" {
-		t.Fatalf("branch query = %q, want epic-a", got)
+	if got := m.queryState.Text(); got != "branch:epic-a" {
+		t.Fatalf("branch query = %q, want branch:epic-a", got)
 	}
 	if got := m.queryState.Mode(); got != QueryIdle {
 		t.Fatalf("query mode = %v, want accepted query", got)
@@ -58,7 +58,7 @@ func TestShowBranchMsg_RepeatKeepsTheFilterOn(t *testing.T) {
 	m, _ = sendMsg(t, m, ShowBranchMsg{ID: "task-a"})
 	m, _ = sendMsg(t, m, ShowBranchMsg{ID: "feature-a"})
 
-	if got := m.queryState.Text(); got != "epic-a" {
+	if got := m.queryState.Text(); got != "branch:epic-a" {
 		t.Fatalf("second request toggled the branch off: query = %q", got)
 	}
 	if got := m.tree.GetSelectedID(); got != "feature-a" {
@@ -66,7 +66,7 @@ func TestShowBranchMsg_RepeatKeepsTheFilterOn(t *testing.T) {
 	}
 
 	m, _ = sendMsg(t, m, ShowBranchMsg{ID: "task-b"})
-	if got := m.queryState.Text(); got != "epic-b" {
+	if got := m.queryState.Text(); got != "branch:epic-b" {
 		t.Fatalf("query = %q, want the other branch epic-b", got)
 	}
 }
@@ -99,7 +99,7 @@ func TestShowBranchMsg_UnknownIDWaitsForTheReloadThatAddsIt(t *testing.T) {
 	issues := append(showBranchTreeIssues(), childOf("task-new", "Fresh task", "epic-b", model.TypeTask, model.StatusOpen))
 	m, _ = sendMsg(t, m, SnapshotReadyMsg{Snapshot: NewSnapshotBuilder(issues).Build()})
 
-	if got := m.queryState.Text(); got != "epic-b" {
+	if got := m.queryState.Text(); got != "branch:epic-b" {
 		t.Fatalf("query after reload = %q, want epic-b", got)
 	}
 	if got := m.tree.GetSelectedID(); got != "task-new" {
@@ -128,8 +128,8 @@ func TestBranchCommandShowsTheNamedIssuesBranch(t *testing.T) {
 
 	m = typeKeys(m, ":", "b", "r", "a", "n", "c", "h", " ", "t", "a", "s", "k", "-", "a", "enter")
 
-	if got := m.queryState.Text(); got != "epic-a" {
-		t.Fatalf(":branch task-a query = %q, want epic-a", got)
+	if got := m.queryState.Text(); got != "branch:epic-a" {
+		t.Fatalf(":branch task-a query = %q, want branch:epic-a", got)
 	}
 	if got := m.tree.GetSelectedID(); got != "task-a" {
 		t.Fatalf(":branch selected %q, want task-a", got)
@@ -151,7 +151,7 @@ func TestShowKnownBranchMsg_ShowsTheFirstLoadedIDAndIgnoresTheRest(t *testing.T)
 
 	m, cmd := sendMsg(t, m, ShowKnownBranchMsg{IDs: []string{"follow-up", "task-b", "task-a"}})
 
-	if got := m.queryState.Text(); got != "epic-b" {
+	if got := m.queryState.Text(); got != "branch:epic-b" {
 		t.Fatalf("branch query = %q, want epic-b", got)
 	}
 	if got := m.tree.GetSelectedID(); got != "task-b" {

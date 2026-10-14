@@ -102,7 +102,7 @@ The tree is always present. Every issue sits under its parent, and an issue with
 | `o`, `C`, `r`, `a` | Show open, closed, ready or all issues |
 | `L`, `A` | Put the labels or the assignees on `1`-`9`; press a digit to filter, `a` to clear |
 | `F1` `F2` `F3` `F4` | Show only epics, features, tasks or bugs. The key writes `type:<name>` into the search query in place of any other type term and keeps every other term; the same key again removes it. `Esc` clears the whole query. Works in the list, tree and board, and the header's type legend shows the keys. Help is on `?` only |
-| `f` | Show only the top-level branch of the issue under the cursor. Press again to undo |
+| `f` | Show only the top-level branch of the issue under the cursor. Each further press steps one parent down the path to that issue (epic, child epic, feature), skipping an issue without children, and the press after the lowest one shows the whole tree again |
 | `x` | Show only the subtree of the issue under the cursor. Press again to undo |
 | `F` | Follow: when another agent changes an issue, move the cursor to it |
 
@@ -191,8 +191,9 @@ A predicate narrows one field:
 | `label:` | `label:ui` |
 | `assignee:` | `assignee:andre` |
 | `project:` | `project:b9s` |
+| `branch:` | `branch:bd-7rt1.2` |
 
-Different fields combine with AND. Repeated values for one field combine with OR. `!` excludes a match. Priority is exact, so `p1` does not match `p10`. An incomplete predicate such as `label:` adds no constraint, so the list stays visible until you type a value.
+Different fields combine with AND. Repeated values for one field combine with OR. `!` excludes a match. Priority is exact, so `p1` does not match `p10`. `branch:` is exact too: it names one issue by its full ID, and the tree shows that issue with its subtree and its parents. `f` and `:branch` write it, because a fuzzy `bd-x.1` would also show `bd-x.10` and every `bd-x.1.N` ([ADR 0056](adr/0056-limit-the-branch-filter-with-an-exact-branch-predicate.md)). An incomplete predicate such as `label:` adds no constraint, so the list stays visible until you type a value.
 
 ```text
 status:open status:blocked type:epic     open or blocked epics
@@ -563,7 +564,7 @@ Opening a graph workspace with plain `b9s` loads its Issues from the workspace's
 | `:mouse` | | Hand the mouse to the terminal, or take it back |
 | `:layout` | | Stack the detail pane below the tree, or put it back to the right |
 | `:wrap` | | Wrap long titles onto extra lines, or truncate them again, as `v` does |
-| `:branch <id>` | | Select the issue and show only its top-level branch, as `f` does. The short id shown on screen works too |
+| `:branch <id>` | | Select the issue and show only its top-level branch, as the first `f` does. The short id shown on screen works too |
 
 ## Steering b9s from another program
 

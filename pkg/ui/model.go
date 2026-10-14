@@ -3596,7 +3596,8 @@ func (m Model) handleBoardKeys(msg tea.KeyMsg) Model {
 		m.board.NextEpic()
 		m.syncBoardToDetail()
 
-	// f shows only the selected card's top-level branch, as f does in the tree.
+	// f shows only the selected card's top-level branch, as the first f does in
+	// the tree.
 	case "f":
 		if root := m.board.ToggleBranch(); root != "" {
 			m.statusMsg = "Branch " + root + " · f shows the whole board"
@@ -5586,13 +5587,28 @@ func (m *Model) setQueryText(text string) {
 	m.syncTreeToDetail()
 }
 
+// filterSelectedTreeBranch limits the tree to one level of the selected
+// issue's parent path per press, from the top-level root down, and shows the
+// whole tree after the lowest level. Any query that is not a level of this
+// path starts the cycle again at the root.
 func (m *Model) filterSelectedTreeBranch() {
 	selectedID := m.tree.GetSelectedID()
-	rootID := m.tree.SelectedBranchRootID()
-	if rootID == "" {
+	path := m.tree.SelectedBranchPathIDs()
+	if len(path) == 0 {
 		return
 	}
-	if m.queryState.Text() == rootID {
+	next := BranchQuery(path[0])
+	for i, id := range path {
+		if m.queryState.Text() != BranchQuery(id) {
+			continue
+		}
+		next = ""
+		if i < len(path)-1 {
+			next = BranchQuery(path[i+1])
+		}
+		break
+	}
+	if next == "" {
 		m.queryState.Clear()
 		m.setQueryText("")
 		if m.tree.SelectByID(selectedID) {
@@ -5601,7 +5617,7 @@ func (m *Model) filterSelectedTreeBranch() {
 		return
 	}
 	m.queryState.StartEditing()
-	m.setQueryText(rootID)
+	m.setQueryText(next)
 	m.queryState.Accept()
 	if m.tree.SelectByID(selectedID) {
 		m.syncTreeToDetail()
@@ -5649,7 +5665,7 @@ func (m Model) queryCompletions() []string {
 	}
 
 	if !strings.Contains(lookupToken, ":") {
-		fields := []string{"assignee:", "id:", "label:", "priority:", "project:", "status:", "title:", "type:"}
+		fields := []string{"assignee:", "branch:", "id:", "label:", "priority:", "project:", "status:", "title:", "type:"}
 		matches := make(map[string]string)
 		addMatch := func(value string) {
 			if value == "" || !strings.HasPrefix(strings.ToLower(value), strings.ToLower(lookupToken)) {
@@ -5689,7 +5705,7 @@ func (m Model) queryCompletions() []string {
 	}
 	for _, issue := range m.issues {
 		switch field {
-		case QueryFieldID:
+		case QueryFieldID, QueryFieldBranch:
 			add(issue.ID)
 		case QueryFieldTitle:
 			for _, term := range queryCompletionTerms(issue.Title) {
