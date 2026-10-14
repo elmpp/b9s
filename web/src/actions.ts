@@ -66,14 +66,20 @@ export function flash(id: string): void {
 
 /* ================= writes ================= */
 
+/** closeLine is a close's bd commands: the comment on each issue first, when there is one. */
+function closeLine(r: WriteRequest, ids: string, q: (s: string) => string): string {
+  const close = `bd close ${ids}${r.reason ? ` --reason=${q(r.reason)}` : ""}`;
+  return r.text ? `bd comments add ${q(r.text)}; ${close}` : close;
+}
+
 /** describe renders the bd command a request asks for, for the toast and the write log. */
 export function describe(r: WriteRequest): string {
   const ids = (r.ids || []).join(" ");
   const q = (s: string) => JSON.stringify(s.length > 40 ? s.slice(0, 40) + "…" : s);
   const flags = (f: Record<string, string> = {}) => Object.entries(f).map(([k, v]) => `--${k}=${v.includes(" ") || !v ? q(v) : v}`).join(" ");
   switch (r.op) {
-    case "status": return r.status === "closed" ? `bd close ${ids}${r.reason ? ` --reason=${q(r.reason)}` : ""}` : `bd update ${ids} --status=${r.status}`;
-    case "close": return `bd close ${ids}${r.reason ? ` --reason=${q(r.reason)}` : ""}`;
+    case "status": return r.status === "closed" ? closeLine(r, ids, q) : `bd update ${ids} --status=${r.status}`;
+    case "close": return closeLine(r, ids, q);
     case "delete": return `bd delete ${ids} --force`;
     case "update": return `bd update ${ids} ${flags(r.fields)}`;
     case "create": return `bd create ${flags(r.fields)}`;
@@ -146,10 +152,11 @@ async function restoreStatus(snap: StatusSnap): Promise<void> {
   if (ok) toast("Undone", [...groups].map(([s, ids]) => describe({ op: "status", ids, status: s })).join("; "));
 }
 
-export async function setStatus(ids: string[], status: string, reason?: string): Promise<void> {
+/** setStatus sets ids to status. A close's comment is added to each issue before bd closes them. */
+export async function setStatus(ids: string[], status: string, comment?: string): Promise<void> {
   if (readOnly() || !ids.length) return;
   const snap = snapStatus(ids);
-  const req: WriteRequest = { op: "status", ids, status, reason: reason || undefined };
+  const req: WriteRequest = { op: "status", ids, status, text: comment || undefined };
   const res = await send(req, () => localStatus(ids, status));
   if (!res.ok) return;
   const who = ids.length > 1 ? ids.length + " issues" : shortId(ids[0]);
@@ -400,11 +407,11 @@ function sheetBody(sh: Sheet): [string, string, string] {
       const ids = sh.ids || [sh.id!];
       const cur = ids.length === 1 && get(ids[0]) ? get(ids[0])!.status : null;
       return [ids.length > 1 ? ids.length + " issues" : "Status", ids.length > 1 ? "bd update --status on every marked issue" : `${esc(shortId(ids[0]))} · ${esc(get(ids[0])?.t || "")}`,
-        SETTABLE.map(s => opt("setstatus", ST[s].g, ST[s].w, s === "blocked" ? "stored as blocked; b9s also derives it from open blockers" : s === "closed" ? "asks for a reason" : "", { val: s, color: ST[s].c, cls: cur === s ? "cur" : "" })).join("")
+        SETTABLE.map(s => opt("setstatus", ST[s].g, ST[s].w, s === "blocked" ? "stored as blocked; b9s also derives it from open blockers" : s === "closed" ? "asks for a comment" : "", { val: s, color: ST[s].c, cls: cur === s ? "cur" : "" })).join("")
         + opt("defer", "◌", "Defer until…", "bd defer, with an optional date", { color: "var(--orange)" })];
     }
-    case "closereason": return ["Close " + (sh.ids!.length > 1 ? sh.ids!.length + " issues" : esc(shortId(sh.ids![0]))), "The reason goes to bd close --reason",
-      `<div class="form"><label>Reason<textarea id="fReason" placeholder="Done: what shipped and where"></textarea></label></div><div class="fbtns"><button data-sa="cancel">Cancel</button><button class="pri" data-sa="doclose">Close</button></div>`];
+    case "closereason": return ["Close " + (sh.ids!.length > 1 ? sh.ids!.length + " issues" : esc(shortId(sh.ids![0]))), (sh.ids!.length > 1 ? "bd comments add on each issue, then bd close" : "bd comments add, then bd close") + "; leave it empty to close without one",
+      `<div class="form"><label>Comment<textarea id="fCloseComment" placeholder="Done: what shipped and where"></textarea></label></div><div class="fbtns"><button data-sa="cancel">Cancel</button><button class="pri" data-sa="doclose">Close</button></div>`];
     case "defer": return ["Defer " + esc(shortId(sh.id!)), "bd defer; leave the date empty to defer without one",
       `<div class="form"><label>Until<input id="fUntil" type="date"></label></div><div class="fbtns"><button data-sa="cancel">Cancel</button><button class="pri" data-sa="dodefer">Defer</button></div>`];
     case "actions": {
@@ -576,10 +583,10 @@ export async function sheetAction(a: string, val: string | undefined): Promise<v
       break;
     }
     case "doclose": {
-      const r = $<HTMLTextAreaElement>("#fReason").value.trim(), ids = sh.ids!;
+      const text = $<HTMLTextAreaElement>("#fCloseComment").value.trim(), ids = sh.ids!;
       closeSheet();
       if (ids.length > 1 || S.marking) endMarking();
-      await setStatus(ids, "closed", r);
+      await setStatus(ids, "closed", text);
       break;
     }
     case "defer": openSheet("defer", { id: sh.id || (sh.ids && sh.ids[0]) }); break;

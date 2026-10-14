@@ -18,13 +18,19 @@ test.describe("writing through bd", () => {
     await expect.poll(() => statusOf(project, "t-5")).toBe("open");
   });
 
-  test("long swipe right opens the status picker; closed asks for a reason", async ({ page, project }) => {
+  test("long swipe right opens the status picker; closed asks for a comment it shows", async ({ page, project }) => {
     await open(page, project);
     await swipe(page, "t-2", 0.65);
     await page.locator('.msheet [data-sa="setstatus"][data-val="closed"]').click();
-    await page.locator("#fReason").fill("Shipped in the web UI");
+    await page.locator("#fCloseComment").fill("Shipped in the web UI");
     await page.locator('[data-sa="doclose"]').click();
-    await expect.poll(() => project.issues().find(i => i.id === "t-2")?.close_reason).toBe("Shipped in the web UI");
+    await expect.poll(() => statusOf(project, "t-2")).toBe("closed");
+    const calls = project.calls();
+    const commented = calls.findIndex(c => c[0] === "comments" && c.includes("t-2") && c.includes("Shipped in the web UI"));
+    expect(commented).toBeGreaterThanOrEqual(0);
+    expect(calls.findIndex(c => c[0] === "close" && c.includes("t-2"))).toBeGreaterThan(commented);
+    const comments = project.issues().find(i => i.id === "t-2")?.comments as { text: string }[];
+    expect(comments.map(c => c.text)).toContain("Shipped in the web UI");
   });
 
   test("edit sends only changed fields", async ({ page, project }) => {

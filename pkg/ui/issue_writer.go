@@ -127,17 +127,32 @@ func (w *IssueWriter) CloseIssue(id, reason string) tea.Cmd {
 // so a failed comment leaves the issue open with nothing lost. An empty
 // comment closes without one.
 func (w *IssueWriter) CloseIssueWithComment(id, comment string) tea.Cmd {
-	if strings.TrimSpace(comment) == "" {
-		return w.CloseIssue(id, "")
+	return w.CloseIssuesWithComment([]string{id}, comment)
+}
+
+// CloseIssuesWithComment adds comment to every id, one bd call each, and then
+// closes them all. The close runs only once every comment has landed, so a
+// failure leaves every issue open. An empty comment closes without one.
+func (w *IssueWriter) CloseIssuesWithComment(ids []string, comment string) tea.Cmd {
+	closeIssues := w.CloseIssues(ids)
+	if len(ids) == 1 {
+		closeIssues = w.CloseIssue(ids[0], "")
 	}
-	addComment := w.AddComment(id, comment)
-	closeIssue := w.CloseIssue(id, "")
+	if strings.TrimSpace(comment) == "" {
+		return closeIssues
+	}
+	comments := make([]tea.Cmd, len(ids))
+	for i, id := range ids {
+		comments[i] = w.AddComment(id, comment)
+	}
 	return func() tea.Msg {
-		msg := addComment()
-		if result, ok := msg.(BdResultMsg); !ok || !result.Success {
-			return msg
+		for _, addComment := range comments {
+			msg := addComment()
+			if result, ok := msg.(BdResultMsg); !ok || !result.Success {
+				return msg
+			}
 		}
-		return closeIssue()
+		return closeIssues()
 	}
 }
 

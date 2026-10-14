@@ -109,7 +109,7 @@ func (s *Server) planWrite(req WriteRequest) (writePlan, error) {
 			return nil, fmt.Errorf("unknown status %q", req.Status)
 		}
 		if req.Status == "closed" {
-			return closePlan(ids, req.Reason), nil
+			return closePlan(ids, req.Reason, req.Text)
 		}
 		if len(ids) == 1 {
 			return func(w *ui.IssueWriter) tea.Cmd { return w.SetStatus(ids[0], req.Status) }, nil
@@ -120,7 +120,7 @@ func (s *Server) planWrite(req WriteRequest) (writePlan, error) {
 		if err := needIDs(false); err != nil {
 			return nil, err
 		}
-		return closePlan(ids, req.Reason), nil
+		return closePlan(ids, req.Reason, req.Text)
 
 	case OpDelete:
 		if err := needIDs(false); err != nil {
@@ -178,7 +178,20 @@ func (s *Server) planWrite(req WriteRequest) (writePlan, error) {
 	return nil, fmt.Errorf("unknown write %q", req.Op)
 }
 
-func closePlan(ids []string, reason string) writePlan {
+// closePlan closes ids. A comment is added to each issue first, as the TUI's
+// Comment and close does, so it shows in the issue's comments; a reason goes
+// to bd close --reason, which b9s does not display.
+func closePlan(ids []string, reason, comment string) (writePlan, error) {
+	if strings.TrimSpace(comment) != "" {
+		if reason != "" {
+			return nil, errors.New("a close takes a comment or a reason, not both")
+		}
+		return func(w *ui.IssueWriter) tea.Cmd { return w.CloseIssuesWithComment(ids, comment) }, nil
+	}
+	return closePlanWithReason(ids, reason), nil
+}
+
+func closePlanWithReason(ids []string, reason string) writePlan {
 	if len(ids) == 1 {
 		return func(w *ui.IssueWriter) tea.Cmd { return w.CloseIssue(ids[0], reason) }
 	}

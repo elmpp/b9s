@@ -129,6 +129,7 @@ func TestInvalidWritesNeverReachBd(t *testing.T) {
 		`{"op":"defer","ids":["t-1"],"until":"--x"}`,
 		`{"op":"sync"}`,
 		`{"op":"close","ids":["t-1"],"extra":1}`,
+		`{"op":"close","ids":["t-1"],"reason":"r","text":"c"}`,
 		`not json`,
 	}
 	for _, body := range bodies {
@@ -223,5 +224,51 @@ func TestIdempotencyEvictsOldest(t *testing.T) {
 	expired.put("x", WriteResult{})
 	if _, ok := expired.get("x"); ok {
 		t.Error("expired key returned")
+	}
+}
+
+// A close with text matches the TUI's Comment and close: the text becomes a
+// comment on every issue, and the close runs only after all of them landed.
+func TestCloseWithTextCommentsThenCloses(t *testing.T) {
+	cases := []struct {
+		body  string
+		calls []string
+	}{
+		{`{"op":"status","ids":["t-3"],"status":"closed","text":"shipped in v2"}`,
+			[]string{"comments add t-3 -- shipped in v2", "close t-3"}},
+		{`{"op":"close","ids":["t-1","t-3"],"text":"done"}`,
+			[]string{"comments add t-1 -- done", "comments add t-3 -- done", "close t-1 t-3"}},
+		{`{"op":"status","ids":["t-1","t-3"],"status":"closed","text":"  "}`,
+			[]string{"close t-1 t-3"}},
+	}
+	for _, tc := range cases {
+		writer, log := fakeBd(t)
+		ts := newTestServer(t, nil, writer)
+		code, res := postWrite(t, ts, ts.Client(), tc.body)
+		if code != http.StatusOK || !res.OK {
+			t.Fatalf("%s: %d %+v", tc.body, code, res)
+		}
+		var got []string
+		for _, call := range bdCalls(t, log) {
+			_, args, _ := strings.Cut(call, "|")
+			got = append(got, args)
+		}
+		if strings.Join(got, "\n") != strings.Join(tc.calls, "\n") {
+			t.Errorf("%s: bd ran %q, want %q", tc.body, got, tc.calls)
+		}
+	}
+}
+
+func TestCloseStaysOpenWhenTheCommentFails(t *testing.T) {
+	writer, log := fakeBd(t)
+	ts := newTestServer(t, nil, writer)
+	_, res := postWrite(t, ts, ts.Client(), `{"op":"close","ids":["t-1","t-3"],"text":"fail"}`)
+	if res.OK {
+		t.Fatalf("a failed comment reported success: %+v", res)
+	}
+	for _, call := range bdCalls(t, log) {
+		if _, args, _ := strings.Cut(call, "|"); strings.HasPrefix(args, "close") {
+			t.Fatalf("bd closed after a failed comment: %q", args)
+		}
 	}
 }

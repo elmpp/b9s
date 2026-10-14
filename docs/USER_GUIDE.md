@@ -786,7 +786,7 @@ The chips under the header are the status filters and the Ready filter from the 
 | Tap ▾ or ▸ | Fold or unfold | `Tab` |
 | Double-tap ▾ | Fold the whole subtree | `h` / `l` |
 | Short swipe right | Start, or stop when in progress | `S` |
-| Long swipe right | Status picker | `S` |
+| Long swipe right | Status picker. Closed asks for an optional comment, which b9s adds to each issue before it closes them, as `C` in the TUI close dialog does | `S` |
 | Short swipe left | Close, with 5 s to undo | `K` |
 | Long swipe left | Action sheet: edit, comment, defer, copy, focus, graph, mark, child, delete | `e` `c` `y` `f` `x` |
 | Long-press a row | Mark it; then tap more rows | `Space` |
