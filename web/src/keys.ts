@@ -14,7 +14,7 @@
 //               └─ tree keys           otherwise
 
 import {
-  act, chipTap, closeDetail, closeSheet, copyIssueMarkdown, markRange, openDetail, openSheet, readOnly,
+  act, chipTap, closeDetail, closeSheet, showTree, copyIssueMarkdown, markRange, openDetail, openSheet, readOnly,
   setFocus, setStatus, switchProject, toast, toggleMark,
 } from "./actions";
 import * as api from "./api";
@@ -140,10 +140,7 @@ function globalKey(k: string): boolean {
     case "b": S.view = S.view === "board" ? "tree" : "board"; S.detail = null; render(); return true;
     case "M": S.view = S.view === "memory" ? "tree" : "memory"; S.detail = null; render(); return true;
     case "t": case "T":
-      if (S.view !== "tree") { S.view = "tree"; render(); return true; }
-      S.list = !S.list; store.set("list", S.list); render();
-      if (S.cursor) ensureVisible(S.cursor);
-      toast(S.list ? "Flat list" : "Tree");
+      showTree();
       return true;
     case "g": {
       const c = S.cursor && get(S.cursor);

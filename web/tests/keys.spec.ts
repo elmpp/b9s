@@ -455,6 +455,30 @@ test.describe("view keys", () => {
     await expect(row(page, "t-1").locator(".rc")).toHaveAttribute("style", "--d:1");
     await expect(row(page, "t-epic").locator("[data-chev]")).toBeVisible();
   });
+
+  test("the active Tree tab switches to the flat list, and again to the tree", async ({ page, project }) => {
+    await open(page, project);
+    const tab = page.locator('#bar [data-view="tree"]');
+    await expect(tab).toHaveText(/Tree/);
+    await tab.click();
+    await expect(page.locator("#treeRows [data-chev]")).toHaveCount(0);
+    await expect(row(page, "t-1").locator(".rc")).toHaveAttribute("style", "--d:0");
+    await expect(tab).toHaveText(/List/);
+    await expect(tab).toHaveAttribute("aria-current", "page");
+    await tab.click();
+    await expect(row(page, "t-1").locator(".rc")).toHaveAttribute("style", "--d:1");
+    await expect(tab).toHaveText(/Tree/);
+  });
+
+  test("the Tree tab from another view opens the tree pane as it was", async ({ page, project }) => {
+    await open(page, project);
+    await page.keyboard.press("t");
+    await page.locator('#bar [data-view="board"]').click();
+    await expect(page.locator("#vBoard")).toBeVisible();
+    await page.locator('#bar [data-view="tree"]').click();
+    await expect(page.locator("#vTree")).toBeVisible();
+    await expect(page.locator("#treeRows [data-chev]")).toHaveCount(0);
+  });
 });
 
 // PageDown and PageUp are the TUI's pgdown and pgup: the tree's Ctrl-F and

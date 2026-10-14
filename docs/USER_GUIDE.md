@@ -787,6 +787,7 @@ The chips under the header are the status filters and the Ready filter from the 
 |---------|--------|---------|
 | Tap a row | Open the detail at full height | `Enter` |
 | Tap ▾ or ▸ | Fold or unfold | `Tab` |
+| Tap **Tree** while the tree shows | Show the flat list, and the tab reads **List**. Tap it again for the tree. From another view the tab opens the tree pane in the layout it last had | `t` |
 | Double-tap ▾ | Fold the whole subtree | `h` / `l` |
 | Short swipe right | Start, or stop when in progress | `S` |
 | Long swipe right | Status picker. Closed asks for an optional comment, which b9s adds to each issue before it closes them, as `C` in the TUI close dialog does | `S` |

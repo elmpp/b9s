@@ -4,7 +4,7 @@
 import { D, eff, get, laneOf } from "./data";
 import {
   act, applySuggestion, chipTap, closeDetail, closeMenu, closeSheet, foldSubtree, menuAction, menuKey, menuOpen, moveCard,
-  nextStatus, openDetail, openMenu, openSheet, reload, setStatus, sheetAction, swipeRightLabel, tabTap, toast, toggleMark,
+  nextStatus, openDetail, openMenu, openSheet, reload, setStatus, sheetAction, swipeRightLabel, showTree, tabTap, toast, toggleMark,
   markRange, hideToast,
 } from "./actions";
 import { adoptCursor, onKey } from "./keys";
@@ -467,6 +467,7 @@ function bindClicks(): void {
     if (t.closest(".row, .card, .bcol, .wboard") || (t.closest("#tabs") && !t.closest("[data-act]"))) return;
     const v = t.closest<HTMLElement>("[data-view]");
     if (v) {
+      if (v.dataset.view === "tree") { showTree(); return; }
       S.view = v.dataset.view as typeof S.view;
       if (S.view === "search") $<HTMLInputElement>("#sIn").value = S.text;
       render();

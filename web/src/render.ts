@@ -176,7 +176,7 @@ function renderBar(): void {
     const on = S.view === v || (v === "more" && S.view === "graph");
     return `<button class="${on ? "on" : ""}" data-view="${v}" aria-current="${on ? "page" : "false"}"><span class="g" aria-hidden="true">${g}</span>${l}</button>`;
   };
-  el.innerHTML = brand + tab("tree", "≣", "Tree") + tab("board", "▥", "Board") + tab("memory", "◇", "Memory") + tab("search", "⌕", "Search") + tab("more", "⋯", "More") + foot;
+  el.innerHTML = brand + (S.list ? tab("tree", "☰", "List") : tab("tree", "≣", "Tree")) + tab("board", "▥", "Board") + tab("memory", "◇", "Memory") + tab("search", "⌕", "Search") + tab("more", "⋯", "More") + foot;
 }
 
 export function renderStale(): void {

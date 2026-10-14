@@ -328,6 +328,18 @@ export function openSheet(kind: string, data: Partial<Sheet> = {}): void {
   syncSoon();
 }
 
+/**
+ * showTree is the t key and the Tree tab: from another view it opens the tree
+ * pane in its saved layout, and in the tree pane it switches between the tree
+ * and the flat list (ADR 0027).
+ */
+export function showTree(): void {
+  if (S.view !== "tree") { S.view = "tree"; render(); return; }
+  S.list = !S.list; store.set("list", S.list); render();
+  if (S.cursor) ensureVisible(S.cursor);
+  toast(S.list ? "Flat list" : "Tree");
+}
+
 export function closeSheet(): void {
   $opt(".msheet")?.classList.remove("on");
   $opt(".backdrop")?.classList.remove("on");
