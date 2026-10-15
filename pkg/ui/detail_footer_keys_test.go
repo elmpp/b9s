@@ -43,6 +43,7 @@ var footerKeyPress = map[string]tea.KeyMsg{
 	"^R":       {Type: tea.KeyCtrlR},
 	"n/p":      {Type: tea.KeyRunes, Runes: []rune("n")},
 	"e":        {Type: tea.KeyRunes, Runes: []rune("e")},
+	"s":        {Type: tea.KeyRunes, Runes: []rune("s")},
 	"c":        {Type: tea.KeyRunes, Runes: []rune("c")},
 	"O":        {Type: tea.KeyRunes, Runes: []rune("O")},
 	"?":        {Type: tea.KeyRunes, Runes: []rune("?")},
@@ -54,19 +55,31 @@ var footerKeyPress = map[string]tea.KeyMsg{
 }
 
 // effectOf is everything a key press may change that the user can see.
+// The bottom of the detail counts too: the user scrolls there to read comments.
 func effectOf(m Model) string {
-	return fmt.Sprintf("%v|%v|%v|%v|%q|%d|%s|%s",
+	bottom := m.viewport
+	bottom.GotoBottom()
+	return fmt.Sprintf("%v|%v|%v|%v|%q|%d|%s|%s|%s",
 		m.focused, m.showEditModal, m.pickerMode, m.pickerVisible,
-		m.statusMsg, m.viewport.YOffset, m.TreeSelectedID(), stripANSI(m.View()))
+		m.statusMsg, m.viewport.YOffset, m.TreeSelectedID(), stripANSI(m.View()),
+		stripANSI(bottom.View()))
 }
 
 func detailFooterIssues() []model.Issue {
 	now := time.Now()
+	// Two comments give the comment-order key something visible to reorder.
+	comments := func(id string) []*model.Comment {
+		return []*model.Comment{
+			{ID: id + "-c1", IssueID: id, Author: "a", Text: "First comment", CreatedAt: now.Add(-2 * time.Hour)},
+			{ID: id + "-c2", IssueID: id, Author: "b", Text: "Second comment", CreatedAt: now.Add(-time.Hour)},
+		}
+	}
 	child := func(id, parent string, age int) model.Issue {
 		return model.Issue{
 			ID: id, Title: "Title " + id, Status: model.StatusOpen, IssueType: model.TypeTask,
 			Priority: 2, CreatedAt: now.Add(time.Duration(age) * time.Second),
 			Description: strings.Repeat("A line of description.\n\n", 60),
+			Comments:    comments(id),
 			Dependencies: []*model.Dependency{
 				{IssueID: id, DependsOnID: parent, Type: model.DepParentChild},
 			},
@@ -74,7 +87,8 @@ func detailFooterIssues() []model.Issue {
 	}
 	return []model.Issue{
 		{ID: "ep-1", Title: "Epic", Status: model.StatusOpen, IssueType: model.TypeEpic, Priority: 1,
-			CreatedAt: now.Add(9 * time.Second), Description: strings.Repeat("Epic line.\n\n", 60)},
+			CreatedAt: now.Add(9 * time.Second), Description: strings.Repeat("Epic line.\n\n", 60),
+			Comments: comments("ep-1")},
 		child("ch-1", "ep-1", 5),
 		child("ch-2", "ep-1", 4),
 		child("gc-1", "ch-1", 3),
