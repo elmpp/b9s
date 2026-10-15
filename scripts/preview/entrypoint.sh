@@ -7,6 +7,8 @@ set -eu
 : "${B9S_DOLT_PORT:?required}"
 : "${B9S_DOLT_READ_USER:?required}"
 : "${B9S_DOLT_READ_PASSWORD:?required}"
+: "${PREVIEW_VIEWER_HEADER:?required}"
+: "${PREVIEW_VIEWER:?required}"
 
 case "$B9S_DOLT_HOST" in
   *[!A-Za-z0-9._:-]*|'') printf 'invalid B9S_DOLT_HOST\n' >&2; exit 1 ;;
@@ -19,9 +21,7 @@ case "$B9S_DOLT_READ_USER" in
 esac
 
 commit_sha="$(sed -n '1p' /app/.commit-sha)"
-mkdir -p /data/projects /tmp/.config/b9s /www/b9s /www/cgi-bin
-cp /usr/local/share/b9s-preview/mobile.html /www/b9s/index.html
-cp /usr/local/share/b9s-preview/mobile-key.cgi /www/cgi-bin/b9s-key
+mkdir -p /data/projects /tmp/.config/b9s /www
 
 export HOME=/tmp
 export TERM=xterm-256color
@@ -77,10 +77,12 @@ fi
 export BEADS_DIR="/data/projects/$current_database/.beads"
 printf '{"commit":"%s","taskId":"%s","namespace":"%s","databaseCount":%s}\n' \
   "$commit_sha" "$PREVIEW_TASK_ID" "$PREVIEW_NAMESPACE" "$database_count" > /www/__preview
-cp /www/__preview /www/b9s/__preview
-
 httpd -f -p 7682 -h /www &
-tmux new-session -d -s b9s /usr/local/bin/b9s
+
+# The terminal UI waits in a detached session. A reviewer or the deployer
+# attaches with kubectl exec, so the TUI is tested in a real terminal and
+# never through a browser.
+tmux new-session -d -s b9s -c "/data/projects/$current_database" /usr/local/bin/b9s
 
 (
   attempts=0
@@ -94,13 +96,9 @@ tmux new-session -d -s b9s /usr/local/bin/b9s
   done
 ) &
 
-ttyd --writable -p 7681 \
-  -t disableLeaveAlert=true \
-  -t 'theme={"background":"#18181b"}' \
-  tmux attach-session -t b9s &
-
-exec ttyd --writable -p 7683 \
-  --base-path /b9s/terminal \
-  -t disableLeaveAlert=true \
-  -t 'theme={"background":"#18181b"}' \
-  tmux attach-session -t b9s
+# Only the ingress reaches this port, and the ingress middleware sets the
+# viewer header on every request, replacing any copy a client sent (ADR 0021).
+cd "/data/projects/$current_database"
+exec /usr/local/bin/b9s web --listen 0.0.0.0:7681 \
+  --trust-header "$PREVIEW_VIEWER_HEADER" --owner "$PREVIEW_VIEWER" \
+  --projects-root /data/projects

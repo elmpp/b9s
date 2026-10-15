@@ -2,7 +2,8 @@
 type: ADR
 id: "0005"
 title: "Bridge mobile controls through a shared terminal session"
-status: active
+status: superseded
+superseded_by: "0058"
 date: 2026-09-13
 ---
 

@@ -27,6 +27,8 @@ export PREVIEW_RUNNER_NAMESPACE=runners
 export PREVIEW_WORKLOAD_ROLE=preview-workloads
 export PREVIEW_DEPLOYER_SA='platform/preview-deployer-{project}'
 export PREVIEW_READER_REF='{project}-reader'
+export PREVIEW_VIEWER_HEADER=X-Example-Viewer
+export PREVIEW_VIEWER=viewer@example.invalid
 
 # Exercise the real Git boundary in disposable fixture repositories. These
 # fixtures never invoke an image builder or use Kubernetes credentials.
@@ -104,16 +106,21 @@ done
 
 if [[ -f $PREVIEW/Dockerfile ]]; then ok "preview image has a Dockerfile"; else bad "preview image has a Dockerfile"; fi
 if [[ -f $PREVIEW/lib.sh ]]; then ok "preview commands share a contract library"; else bad "preview commands share a contract library"; fi
-if [[ -f $PREVIEW/mobile.html ]]; then ok "mobile preview has a touch shell"; else bad "mobile preview has a touch shell"; fi
-if [[ -x $PREVIEW/mobile-key.cgi ]]; then ok "mobile preview has an executable key endpoint"; else bad "mobile preview has an executable key endpoint"; fi
-if [[ -x $ROOT/tests/mobile_preview_e2e.sh ]]; then ok "mobile preview has an executable E2E check"; else bad "mobile preview has an executable E2E check"; fi
 if [[ -x $PREVIEW/preview-provision-reader ]]; then ok "preview has an executable read-only credential provisioner"; else bad "preview has an executable read-only credential provisioner"; fi
 
 entrypoint="$(<"$PREVIEW/entrypoint.sh")"
-contains "browser terminal uses the darker preview background" 'theme={"background":"#18181b"}' "$entrypoint"
-contains "mobile and desktop terminals share one session" "tmux new-session -d -s b9s" "$entrypoint"
-contains "mobile terminal has a stable base path" "--base-path /b9s/terminal" "$entrypoint"
-contains "mobile key endpoint is installed in the CGI root" "/www/cgi-bin/b9s-key" "$entrypoint"
+contains "terminal UI waits in a tmux session for kubectl exec" "tmux new-session -d -s b9s" "$entrypoint"
+contains "preview serves the web board" "exec /usr/local/bin/b9s web --listen 0.0.0.0:7681" "$entrypoint"
+contains "web board trusts the cluster-supplied viewer header" '--trust-header "$PREVIEW_VIEWER_HEADER" --owner "$PREVIEW_VIEWER"' "$entrypoint"
+contains "preview requires a viewer header" 'PREVIEW_VIEWER_HEADER:?required' "$entrypoint"
+contains "preview requires a viewer" 'PREVIEW_VIEWER:?required' "$entrypoint"
+for retired in ttyd mobile.html mobile-key.cgi --no-token; do
+  if grep -Fq -- "$retired" <<<"$entrypoint$(<"$PREVIEW/Dockerfile")"; then
+    bad "preview image carries no $retired"
+  else
+    ok "preview image carries no $retired"
+  fi
+done
 contains "preview requires a read-only Dolt user" 'B9S_DOLT_READ_USER:?required' "$entrypoint"
 contains "preview requires a read-only Dolt password" 'B9S_DOLT_READ_PASSWORD:?required' "$entrypoint"
 contains "preview explicitly trusts its provisioned Dolt endpoint" 'B9S_TRUSTED_DOLT_ENDPOINTS="$B9S_DOLT_HOST:$B9S_DOLT_PORT"' "$entrypoint"
@@ -127,10 +134,11 @@ else
 fi
 
 contract_library="$(<"$PREVIEW/lib.sh")"
-contains "mobile terminal is allowed through the network policy" 'port: 7683' "$contract_library"
-contains "mobile terminal is exposed by the service" 'name: mobile-terminal' "$contract_library"
-contains "mobile shell has a dedicated ingress path" 'path: /b9s/terminal' "$contract_library"
-contains "mobile key endpoint has a dedicated ingress path" 'path: /cgi-bin/b9s-key' "$contract_library"
+if grep -Fq 'port: 7683' <<<"$contract_library"; then
+  bad "network policy admits only the web and identity ports"
+else
+  ok "network policy admits only the web and identity ports"
+fi
 contains "database traffic is limited to the MySQL port" 'port: 3306' "$contract_library"
 contains "deployment reads the dedicated Dolt secret" 'secretRef:' "$contract_library"
 contains "deployment names the cluster-supplied reader secret" 'name: ${PREVIEW_READER_REF}' "$contract_library"
@@ -147,25 +155,6 @@ if [[ -f $PREVIEW/preview-provision-reader ]]; then
   fi
 fi
 
-if [[ -f $PREVIEW/mobile.html ]]; then
-  mobile="$(<"$PREVIEW/mobile.html")"
-  contains "mobile viewport is declared" 'name="viewport"' "$mobile"
-  contains "mobile shell avoids a favicon request" 'rel="icon"' "$mobile"
-  contains "mobile projects are directly selectable" 'data-key="0"' "$mobile"
-  contains "mobile project slots scroll between pinned paging buttons" 'class="project-slots"' "$mobile"
-  contains "mobile projects can scroll backward" 'data-key="["' "$mobile"
-  contains "mobile projects can scroll forward" 'data-key="]"' "$mobile"
-  contains "mobile list can move upward" 'data-key="Up"' "$mobile"
-  contains "mobile list can move downward" 'data-key="Down"' "$mobile"
-  contains "mobile pages can move left" 'data-key="Left"' "$mobile"
-  contains "mobile pages can move right" 'data-key="Right"' "$mobile"
-  contains "mobile selection can open" 'data-key="Enter"' "$mobile"
-  contains "mobile selection can go back" 'data-key="Escape"' "$mobile"
-  contains "mobile terminal has a reconnect control" 'aria-label="Reconnect terminal"' "$mobile"
-  contains "mobile terminal reconnects when the network returns" "window.addEventListener('online', reconnectTerminal)" "$mobile"
-  contains "mobile controls call the executable CGI path" '/cgi-bin/b9s-key?key=' "$mobile"
-fi
-
 if [[ $fail -eq 0 ]]; then
   sha="$(git -C "$ROOT" rev-parse HEAD)"
   kubeconfig="$ROOT/go.mod"
@@ -173,7 +162,6 @@ if [[ $fail -eq 0 ]]; then
     PREVIEW_CMD=contract-test \
     B9S_PREVIEW_KUBECONFIG="$kubeconfig" \
     B9S_PREVIEW_CONTEXT=preview \
-    B9S_PREVIEW_TAILSCALE_HOST=laptop.tailnet-example.ts.net \
     bash -c 'source "$1"; preview_parse_args bd-b6jw "$2"; preview_render_manifests /dev/stdout' \
       bash "$PREVIEW/lib.sh" "$sha"
   )"
@@ -189,10 +177,16 @@ if [[ $fail -eq 0 ]]; then
   contains "deployment names the project reader secret" "name: b9s-reader" "$rendered"
   contains "binding names the b9s deployer" "name: preview-deployer-b9s" "$rendered"
   contains "image is immutable by full commit" "b9s-preview:$sha" "$rendered"
-  contains "browser terminal is exposed" "name: terminal" "$rendered"
+  contains "web board is exposed" "name: web" "$rendered"
+  contains "deployment passes the viewer header name" 'name: PREVIEW_VIEWER_HEADER, value: "X-Example-Viewer"' "$rendered"
+  contains "deployment passes the viewer" 'name: PREVIEW_VIEWER, value: "viewer@example.invalid"' "$rendered"
+  if grep -Eq 'mobile-terminal|/b9s/terminal|cgi-bin' <<<"$rendered"; then
+    bad "rendered preview has no browser terminal route"
+  else
+    ok "rendered preview has no browser terminal route"
+  fi
   contains "identity endpoint is exposed" "name: identity" "$rendered"
   contains "preview has a clickable hostname" "host: b9s-bd-b6jw.previews.example.test" "$rendered"
-  contains "mobile preview has a tailnet-only hostname" "host: laptop.tailnet-example.ts.net" "$rendered"
 
   set +e
   invalid="$(B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
@@ -202,14 +196,27 @@ if [[ $fail -eq 0 ]]; then
   if [[ $invalid_rc -eq 2 ]]; then ok "unsafe task identifiers stop before cluster access"; else bad "unsafe task identifiers stop before cluster access" "exit $invalid_rc"; fi
   contains "unsafe task identifier reports the boundary" "TASK_ID is not a plain identifier" "$invalid"
 
-  set +e
-  invalid_tailnet="$(B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
-    B9S_PREVIEW_TAILSCALE_HOST='bad host' \
-    "$PREVIEW/preview-status" bd-b6jw "$sha" 2>&1)"
-  invalid_tailnet_rc=$?
-  set -e
-  if [[ $invalid_tailnet_rc -eq 2 ]]; then ok "unsafe tailnet host stops before cluster access"; else bad "unsafe tailnet host stops before cluster access" "exit $invalid_tailnet_rc"; fi
-  contains "unsafe tailnet host reports the boundary" "tailnet host is not valid" "$invalid_tailnet"
+  for viewer_case in 'PREVIEW_VIEWER_HEADER=bad header:PREVIEW_VIEWER_HEADER is not an HTTP header name' \
+    'PREVIEW_VIEWER=no-at-sign:PREVIEW_VIEWER is not an email address'; do
+    assignment="${viewer_case%%:*}"
+    expected="${viewer_case#*:}"
+    set +e
+    invalid_viewer="$(env B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
+      "$assignment" "$PREVIEW/preview-status" bd-b6jw "$sha" 2>&1)"
+    invalid_viewer_rc=$?
+    set -e
+    if [[ $invalid_viewer_rc -eq 2 ]]; then ok "invalid ${assignment%%=*} stops before cluster access"; else bad "invalid ${assignment%%=*} stops before cluster access" "exit $invalid_viewer_rc"; fi
+    contains "invalid ${assignment%%=*} reports the boundary" "$expected" "$invalid_viewer"
+  done
+
+  chained_rendered="$(
+    B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
+    PREVIEW_INGRESS_MIDDLEWARE=platform-preview-only@kubernetescrd,platform-viewer@kubernetescrd \
+    bash -c 'source "$1"; preview_parse_args bd-b6jw "$2"; preview_render_manifests /dev/stdout' \
+      bash "$PREVIEW/lib.sh" "$sha"
+  )"
+  contains "preview Ingress chains several Middlewares in order" \
+    "router.middlewares: platform-preview-only@kubernetescrd,platform-viewer@kubernetescrd" "$chained_rendered"
 
   contains "preview Ingress admits only port-forward traffic" \
     "traefik.ingress.kubernetes.io/router.middlewares: platform-preview-only@kubernetescrd" "$rendered"
@@ -230,7 +237,7 @@ if [[ $fail -eq 0 ]]; then
   invalid_middleware_rc=$?
   set -e
   if [[ $invalid_middleware_rc -eq 2 ]]; then ok "unsafe middleware stops before cluster access"; else bad "unsafe middleware stops before cluster access" "exit $invalid_middleware_rc"; fi
-  contains "unsafe middleware reports the boundary" "ingress middleware is not a Traefik CRD reference" "$invalid_middleware"
+  contains "unsafe middleware reports the boundary" "ingress middleware is not a list of Traefik CRD references" "$invalid_middleware"
 fi
 
 # Model kubectl's partial apply: a denied Namespace does not stop it applying
@@ -339,7 +346,8 @@ contains "namespace policy denial identifies the infrastructure prerequisite" 't
 # The repository ships no deployment values: each one must come from the
 # cluster, and a missing one stops before any cluster access.
 for name in PREVIEW_HOST_SUFFIX PREVIEW_LABEL_DOMAIN PREVIEW_RUNNER_NAMESPACE \
-  PREVIEW_WORKLOAD_ROLE PREVIEW_DEPLOYER_SA PREVIEW_READER_REF; do
+  PREVIEW_WORKLOAD_ROLE PREVIEW_DEPLOYER_SA PREVIEW_READER_REF \
+  PREVIEW_VIEWER_HEADER PREVIEW_VIEWER; do
   set +e
   missing="$(env -u "$name" B9S_PREVIEW_KUBECONFIG="$ROOT/go.mod" B9S_PREVIEW_CONTEXT=preview \
     "$timeout_bin" 20 "$PREVIEW/preview-status" bd-b6jw "$(git -C "$ROOT" rev-parse HEAD)" 2>&1)"

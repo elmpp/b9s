@@ -2,7 +2,8 @@
 type: ADR
 id: "0006"
 title: "Route mobile previews through tailnet paths"
-status: active
+status: superseded
+superseded_by: "0058"
 date: 2026-09-13
 ---
 

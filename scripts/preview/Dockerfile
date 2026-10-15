@@ -8,19 +8,16 @@ RUN CGO_ENABLED=1 go build -mod=vendor \
     -ldflags "-s -w" \
     -o /out/b9s ./cmd/b9s
 
-FROM tsl0922/ttyd:alpine@sha256:dafdb93a65c9b487f3056933733a06c12f6e447e3bd31ccd4ef6c279cf9a7648 AS runtime
+FROM alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8 AS runtime
 ARG COMMIT_SHA
 RUN apk add --no-cache busybox-extras mariadb-client tmux \
     && test -n "$COMMIT_SHA" \
-    && mkdir -p /app /data /www /usr/local/share/b9s-preview \
+    && mkdir -p /app /data /www \
     && printf '%s\n' "$COMMIT_SHA" > /app/.commit-sha \
     && chown -R 65532:65532 /data /www
 COPY --from=builder /out/b9s /usr/local/bin/b9s
 COPY scripts/preview/entrypoint.sh /usr/local/bin/b9s-preview-entrypoint
-COPY scripts/preview/mobile.html /usr/local/share/b9s-preview/mobile.html
-COPY scripts/preview/mobile-key.cgi /usr/local/share/b9s-preview/mobile-key.cgi
-RUN chmod 0755 /usr/local/bin/b9s /usr/local/bin/b9s-preview-entrypoint \
-    /usr/local/share/b9s-preview/mobile-key.cgi
+RUN chmod 0755 /usr/local/bin/b9s /usr/local/bin/b9s-preview-entrypoint
 
-EXPOSE 7681 7682 7683
+EXPOSE 7681 7682
 ENTRYPOINT ["/usr/local/bin/b9s-preview-entrypoint"]

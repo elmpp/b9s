@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify the live browser terminal and its immutable preview identity.
+# Verify the live web board, the terminal UI session and the preview identity.
 PREVIEW_CMD=preview-verify
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
@@ -10,7 +10,8 @@ preview_require_cluster
 if preview_wait_for_rollout >/dev/null 2>&1; then check_pass rollout "deployment/b9s is ready"; else check_fail rollout "deployment is not ready"; preview_finish; fi
 
 identity_file="$PREVIEW_EVIDENCE_DIR/identity.json"
-terminal_file="$PREVIEW_EVIDENCE_DIR/terminal.html"
+session_file="$PREVIEW_EVIDENCE_DIR/session.json"
+pane_file="$PREVIEW_EVIDENCE_DIR/tui-pane.txt"
 if curl -fsS --connect-timeout 3 --max-time 10 "$(preview_identity_url)" -o "$identity_file"; then
   check_pass identity-http "service returned 200"
 else
@@ -30,11 +31,28 @@ if [[ ${served_commit:-} == "$PREVIEW_COMMIT_SHA" ]]; then check_pass served-com
 if [[ ${served_task:-} == "$PREVIEW_TASK_ID" ]]; then check_pass served-task "$PREVIEW_TASK_ID"; else check_fail served-task "${served_task:-missing}"; fi
 if [[ ${served_namespace:-} == "$PREVIEW_NAMESPACE" ]]; then check_pass served-namespace "$PREVIEW_NAMESPACE"; else check_fail served-namespace "${served_namespace:-missing}"; fi
 
-if curl -fsS --connect-timeout 3 --max-time 10 "$(preview_terminal_url)" -o "$terminal_file" \
-  && grep -qi '<title>ttyd' "$terminal_file"; then
-  check_pass browser-terminal "ttyd page is reachable"
+# The board answers only a request carrying the viewer header, which the
+# ingress sets in front of a browser and this check sets itself.
+if curl -fsS --connect-timeout 3 --max-time 10 \
+  -H "$PREVIEW_VIEWER_HEADER: $PREVIEW_VIEWER" \
+  "$(preview_web_url)api/session" -o "$session_file"; then
+  web_commit="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("commit", ""))' "$session_file" 2>/dev/null || true)"
+  # A build without VCS stamping reports no commit, and the identity check
+  # above already pins the image to the commit.
+  if [[ -z $web_commit || $web_commit == "$PREVIEW_COMMIT_SHA" ]]; then
+    check_pass web-board "b9s web answers for the viewer"
+  else
+    check_fail web-board "b9s web reports commit $web_commit"
+  fi
 else
-  check_fail browser-terminal "ttyd page is unreachable or malformed"
+  check_fail web-board "b9s web is unreachable or refused the viewer"
+fi
+
+if kcn exec deploy/b9s -- tmux capture-pane -p -t b9s >"$pane_file" 2>/dev/null \
+  && grep -q '[^[:space:]]' "$pane_file"; then
+  check_pass tui-session "tmux session b9s shows the terminal UI"
+else
+  check_fail tui-session "tmux session b9s is missing or blank"
 fi
 
 preview_log "open $PREVIEW_URL"

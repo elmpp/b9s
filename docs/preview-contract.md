@@ -1,8 +1,9 @@
 # Browser-accessible Kubernetes previews
 
-The b9s preview runs the real terminal UI through ttyd. A reviewer can use the
-desktop terminal with a keyboard or open the mobile shell at `/b9s/` for touch
-navigation. The preview reads every accessible Beads database through a
+The b9s preview serves `b9s web` at its URL and runs the real terminal UI in a
+tmux session inside the Pod. A reviewer opens the board in a browser and
+attaches to the terminal UI with `kubectl exec`, so the TUI is tested in a real
+terminal (ADR 0058). The preview reads every accessible Beads database through a
 database-enforced SELECT-only account. It does not seed fixture tickets or hold
 a write-capable Beads credential.
 
@@ -13,14 +14,14 @@ Status: active
 - [Interface](#interface)
 - [Deployment values](#deployment-values)
 - [Runtime shape](#runtime-shape)
-- [Mobile navigation](#mobile-navigation)
+- [Terminal UI access](#terminal-ui-access)
+- [Web board access](#web-board-access)
 - [Namespace and access boundary](#namespace-and-access-boundary)
 - [Image delivery](#image-delivery)
 - [Clickable URL](#clickable-url)
 - [Ingress access](#ingress-access)
 - [Configuration](#configuration)
 - [Local verification](#local-verification)
-- [Recovering a stale browser session](#recovering-a-stale-browser-session)
 - [Cleanup](#cleanup)
 
 ## Interface
@@ -58,12 +59,14 @@ any cluster access when a required value is missing.
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `PREVIEW_HOST_SUFFIX` | yes | DNS suffix of preview hosts |
-| `PREVIEW_INGRESS_MIDDLEWARE` | no | Traefik Middleware reference (`namespace-name@kubernetescrd`) on every preview Ingress; empty renders none |
+| `PREVIEW_INGRESS_MIDDLEWARE` | no | Comma-separated Traefik Middleware references (`namespace-name@kubernetescrd`) on every preview Ingress, in the order Traefik applies them; empty renders none |
 | `PREVIEW_LABEL_DOMAIN` | yes | Prefix of the namespace labels the cluster's policies match |
 | `PREVIEW_RUNNER_NAMESPACE` | yes | Namespace whose Pods may reach the preview |
 | `PREVIEW_WORKLOAD_ROLE` | yes | ClusterRole bound inside the preview namespace |
 | `PREVIEW_DEPLOYER_SA` | yes | `namespace/name` of the deploying ServiceAccount |
 | `PREVIEW_READER_REF` | yes | Name of the Secret holding the read-only database credential |
+| `PREVIEW_VIEWER_HEADER` | yes | Request header the ingress sets to the viewer's identity, which `b9s web --trust-header` reads |
+| `PREVIEW_VIEWER` | yes | Email address the board accepts in that header, passed as `b9s web --owner` |
 
 `PREVIEW_DEPLOYER_SA` and `PREVIEW_READER_REF` may contain `{project}`, which
 the scripts replace with `b9s`. A cluster that serves several projects can then
@@ -73,31 +76,29 @@ set one template for all of them.
 
 ```mermaid
 graph TB
-    USER["👤 **Reviewer**<br/>desktop or mobile browser"]
-    TRAEFIK["**Traefik**<br/>b9s-TASK.PREVIEW_HOST_SUFFIX"]
+    USER["👤 **Reviewer**<br/>browser"]
+    TERM["👤 **Reviewer or deployer**<br/>terminal"]
+    TRAEFIK["**Traefik**<br/>b9s-TASK.PREVIEW_HOST_SUFFIX<br/>sets PREVIEW_VIEWER_HEADER"]
+    API["**Kubernetes API**<br/>pods/exec"]
 
     subgraph NS["🖥️ b9s task namespace"]
-        DESKTOP["**Desktop ttyd**<br/>keyboard terminal on 7681"]
-        MOBILE["**Mobile shell**<br/>touch controls on 7682"]
-        TTYD["**Mobile ttyd**<br/>terminal on 7683"]
-        TMUX["**tmux**<br/>shared terminal session"]
-        B9S["**b9s**<br/>real TUI"]
+        WEB["**b9s web**<br/>board on 7681"]
         ID["**Identity endpoint**<br/>commit, task, namespace on 7682"]
+        TMUX["**tmux session b9s**"]
+        B9S["**b9s**<br/>real TUI"]
         CATALOG[("Generated project catalog")]
-        DESKTOP --> TMUX
-        MOBILE -->|"allowlisted keys"| TMUX
-        MOBILE --> TTYD
-        TTYD --> TMUX
         TMUX --> B9S
         B9S --> CATALOG
+        WEB --> CATALOG
     end
 
     DOLT[("Shared Dolt<br/>SELECT only")]
 
     USER --> TRAEFIK
-    TRAEFIK --> DESKTOP
-    TRAEFIK --> MOBILE
+    TRAEFIK --> WEB
     TRAEFIK --> ID
+    TERM --> API
+    API -->|"tmux attach -t b9s"| TMUX
     CATALOG -->|"TCP 3306"| DOLT
 ```
 
@@ -106,17 +107,25 @@ namespace, so an edited environment variable cannot make one image claim to be
 another commit. `preview-verify` reads `/__preview` through the Service and
 compares all three identity fields with the requested preview.
 
-## Mobile navigation
+## Terminal UI access
 
-The mobile shell keeps the terminal visible above two touch-control rows. The
-project row pins previous and next project-page buttons around a horizontally
-scrollable strip containing `All` plus project keys `1` through `9`. The
-navigation row provides up, down, previous page, next page, open and back
-actions. Each button sends one allowlisted key through the CGI endpoint to the
-shared tmux session, so it does not depend on a mobile browser synthesizing
-keyboard events.
+The TUI starts in a detached tmux session named `b9s` and opens the all-projects
+view. Attach to it with the namespace's credential:
 
-The desktop URL remains unchanged. Append `/b9s/` to open the mobile shell.
+```sh
+kubectl -n b9s-TASK-SLUG exec -it deploy/b9s -- tmux attach -t b9s
+```
+
+Detach with `Ctrl-b d`. The session keeps running, so a second viewer attaching
+later sees the same screen. The browser URL never serves a terminal.
+
+## Web board access
+
+`b9s web` runs in trust-header mode (ADR 0021). It answers only a request whose
+`PREVIEW_VIEWER_HEADER` equals `PREVIEW_VIEWER`, so the cluster's ingress must
+set that header on every request and replace any copy a client sent. Without
+the header the board answers 401. `preview-verify` sets the header itself when
+it reaches the Service from inside the cluster.
 
 ## Namespace and access boundary
 
@@ -193,27 +202,13 @@ name answered by a local resolver. Do not use nip.io or sslip.io: a label
 ending in digits can be read as part of the embedded address and route to an
 unrelated public IP.
 
-For phone access, set `B9S_PREVIEW_TAILSCALE_HOST` to the workstation's
-MagicDNS name before deploying. The manifest adds only `/b9s`, `/b9s/terminal`
-and the allowlisted key endpoint to that host, so an existing application at
-the host root remains unchanged. Tailscale Serve forwards tailnet HTTPS to the
-local Traefik listener:
-
-```sh
-tailnet_host="$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')"
-export B9S_PREVIEW_TAILSCALE_HOST="$tailnet_host"
-tailscale serve --bg --yes http://127.0.0.1:8081
-scripts/preview/preview-deploy bd-b6jw "$sha"
-```
-
-The mobile URL is `https://TAILNET_HOST/b9s/`. Tailscale Serve is private to
-the tailnet. Do not use Funnel for this preview.
-
 ## Ingress access
 
-A preview serves a writable terminal. On a cluster whose ingress is publicly
-reachable, set `PREVIEW_INGRESS_MIDDLEWARE` to a Traefik Middleware that admits
-only trusted traffic, and have admission refuse a preview Ingress without it.
+The board trusts a request header, so whoever can reach the ingress route can
+act as the viewer. On a cluster whose ingress is publicly reachable, list in
+`PREVIEW_INGRESS_MIDDLEWARE` a Middleware that admits only trusted traffic and
+one that sets the viewer header, and have admission refuse a preview Ingress
+without the first.
 How a reviewer then reaches the preview (a port-forward, a VPN) is the
 cluster operator's choice and is documented with the cluster, not here.
 
@@ -232,7 +227,6 @@ Tuning knobs, all optional:
 | `B9S_PREVIEW_PUSH_REGISTRY` | same as registry | Docker push endpoint |
 | `B9S_PREVIEW_BUILDKIT_ADDR` | `tcp://buildkitd.buildkit.svc.cluster.local:1234` | Unprivileged in-cluster builder |
 | `B9S_PREVIEW_INGRESS_PORT` | `8081` | Local Traefik host port |
-| `B9S_PREVIEW_TAILSCALE_HOST` | empty | Optional MagicDNS hostname for the private `/b9s/` route |
 | `B9S_PREVIEW_ROLLOUT_TIMEOUT` | `180` | Bounded rollout wait in seconds |
 | `B9S_PREVIEW_DELETE_TIMEOUT` | `180` | Bounded namespace deletion wait in seconds |
 
@@ -278,31 +272,9 @@ that `default` and an outside-prefix namespace are denied. Do not substitute
 evaluate the namespace policy. The operator-owned reader Secret must already
 exist; a lane cannot read or provision its contents.
 
-After deployment, exercise the exact phone controls against two populated
-databases and compare the rendered totals with read-only Dolt queries:
-
-```sh
-tests/mobile_project_switch_e2e.sh \
-  "https://$tailnet_host" bd-b6jw "$sha" b9s-bd-b6jw \
-  "$B9S_PREVIEW_KUBECONFIG"
-```
-
-## Recovering a stale browser session
-
-After a preview Pod is replaced, an already-open ttyd frame can remain on
-`Press Enter to Reconnect` even though the deployment and tailnet route are
-healthy. Confirm the two server boundaries before changing the deployment:
-
-```sh
-curl -fsS "https://$tailnet_host/b9s/__preview"
-kubectl --kubeconfig "$B9S_PREVIEW_KUBECONFIG" \
-  --context "$B9S_PREVIEW_CONTEXT" -n b9s-TASK-SLUG get deploy,pod
-```
-
-If the identity responds and the deployment is ready, use the mobile shell's
-`Reconnect` control. The shell also reconnects when the browser returns online
-or the tab becomes visible again. This preserves the shared tmux session and
-does not redeploy or delete anything.
+`preview-verify` checks the served identity, asks the board for `/api/session`
+with the viewer header, and reads the tmux pane through `kubectl exec`, so a
+preview passes only when the board and the terminal UI both run.
 
 ## Cleanup
 

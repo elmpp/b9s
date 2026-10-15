@@ -15,9 +15,6 @@ preview_finish() {
   local verdict=pass
   [[ $PREVIEW_FAIL -eq 0 ]] || verdict=fail
   printf 'PREVIEW_URL=%s\n' "$PREVIEW_URL"
-  if [[ -n ${PREVIEW_TAILSCALE_URL:-} ]]; then
-    printf 'PREVIEW_TAILSCALE_URL=%s\n' "$PREVIEW_TAILSCALE_URL"
-  fi
   printf 'PREVIEW_IDENTITY task=%s commit=%s namespace=%s image=%s\n' \
     "$PREVIEW_TASK_ID" "$PREVIEW_COMMIT_SHA" "$PREVIEW_NAMESPACE" "$PREVIEW_IMAGE"
   printf '=== %s DONE pass=%d fail=%d verdict=%s ===\n' \
@@ -81,7 +78,12 @@ preview_parse_args() {
   # (docs/preview-contract.md, "Deployment values"). They have no defaults: a
   # guessed name renders objects the platform refuses or cannot find again.
   preview_require_env PREVIEW_HOST_SUFFIX PREVIEW_LABEL_DOMAIN PREVIEW_RUNNER_NAMESPACE \
-    PREVIEW_WORKLOAD_ROLE PREVIEW_DEPLOYER_SA PREVIEW_READER_REF
+    PREVIEW_WORKLOAD_ROLE PREVIEW_DEPLOYER_SA PREVIEW_READER_REF \
+    PREVIEW_VIEWER_HEADER PREVIEW_VIEWER
+  [[ $PREVIEW_VIEWER_HEADER =~ ^[A-Za-z0-9-]+$ ]] \
+    || preview_die usage "PREVIEW_VIEWER_HEADER is not an HTTP header name"
+  [[ $PREVIEW_VIEWER =~ ^[^[:space:]\"@]+@[^[:space:]\"@]+$ ]] \
+    || preview_die usage "PREVIEW_VIEWER is not an email address"
   [[ $PREVIEW_LABEL_DOMAIN =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]] \
     || preview_die usage "PREVIEW_LABEL_DOMAIN is not a DNS name"
   local name
@@ -103,22 +105,14 @@ preview_parse_args() {
   PREVIEW_INGRESS_PORT="${B9S_PREVIEW_INGRESS_PORT:-8081}"
   [[ $PREVIEW_INGRESS_PORT =~ ^[0-9]{1,5}$ ]] || preview_die usage "ingress port is not valid"
   PREVIEW_URL="http://${PREVIEW_HOST}:${PREVIEW_INGRESS_PORT}"
-  # The ingress controller may be public, and a preview serves a writable
-  # terminal, so a cluster that exposes Traefik names a Middleware that restricts
-  # access and refuses a preview Ingress without it. Empty renders none, for a
-  # cluster that defines no such Middleware.
+  # The ingress controller may be public, and the board trusts a viewer header,
+  # so a cluster names the Middlewares that restrict access and set that header,
+  # as a comma-separated list in the order Traefik applies them. Empty renders
+  # none, for a cluster that defines no such Middleware.
   PREVIEW_INGRESS_MIDDLEWARE="${PREVIEW_INGRESS_MIDDLEWARE:-}"
-  [[ -z $PREVIEW_INGRESS_MIDDLEWARE || $PREVIEW_INGRESS_MIDDLEWARE =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?@kubernetescrd$ ]] \
-    || preview_die usage "ingress middleware is not a Traefik CRD reference"
-
-  PREVIEW_TAILSCALE_HOST="${B9S_PREVIEW_TAILSCALE_HOST:-}"
-  PREVIEW_TAILSCALE_HOST="${PREVIEW_TAILSCALE_HOST%.}"
-  PREVIEW_TAILSCALE_URL=""
-  if [[ -n $PREVIEW_TAILSCALE_HOST ]]; then
-    [[ $PREVIEW_TAILSCALE_HOST =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]] \
-      || preview_die usage "tailnet host is not valid"
-    PREVIEW_TAILSCALE_URL="https://${PREVIEW_TAILSCALE_HOST}/b9s/"
-  fi
+  local middleware_ref='[a-z0-9]([-a-z0-9]*[a-z0-9])?@kubernetescrd'
+  [[ -z $PREVIEW_INGRESS_MIDDLEWARE || $PREVIEW_INGRESS_MIDDLEWARE =~ ^${middleware_ref}(,${middleware_ref})*$ ]] \
+    || preview_die usage "ingress middleware is not a list of Traefik CRD references"
 
   PREVIEW_REGISTRY="${B9S_PREVIEW_REGISTRY:-registry.registry.svc.cluster.local:5000}"
   [[ $PREVIEW_REGISTRY =~ ^[a-z0-9]([-a-z0-9.:/]*[a-z0-9])?$ ]] \
@@ -131,7 +125,7 @@ preview_parse_args() {
 
   export PREVIEW_LABEL_DOMAIN
   export PREVIEW_TASK_ID PREVIEW_COMMIT_SHA PREVIEW_NAMESPACE PREVIEW_HOST PREVIEW_URL
-  export PREVIEW_TAILSCALE_HOST PREVIEW_TAILSCALE_URL
+  export PREVIEW_VIEWER_HEADER PREVIEW_VIEWER
   export PREVIEW_KUBECONFIG PREVIEW_CONTEXT PREVIEW_IMAGE PREVIEW_PUSH_IMAGE PREVIEW_EVIDENCE_DIR
 }
 
@@ -162,36 +156,11 @@ preview_require_cluster() {
 
 preview_render_manifests() {
   local output="$1"
-  local tailscale_rule=""
   local ingress_annotations=""
   if [[ -n $PREVIEW_INGRESS_MIDDLEWARE ]]; then
     ingress_annotations="$(printf '%s\n' \
       "  annotations:" \
       "    traefik.ingress.kubernetes.io/router.middlewares: ${PREVIEW_INGRESS_MIDDLEWARE}")"
-  fi
-  if [[ -n $PREVIEW_TAILSCALE_HOST ]]; then
-    tailscale_rule="$(printf '%s\n' \
-      "    - host: ${PREVIEW_TAILSCALE_HOST}" \
-      "      http:" \
-      "        paths:" \
-      "          - path: /b9s/terminal" \
-      "            pathType: Prefix" \
-      "            backend:" \
-      "              service:" \
-      "                name: b9s" \
-      "                port: {name: mobile-terminal}" \
-      "          - path: /cgi-bin/b9s-key" \
-      "            pathType: Exact" \
-      "            backend:" \
-      "              service:" \
-      "                name: b9s" \
-      "                port: {name: identity}" \
-      "          - path: /b9s" \
-      "            pathType: Prefix" \
-      "            backend:" \
-      "              service:" \
-      "                name: b9s" \
-      "                port: {name: identity}")"
   fi
   cat >"$output" <<YAML
 apiVersion: v1
@@ -266,7 +235,6 @@ spec:
       ports:
         - {protocol: TCP, port: 7681}
         - {protocol: TCP, port: 7682}
-        - {protocol: TCP, port: 7683}
     - from:
         - namespaceSelector:
             matchLabels:
@@ -323,13 +291,14 @@ spec:
           env:
             - {name: PREVIEW_TASK_ID, value: "${PREVIEW_TASK_ID}"}
             - {name: PREVIEW_NAMESPACE, value: "${PREVIEW_NAMESPACE}"}
+            - {name: PREVIEW_VIEWER_HEADER, value: "${PREVIEW_VIEWER_HEADER}"}
+            - {name: PREVIEW_VIEWER, value: "${PREVIEW_VIEWER}"}
           envFrom:
             - secretRef:
                 name: ${PREVIEW_READER_REF}
           ports:
-            - {name: terminal, containerPort: 7681}
+            - {name: web, containerPort: 7681}
             - {name: identity, containerPort: 7682}
-            - {name: mobile-terminal, containerPort: 7683}
           readinessProbe:
             httpGet: {path: /__preview, port: identity}
             initialDelaySeconds: 2
@@ -367,9 +336,8 @@ spec:
     app.kubernetes.io/name: b9s
     app.kubernetes.io/instance: ${PREVIEW_NAMESPACE}
   ports:
-    - {name: terminal, port: 7681, targetPort: terminal}
+    - {name: web, port: 7681, targetPort: web}
     - {name: identity, port: 7682, targetPort: identity}
-    - {name: mobile-terminal, port: 7683, targetPort: mobile-terminal}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -389,31 +357,12 @@ spec:
               service:
                 name: b9s
                 port: {name: identity}
-          - path: /b9s/terminal
-            pathType: Prefix
-            backend:
-              service:
-                name: b9s
-                port: {name: mobile-terminal}
-          - path: /cgi-bin/b9s-key
-            pathType: Exact
-            backend:
-              service:
-                name: b9s
-                port: {name: identity}
-          - path: /b9s
-            pathType: Prefix
-            backend:
-              service:
-                name: b9s
-                port: {name: identity}
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: b9s
-                port: {name: terminal}
-${tailscale_rule}
+                port: {name: web}
 YAML
 }
 
@@ -426,6 +375,6 @@ preview_identity_url() {
   printf 'http://b9s.%s.svc.cluster.local:7682/__preview' "$PREVIEW_NAMESPACE"
 }
 
-preview_terminal_url() {
+preview_web_url() {
   printf 'http://b9s.%s.svc.cluster.local:7681/' "$PREVIEW_NAMESPACE"
 }
