@@ -72,7 +72,7 @@ time. The operator approved the plan with the instruction to start the work.
   local `b9s web` with 1000 and 5000 issues (a JSONL fixture made by a
   generator in the same folder) and, where useful, the local Gas City beads
   stores (b9s opens proxied-server stores since `5994a7e4`). It measures only
-  local beads stores: beads.osen.co and the osenco Dolt setup on Hetzner are
+  local beads stores: the hosted board and its shared Dolt server are
   out of this epic (operator, 2026-10-11). Writes are measured with
   `fake-bd.mjs` against the local fixture, never against the shared
   server. Output: `docs/plans/2026-10-11-responsive-web/measurements.md` with
@@ -170,11 +170,11 @@ classes it touches.
 - **Commits:** each worker commits only the files it names, with explicit
   `git add <path>`, on `b9s-alpha` `main`, with `Refs: <task id>`. The daily
   sync rebases those commits onto b9s `main`.
-- **Production stays untouched:** no task deploys to beads.osen.co or
-  changes its image, the Hetzner servers, the shared Dolt server or the
+- **Production stays untouched:** no task deploys to the hosted board or
+  changes its image, its servers, the shared Dolt server or the
   operator's working setup. All work and every measurement use local beads
-  stores only: no task sends requests to beads.osen.co or touches the osenco
-  Dolt setup, and none uses the operator's browser sessions or sign-ins
+  stores only: no task sends requests to the hosted board or touches the shared
+  Dolt server, and none uses the operator's browser sessions or sign-ins
   (operator, 2026-10-11).
 - **Release:** none in this epic. The operator decides when b9s takes the
   work from b9s-alpha.

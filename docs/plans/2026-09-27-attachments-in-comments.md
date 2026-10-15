@@ -80,12 +80,12 @@ attachments:
   max_bytes: 26214400      # 25 MiB
   gc_grace: 24h
   local_dir: ""            # local backend only; default <beads dir>/attachments
-  prefix: osenco            # the workspace; default is the project's database name; applies to both backends
+  prefix: acme              # the workspace; default is the project's database name; applies to both backends
   local_with_dolt_server: false # required true to use the local backend when the source is a Dolt server
   s3:
-    endpoint: https://nbg1.your-objectstorage.com
-    region: nbg1
-    bucket: osenco-beads-attachments
+    endpoint: https://s3.example.com
+    region: eu-central-1
+    bucket: acme-beads-attachments
     path_style: false
     url_ttl: 15m            # at most 168h (7 days): the S3 presign limit
     credential_command: "" # prints two lines: access key id, secret
@@ -210,8 +210,8 @@ Commit: `feat(attach): collect unreferenced blobs`.
 
 ## Task 8: infrastructure
 
-Beads task `bd-t8j5.8`: bucket `osenco-beads-attachments` on Hetzner Object
-Storage, one key pair per workspace scoped to its prefix, secrets in the workspace
+Beads task `bd-t8j5.8`: bucket `acme-beads-attachments` on S3-compatible object
+storage, one key pair per workspace scoped to its prefix, secrets in the workspace
 `.envrc`, a weekly `b9s attach gc --apply`, and a smoke test of every Store method
 and a presigned download against the real bucket.
 

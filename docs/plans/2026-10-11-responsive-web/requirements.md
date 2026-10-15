@@ -29,7 +29,7 @@ TUI carried into a browser. Three things now hold it back.
 3. **Speed is unmeasured where it matters.** Emulated rendering is fast
    (`b9m-foit.16`: 1000 issues load in 263 to 519 ms, a full re-render takes
    11 to 77 ms), but nobody has measured the real deployments: first load,
-   project switch, writes through `bd`, and live updates on beads.osen.co and
+   project switch, writes through `bd`, and live updates on the hosted board and
    a local `b9s web`. The operator wants it to feel more responsive.
 
 ## Solution
@@ -113,7 +113,7 @@ As any user, the UI looks calm and clean and still reads as b9s.
 As the operator, I know where b9s web is slow before anyone changes code for
 speed.
 
-- Measured on beads.osen.co and on a local `b9s web`, on a phone and a
+- Measured on the hosted board and on a local `b9s web`, on a phone and a
   desktop, with at least 1000 issues: first load, project switch, tap or click
   to visible feedback, write round trip through `bd`, live-update latency, and
   scroll and gesture smoothness.
@@ -164,7 +164,7 @@ As the operator, I choose the design before implementation starts.
   and built with esbuild, no Node at runtime; the JSON contract is generated
   from Go types (`web/src/api.gen.ts`); the Playwright suite in `web/tests`
   with device profiles runs in CI (`b9m-foit.19`); ADR 0019 serves the web UI
-  from `b9s web`; beads.osen.co runs the image behind a login proxy
+  from `b9s web`; the hosted board runs the image behind a login proxy
   (`b9m-foit.22`); the Dolt password never reaches the browser (ADR 0013).
 - **Operator's direction for the mockups:** "more phone and web native, less
   a TUI turned into a web app", "retain the original look and feel", "less

@@ -43,7 +43,7 @@ old b9s README was drifting toward.
 
 ## What the audience research says
 
-From `osenco/projects/b9s-launch/` (plan, comms plan, community-tools and Pullboard research,
+From the private launch notes (plan, comms plan, community-tools and Pullboard research,
 release notes) and the Reddit research. The audience is existing Beads users, above all
 developers who run coding agents against a Beads project. The research says about them:
 

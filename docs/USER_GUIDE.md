@@ -55,8 +55,8 @@ b9s --repo api
 ├──────────────────────────────────────────────────────────────────────┤
 │ b9s  ·  Dolt 127.0.0.1:3306/b9s                                      │  title bar
 ├──────────────────────────────┬───────────────────────────────────────┤
-│ ▸ [g9h] Epic: Run experiment │ # [g9h.2] Move to big-hetzner         │
-│   ▸ [g9h.2] Move to big-h…   │                                       │
+│ ▸ [g9h] Epic: Run experiment │ # [g9h.2] Move to the cluster         │
+│   ▸ [g9h.2] Move to the c…   │                                       │
 │     • [g9h.2.1] Close the f… │ Status: open   Priority: P1           │
 │                              │ ...                                   │  tree | detail
 ├──────────────────────────────┴───────────────────────────────────────┤
@@ -293,12 +293,12 @@ attachments:
   max_bytes: 26214400   # 25 MiB
   gc_grace: 24h
   local_dir: ""         # local backend only; default <beads dir>/attachments
-  prefix: osenco        # the workspace; default is the project's database name; applies to both backends
+  prefix: acme          # the workspace; default is the project's database name; applies to both backends
   local_with_dolt_server: false # required true to use the local backend when the project is a Dolt server
   s3:
-    endpoint: https://nbg1.your-objectstorage.com
-    region: nbg1
-    bucket: osenco-beads-attachments
+    endpoint: https://s3.example.com
+    region: eu-central-1
+    bucket: acme-beads-attachments
     path_style: false
     url_ttl: 15m         # at most 168h (7 days): the S3 presign limit
     credential_command: "" # prints two lines: access key id, secret
@@ -327,7 +327,7 @@ The same person often appears under several names: a git user name, an email, a 
 
 ```bash
 bd config set b9s.identities '[
-  {"name": "vanderheijden86", "kind": "human", "aliases": ["vanderheijden86@gmail.com", "andre"]},
+  {"name": "alice", "kind": "human", "aliases": ["alice@example.invalid", "asmith"]},
   {"name": "lane-agents", "kind": "agent", "aliases": ["ubuntu", "BrownBear"]}
 ]'
 ```
@@ -760,7 +760,7 @@ Every browser pairs once, by opening the link `b9s web` printed at start. The li
 | `--dev-assets <dir>` | Serve the web UI from `dir` and reload open browsers when it changes. Loopback only, for development with `make web-dev` |
 | `--debug` | Write a debug log to `.b9s/debug.log` |
 
-Behind a login proxy, `b9s web --trust-header X-Forwarded-Email --owner you@example.com` replaces pairing: a request is served only when the proxy's header names the owner, and there is no link to open. Use it only where nothing but the proxy can reach the port. The hosted board at `<person>.beads.osen.co` runs this way (`scripts/web/README.md`).
+Behind a login proxy, `b9s web --trust-header X-Forwarded-Email --owner you@example.com` replaces pairing: a request is served only when the proxy's header names the owner, and there is no link to open. Use it only where nothing but the proxy can reach the port. A hosted per-person board runs this way (`scripts/web/README.md`).
 
 `b9s web --public` serves one project to anyone, with no pairing, and lets every visitor write. It exists for a disposable demo, such as `demo.b9s.osen.co` (`scripts/demo/README.md`, ADR 0029): the project switcher is gone, writes share a budget of 30 a minute, and `--banner "text"` with `--banner-link URL` shows one thin line above the board. Never point it at a real project.
 

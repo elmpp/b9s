@@ -10,8 +10,8 @@ date: 2026-09-26
 
 ADR 0020 pairs every browser with a link derived from a secret on the
 machine running `b9s web`. Its re-evaluation clause is "b9s web serves more
-than one person". The hosted board at `<person>.beads.osen.co` (osenco-infra
-ADR 0004) is that case in its simplest form: one pod per person, behind an
+than one person". The hosted board at `<person>.beads.example.com` (described in
+the deployment repository) is that case in its simplest form: one pod per person, behind an
 oauth2-proxy that signs the person in with Google and forwards their email in
 `X-Forwarded-Email`. Until now that pod ran the TUI in ttyd, because ttyd
 could trust the header and `b9s web` could not.
@@ -55,7 +55,7 @@ sequenceDiagram
   change and one sign-in, but a second process whose only job is what four
   lines in `Auth` do.
 - **Several owners per server**: out of scope. Each person still gets their
-  own pod and their own Dolt credential (osenco-infra ADR 0004).
+  own pod and their own Dolt credential (see the deployment repository).
 
 ## Consequences
 

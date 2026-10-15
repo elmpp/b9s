@@ -149,7 +149,7 @@
         <div class="pills"><span class="pill" style="color:var(--${r[5] === "blocked" ? "red" : r[5] === "in_progress" ? "hi" : "green"})">⊘ ${r[5]}</span><span class="pill" style="color:var(--muted)">${r[2]}</span><span class="pill" style="color:${ROWC[r[3]]}">● ${r[3]}</span><span class="pill" style="color:var(--cyan)">#lane-project=b9s</span></div>
       </div>
       <div class="dbody" id="dbody">
-        <dl class="meta"><dt>assignee</dt><dd>—</dd><dt>creator</dt><dd>vanderheijden86</dd><dt>created</dt><dd>2026-08-17 07:53 · 5w</dd><dt>updated</dt><dd>2026-09-13 17:46 · ${r[4]}</dd></dl>
+        <dl class="meta"><dt>assignee</dt><dd>—</dd><dt>creator</dt><dd>alice</dd><dt>created</dt><dd>2026-08-17 07:53 · 5w</dd><dt>updated</dt><dd>2026-09-13 17:46 · ${r[4]}</dd></dl>
         <div class="dsec">Description</div>
         <p>${r[1]}. The phone layout opens this sheet over the tree, so the reader keeps the row context above and the fields below.</p>
         <p>Reproduce on a Pixel 9 at 412 px: open the tree, filter by status, tap the row. The half sheet shows the title, pills and the first four fields. Everything below needs a scroll or a resize.</p>
@@ -159,9 +159,9 @@
         <div class="dsec">Blocked by</div>
         <button class="rel" data-go="${(D.idx + 5) % ISSUES.length}"><span class="id">${ISSUES[(D.idx + 5) % ISSUES.length][0]}</span><span class="t">${ISSUES[(D.idx + 5) % ISSUES.length][1]}</span></button>
         <div class="dsec">Comments</div>
-        <p><span style="color:var(--muted)">vanderheijden86 · 3d</span><br>Half screen on the phone hides most of the description. Let it open full and give the half sheet a gesture instead.</p>
-        <p><span style="color:var(--muted)">polly · 2d</span><br>Agreed. The detents mockup shows the trade-off. Scroll-to-expand feels native on iOS and Android sheets.</p>
-        <p><span style="color:var(--muted)">vanderheijden86 · 1d</span><br>Trying all four on the phone now.</p>
+        <p><span style="color:var(--muted)">alice · 3d</span><br>Half screen on the phone hides most of the description. Let it open full and give the half sheet a gesture instead.</p>
+        <p><span style="color:var(--muted)">bob · 2d</span><br>Agreed. The detents mockup shows the trade-off. Scroll-to-expand feels native on iOS and Android sheets.</p>
+        <p><span style="color:var(--muted)">alice · 1d</span><br>Trying all four on the phone now.</p>
       </div>
       <div class="dacts"><button class="pri">Status</button><button>Edit</button><button>Comment</button><button>Branch</button><button>More</button></div>
     </section>`;

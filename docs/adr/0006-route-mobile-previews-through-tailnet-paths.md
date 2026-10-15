@@ -10,7 +10,7 @@ date: 2026-09-13
 
 The local k3s cluster already exposes Traefik on the laptop, and Tailscale Serve
 already forwards the laptop's private HTTPS hostname to that listener. The host
-root serves Omnigent, so replacing the Serve target or claiming `/` for B9s
+root serves another application, so replacing the Serve target or claiming `/` for B9s
 would break an existing local tool. Funnel would make the preview public.
 
 ## Decision

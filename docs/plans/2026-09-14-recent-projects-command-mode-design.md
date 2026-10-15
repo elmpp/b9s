@@ -141,8 +141,8 @@ filter is visible in the query bar.
  PROJECTS (bd_b9s@127.0.0.1:3306)                    / filter
  NAME             O    P    R   RECENT  LOCAL
  b9s             12    2    8   <1>     ~/Documents/b9s
- agents_config   40   16   43   <2>     ~/Documents/agents-config
- LP_Team          0    0    0           ─
+ web_shop        40   16   43   <2>     ~/Documents/web-shop
+ infra            0    0    0           ─
 ```
 
 - Rows come from one catalog query:

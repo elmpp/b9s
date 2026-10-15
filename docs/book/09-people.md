@@ -2,7 +2,7 @@
 
 An issue has two people on it. The creator is fixed at creation: `created_by` holds a name and `owner` holds the git email behind it. The assignee changes, and it is the field most often edited.
 
-Both fields hold names, and the names are not tidy. The same person appears as `andre`, `vanderheijden86`, their email and the name of an agent acting for them. A pool such as `agents` stands for several. b9s has to show one person per person, offer one entry per person in the assignee picker, and know who *you* are when you press `Ctrl-N` to create an issue as yourself.
+Both fields hold names, and the names are not tidy. The same person appears as `asmith`, `alice`, their email and the name of an agent acting for them. A pool such as `agents` stands for several. b9s has to show one person per person, offer one entry per person in the assignee picker, and know who *you* are when you press `Ctrl-N` to create an issue as yourself.
 
 ## The registry
 
