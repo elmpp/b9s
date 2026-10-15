@@ -18,6 +18,16 @@ contains() {
   if grep -Fq -- "$needle" <<<"$haystack"; then ok "$desc"; else bad "$desc" "missing $needle"; fi
 }
 
+# The cluster supplies these (docs/preview-contract.md). Placeholder values
+# keep the test independent of any real deployment.
+export PREVIEW_HOST_SUFFIX=previews.example.test
+export PREVIEW_INGRESS_MIDDLEWARE=platform-preview-only@kubernetescrd
+export PREVIEW_LABEL_DOMAIN=preview.example
+export PREVIEW_RUNNER_NAMESPACE=runners
+export PREVIEW_WORKLOAD_ROLE=preview-workloads
+export PREVIEW_DEPLOYER_SA='platform/preview-deployer-{project}'
+export PREVIEW_READER_REF='{project}-reader'
+
 # Exercise the real Git boundary in disposable fixture repositories. These
 # fixtures never invoke an image builder or use Kubernetes credentials.
 boundary_case() {
@@ -123,7 +133,7 @@ contains "mobile shell has a dedicated ingress path" 'path: /b9s/terminal' "$con
 contains "mobile key endpoint has a dedicated ingress path" 'path: /cgi-bin/b9s-key' "$contract_library"
 contains "database traffic is limited to the MySQL port" 'port: 3306' "$contract_library"
 contains "deployment reads the dedicated Dolt secret" 'secretRef:' "$contract_library"
-contains "deployment names the dedicated Dolt secret" 'name: b9s-shared-dolt-reader' "$contract_library"
+contains "deployment names the cluster-supplied reader secret" 'name: ${PREVIEW_READER_REF}' "$contract_library"
 
 if [[ -f $PREVIEW/preview-provision-reader ]]; then
   provisioner="$(<"$PREVIEW/preview-provision-reader")"
@@ -163,8 +173,7 @@ if [[ $fail -eq 0 ]]; then
     PREVIEW_CMD=contract-test \
     B9S_PREVIEW_KUBECONFIG="$kubeconfig" \
     B9S_PREVIEW_CONTEXT=preview \
-    B9S_PREVIEW_HOST_SUFFIX=previews.osenco.test \
-    B9S_PREVIEW_TAILSCALE_HOST=macbook-pro-2.tailb7c04d.ts.net \
+    B9S_PREVIEW_TAILSCALE_HOST=laptop.tailnet-example.ts.net \
     bash -c 'source "$1"; preview_parse_args bd-b6jw "$2"; preview_render_manifests /dev/stdout' \
       bash "$PREVIEW/lib.sh" "$sha"
   )"
@@ -172,15 +181,18 @@ if [[ $fail -eq 0 ]]; then
   if [[ $render_rc -eq 0 ]]; then ok "preview manifest renders without cluster writes"; else bad "preview manifest renders without cluster writes"; fi
 
   contains "namespace is project-prefixed" "name: b9s-bd-b6jw" "$rendered"
-  contains "namespace is labelled for b9s" "omnigent.osenco.dev/project: b9s" "$rendered"
-  contains "namespace records its task" "omnigent.osenco.dev/task-id: bd-b6jw" "$rendered"
-  contains "deployer binds the shared workload role" "name: omnigent-preview-workloads" "$rendered"
-  contains "binding names the b9s deployer" "name: omnigent-preview-deployer-b9s" "$rendered"
+  contains "namespace is labelled for b9s" "preview.example/project: b9s" "$rendered"
+  contains "namespace records its task" "preview.example/task-id: bd-b6jw" "$rendered"
+  contains "deployer binds the shared workload role" "name: preview-workloads" "$rendered"
+  contains "binding names the deployer namespace" "namespace: platform" "$rendered"
+  contains "runner namespace may reach the preview" "kubernetes.io/metadata.name: runners" "$rendered"
+  contains "deployment names the project reader secret" "name: b9s-reader" "$rendered"
+  contains "binding names the b9s deployer" "name: preview-deployer-b9s" "$rendered"
   contains "image is immutable by full commit" "b9s-preview:$sha" "$rendered"
   contains "browser terminal is exposed" "name: terminal" "$rendered"
   contains "identity endpoint is exposed" "name: identity" "$rendered"
-  contains "preview has a clickable hostname" "host: b9s-bd-b6jw.previews.osenco.test" "$rendered"
-  contains "mobile preview has a tailnet-only hostname" "host: macbook-pro-2.tailb7c04d.ts.net" "$rendered"
+  contains "preview has a clickable hostname" "host: b9s-bd-b6jw.previews.example.test" "$rendered"
+  contains "mobile preview has a tailnet-only hostname" "host: laptop.tailnet-example.ts.net" "$rendered"
 
   set +e
   invalid="$(B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
@@ -200,9 +212,9 @@ if [[ $fail -eq 0 ]]; then
   contains "unsafe tailnet host reports the boundary" "tailnet host is not valid" "$invalid_tailnet"
 
   contains "preview Ingress admits only port-forward traffic" \
-    "traefik.ingress.kubernetes.io/router.middlewares: kube-system-preview-private@kubernetescrd" "$rendered"
+    "traefik.ingress.kubernetes.io/router.middlewares: platform-preview-only@kubernetescrd" "$rendered"
   open_rendered="$(
-    B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview B9S_PREVIEW_INGRESS_MIDDLEWARE= \
+    B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview PREVIEW_INGRESS_MIDDLEWARE= \
     bash -c 'source "$1"; preview_parse_args bd-b6jw "$2"; preview_render_manifests /dev/stdout' \
       bash "$PREVIEW/lib.sh" "$sha"
   )"
@@ -213,7 +225,7 @@ if [[ $fail -eq 0 ]]; then
   fi
   set +e
   invalid_middleware="$(B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
-    B9S_PREVIEW_INGRESS_MIDDLEWARE='x"; evil' \
+    PREVIEW_INGRESS_MIDDLEWARE='x"; evil' \
     "$PREVIEW/preview-status" bd-b6jw "$sha" 2>&1)"
   invalid_middleware_rc=$?
   set -e
@@ -233,7 +245,7 @@ run_deploy() (
   git() {
     case "$*" in
       *'rev-parse HEAD') printf '%s\n' "$TEST_SHA" ;;
-      *'cat-file -e '*|*'status --porcelain '*) return 0 ;;
+      *'cat-file -e '*|*'status --porcelain'*) return 0 ;;
       *) command git "$@" ;;
     esac
   }
@@ -293,7 +305,7 @@ if run_deploy "$second_sha" 0 "$redeploy_dir/allowed" >"$redeploy_dir/second.log
 else
   bad "restricted same-task deployment accepts a new SHA" "see $redeploy_dir/second.log"
 fi
-contains "redeploy refreshes namespace commit label" "omnigent.osenco.dev/commit-sha: $second_sha" \
+contains "redeploy refreshes namespace commit label" "preview.example/commit-sha: $second_sha" \
   "$(cat "$redeploy_dir/allowed/namespace.yaml" 2>/dev/null)"
 if [[ $(cat "$redeploy_dir/allowed/calls" 2>/dev/null) == $'preflight\napply\npreflight\napply' ]]; then
   ok "each deployment preflights namespace policy before workload apply"
@@ -321,8 +333,31 @@ if [[ ! -f $redeploy_dir/denied/workloads ]]; then
 else
   bad "namespace policy denial prevents partial workload deployment"
 fi
-contains "namespace policy denial identifies the infrastructure prerequisite" 'osenco-infra' \
+contains "namespace policy denial identifies the infrastructure prerequisite" 'the cluster must permit' \
   "$(cat "$redeploy_dir/denied.log")"
+
+# The repository ships no deployment values: each one must come from the
+# cluster, and a missing one stops before any cluster access.
+for name in PREVIEW_HOST_SUFFIX PREVIEW_LABEL_DOMAIN PREVIEW_RUNNER_NAMESPACE \
+  PREVIEW_WORKLOAD_ROLE PREVIEW_DEPLOYER_SA PREVIEW_READER_REF; do
+  set +e
+  missing="$(env -u "$name" B9S_PREVIEW_KUBECONFIG="$ROOT/go.mod" B9S_PREVIEW_CONTEXT=preview \
+    "$timeout_bin" 20 "$PREVIEW/preview-status" bd-b6jw "$(git -C "$ROOT" rev-parse HEAD)" 2>&1)"
+  missing_rc=$?
+  set -e
+  if [[ $missing_rc -ne 0 && $missing == *"$name is not set"* ]]; then
+    ok "missing $name stops before cluster access"
+  else
+    bad "missing $name stops before cluster access" "exit $missing_rc"
+  fi
+done
+
+set +e
+bad_sa="$(PREVIEW_DEPLOYER_SA=no-namespace B9S_PREVIEW_KUBECONFIG="$ROOT/go.mod" B9S_PREVIEW_CONTEXT=preview \
+  "$timeout_bin" 20 "$PREVIEW/preview-status" bd-b6jw "$(git -C "$ROOT" rev-parse HEAD)" 2>&1)"
+bad_sa_rc=$?
+set -e
+if [[ $bad_sa_rc -ne 0 ]]; then ok "a deployer without namespace/name is refused"; else bad "a deployer without namespace/name is refused"; fi
 
 printf '=== preview-contract DONE pass=%d fail=%d ===\n' "$pass" "$fail"
 [[ $fail -eq 0 ]]

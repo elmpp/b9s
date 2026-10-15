@@ -34,6 +34,13 @@ preview_usage() {
   printf 'usage: %s TASK_ID COMMIT_SHA [--kubeconfig PATH] [--context NAME]\n' "$PREVIEW_CMD" >&2
 }
 
+preview_require_env() {
+  local name
+  for name in "$@"; do
+    [[ -n ${!name:-} ]] || preview_die usage "$name is not set; the cluster supplies it (docs/preview-contract.md)"
+  done
+}
+
 preview_parse_args() {
   PREVIEW_TASK_ID=""
   PREVIEW_COMMIT_SHA=""
@@ -70,7 +77,26 @@ preview_parse_args() {
   PREVIEW_NAMESPACE="b9s-${task_slug#b9s-}"
   [[ ${#PREVIEW_NAMESPACE} -le 63 ]] || preview_die usage "namespace exceeds 63 characters"
 
-  PREVIEW_HOST_SUFFIX="${B9S_PREVIEW_HOST_SUFFIX:-previews.osenco.test}"
+  # The cluster supplies the names its own RBAC and admission policies match
+  # (docs/preview-contract.md, "Deployment values"). They have no defaults: a
+  # guessed name renders objects the platform refuses or cannot find again.
+  preview_require_env PREVIEW_HOST_SUFFIX PREVIEW_LABEL_DOMAIN PREVIEW_RUNNER_NAMESPACE \
+    PREVIEW_WORKLOAD_ROLE PREVIEW_DEPLOYER_SA PREVIEW_READER_REF
+  [[ $PREVIEW_LABEL_DOMAIN =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]] \
+    || preview_die usage "PREVIEW_LABEL_DOMAIN is not a DNS name"
+  local name
+  for name in PREVIEW_RUNNER_NAMESPACE PREVIEW_WORKLOAD_ROLE; do
+    [[ ${!name} =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || preview_die usage "$name is not a Kubernetes name"
+  done
+  PREVIEW_DEPLOYER_SA="${PREVIEW_DEPLOYER_SA//\{project\}/b9s}"
+  [[ $PREVIEW_DEPLOYER_SA =~ ^([a-z0-9]([-a-z0-9]*[a-z0-9])?)/([a-z0-9]([-a-z0-9]*[a-z0-9])?)$ ]] \
+    || preview_die usage "PREVIEW_DEPLOYER_SA is not NAMESPACE/NAME"
+  PREVIEW_DEPLOYER_SA_NAMESPACE="${BASH_REMATCH[1]}"
+  PREVIEW_DEPLOYER_SA_NAME="${BASH_REMATCH[3]}"
+  PREVIEW_READER_REF="${PREVIEW_READER_REF//\{project\}/b9s}"
+  [[ $PREVIEW_READER_REF =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] \
+    || preview_die usage "PREVIEW_READER_REF is not a Kubernetes name"
+
   [[ $PREVIEW_HOST_SUFFIX =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]] \
     || preview_die usage "host suffix is not valid"
   PREVIEW_HOST="${PREVIEW_NAMESPACE}.${PREVIEW_HOST_SUFFIX}"
@@ -78,10 +104,10 @@ preview_parse_args() {
   [[ $PREVIEW_INGRESS_PORT =~ ^[0-9]{1,5}$ ]] || preview_die usage "ingress port is not valid"
   PREVIEW_URL="http://${PREVIEW_HOST}:${PREVIEW_INGRESS_PORT}"
   # The ingress controller may be public, and a preview serves a writable
-  # terminal. The default names the osenco-infra Middleware that admits only
-  # port-forward traffic; big-hetzner refuses a preview Ingress without it. An
-  # empty value renders no Middleware, for a cluster that does not define it.
-  PREVIEW_INGRESS_MIDDLEWARE="${B9S_PREVIEW_INGRESS_MIDDLEWARE-kube-system-preview-private@kubernetescrd}"
+  # terminal, so a cluster that exposes Traefik names a Middleware that restricts
+  # access and refuses a preview Ingress without it. Empty renders none, for a
+  # cluster that defines no such Middleware.
+  PREVIEW_INGRESS_MIDDLEWARE="${PREVIEW_INGRESS_MIDDLEWARE:-}"
   [[ -z $PREVIEW_INGRESS_MIDDLEWARE || $PREVIEW_INGRESS_MIDDLEWARE =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?@kubernetescrd$ ]] \
     || preview_die usage "ingress middleware is not a Traefik CRD reference"
 
@@ -103,6 +129,7 @@ preview_parse_args() {
   PREVIEW_EVIDENCE_DIR="${B9S_PREVIEW_EVIDENCE_DIR:-${TMPDIR:-/tmp}/b9s-preview/${PREVIEW_NAMESPACE}}"
   mkdir -p "$PREVIEW_EVIDENCE_DIR"
 
+  export PREVIEW_LABEL_DOMAIN
   export PREVIEW_TASK_ID PREVIEW_COMMIT_SHA PREVIEW_NAMESPACE PREVIEW_HOST PREVIEW_URL
   export PREVIEW_TAILSCALE_HOST PREVIEW_TAILSCALE_URL
   export PREVIEW_KUBECONFIG PREVIEW_CONTEXT PREVIEW_IMAGE PREVIEW_PUSH_IMAGE PREVIEW_EVIDENCE_DIR
@@ -174,10 +201,10 @@ metadata:
   labels:
     app.kubernetes.io/name: b9s
     app.kubernetes.io/managed-by: b9s-preview
-    omnigent.osenco.dev/preview: "true"
-    omnigent.osenco.dev/project: b9s
-    omnigent.osenco.dev/task-id: ${PREVIEW_TASK_ID}
-    omnigent.osenco.dev/commit-sha: ${PREVIEW_COMMIT_SHA}
+    ${PREVIEW_LABEL_DOMAIN}/preview: "true"
+    ${PREVIEW_LABEL_DOMAIN}/project: b9s
+    ${PREVIEW_LABEL_DOMAIN}/task-id: ${PREVIEW_TASK_ID}
+    ${PREVIEW_LABEL_DOMAIN}/commit-sha: ${PREVIEW_COMMIT_SHA}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -187,11 +214,11 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: omnigent-preview-workloads
+  name: ${PREVIEW_WORKLOAD_ROLE}
 subjects:
   - kind: ServiceAccount
-    name: omnigent-preview-deployer-b9s
-    namespace: omnigent
+    name: ${PREVIEW_DEPLOYER_SA_NAME}
+    namespace: ${PREVIEW_DEPLOYER_SA_NAMESPACE}
 ---
 apiVersion: v1
 kind: LimitRange
@@ -243,7 +270,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: omnigent-sandboxes
+              kubernetes.io/metadata.name: ${PREVIEW_RUNNER_NAMESPACE}
       ports:
         - {protocol: TCP, port: 7681}
         - {protocol: TCP, port: 7682}
@@ -266,7 +293,7 @@ metadata:
   labels:
     app.kubernetes.io/name: b9s
     app.kubernetes.io/version: ${PREVIEW_COMMIT_SHA}
-    omnigent.osenco.dev/task-id: ${PREVIEW_TASK_ID}
+    ${PREVIEW_LABEL_DOMAIN}/task-id: ${PREVIEW_TASK_ID}
 spec:
   replicas: 1
   revisionHistoryLimit: 2
@@ -280,7 +307,7 @@ spec:
         app.kubernetes.io/name: b9s
         app.kubernetes.io/instance: ${PREVIEW_NAMESPACE}
         app.kubernetes.io/version: ${PREVIEW_COMMIT_SHA}
-        omnigent.osenco.dev/task-id: ${PREVIEW_TASK_ID}
+        ${PREVIEW_LABEL_DOMAIN}/task-id: ${PREVIEW_TASK_ID}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -298,7 +325,7 @@ spec:
             - {name: PREVIEW_NAMESPACE, value: "${PREVIEW_NAMESPACE}"}
           envFrom:
             - secretRef:
-                name: b9s-shared-dolt-reader
+                name: ${PREVIEW_READER_REF}
           ports:
             - {name: terminal, containerPort: 7681}
             - {name: identity, containerPort: 7682}

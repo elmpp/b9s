@@ -12,8 +12,9 @@ if ! kc get namespace "$PREVIEW_NAMESPACE" >/dev/null 2>&1; then
   preview_finish
 fi
 
-owner="$(kc get namespace "$PREVIEW_NAMESPACE" -o jsonpath='{.metadata.labels.omnigent\.osenco\.dev/task-id}' 2>/dev/null || true)"
-project="$(kc get namespace "$PREVIEW_NAMESPACE" -o jsonpath='{.metadata.labels.omnigent\.osenco\.dev/project}' 2>/dev/null || true)"
+label_prefix="${PREVIEW_LABEL_DOMAIN//./\\.}"
+owner="$(kc get namespace "$PREVIEW_NAMESPACE" -o jsonpath="{.metadata.labels.${label_prefix}/task-id}" 2>/dev/null || true)"
+project="$(kc get namespace "$PREVIEW_NAMESPACE" -o jsonpath="{.metadata.labels.${label_prefix}/project}" 2>/dev/null || true)"
 if [[ $owner != "$PREVIEW_TASK_ID" || $project != b9s ]]; then
   check_fail boundary "namespace labels are task=${owner:-missing} project=${project:-missing}"
   preview_finish
