@@ -163,8 +163,15 @@ This catches metadata policy regressions even when the existing namespaced
 RoleBinding still allows workload changes. The preflight does not grant access
 or make the subsequent multi-resource apply atomic.
 
-Before the first deployment, an operator runs
-`scripts/preview/preview-provision-reader TASK_ID`. The command finds databases
+The `PREVIEW_READER_REF` Secret belongs to the cluster, not to the lane. A
+cluster may place it in each preview namespace by itself; on one that does not,
+an operator runs `scripts/preview/preview-provision-reader TASK_ID` once per
+task. A lane never creates the Secret and never waits for it before deploying:
+it runs `preview-deploy`, and if the Secret is absent the bounded rollout
+fails and that failure is the report. Do not block in advance because the
+Secret cannot be seen, since a lane has no permission to read it.
+
+`preview-provision-reader` finds databases
 that contain an `issues` table, grants the read-only identity named by
 `BEADS_DOLT_READ_USER` `SELECT` on each database individually, proves a no-op
 `UPDATE` is denied, and only then writes the `PREVIEW_READER_REF` Secret into
@@ -269,8 +276,8 @@ the namespace label and last-applied annotation, and verify the image's served
 identity after each rollout. Use server-side dry-run metadata patches to prove
 that `default` and an outside-prefix namespace are denied. Do not substitute
 `kubectl auth can-i` for admission testing: RBAC permission alone does not
-evaluate the namespace policy. The operator-owned reader Secret must already
-exist; a lane cannot read or provision its contents.
+evaluate the namespace policy. A lane cannot read or provision the reader
+Secret; a missing one shows up as a failed rollout, not as a precondition.
 
 `preview-verify` checks the served identity, asks the board for `/api/session`
 with the viewer header, and reads the tmux pane through `kubectl exec`, so a
