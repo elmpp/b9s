@@ -28,7 +28,7 @@ type detailRelation struct {
 // copy keeps formatIssueMarkdown, because markdown is what gets pasted.
 // decisions holds the rendered decision section of a Memory graph workspace,
 // or nil for a project without one.
-func renderIssueDetail(item model.Issue, issueMap map[string]*model.Issue, t Theme, width int, md *MarkdownRenderer, update *detailUpdateNotice, decisions []string) string {
+func renderIssueDetail(item model.Issue, issueMap map[string]*model.Issue, t Theme, width int, md *MarkdownRenderer, update *detailUpdateNotice, decisions []string, oldestFirst bool) string {
 	if width < 20 {
 		width = 20
 	}
@@ -206,9 +206,26 @@ func renderIssueDetail(item model.Issue, issueMap map[string]*model.Issue, t The
 	}
 
 	if len(item.Comments) > 0 {
-		blocks = append(blocks, section(fmt.Sprintf("COMMENTS · %d", len(item.Comments))))
+		order := "newest first"
+		if oldestFirst {
+			order = "oldest first"
+		}
+		blocks = append(blocks, section(fmt.Sprintf("COMMENTS · %d · %s · s: reverse", len(item.Comments), order)))
 		body := r.NewStyle().Width(width - 2).PaddingLeft(2)
-		for _, c := range item.Comments {
+		comments := append([]*model.Comment(nil), item.Comments...)
+		sort.SliceStable(comments, func(i, j int) bool {
+			if comments[i] == nil {
+				return false
+			}
+			if comments[j] == nil {
+				return true
+			}
+			if oldestFirst {
+				return comments[i].CreatedAt.Before(comments[j].CreatedAt)
+			}
+			return comments[i].CreatedAt.After(comments[j].CreatedAt)
+		})
+		for _, c := range comments {
 			if c == nil {
 				continue
 			}

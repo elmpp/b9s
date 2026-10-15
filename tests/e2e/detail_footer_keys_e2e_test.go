@@ -1,10 +1,41 @@
 package main_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestDetailCommentOrderE2E(t *testing.T) {
+	for _, oldestFirst := range []bool{false, true} {
+		name := "newest-first"
+		if oldestFirst {
+			name = "oldest-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := detailFooterFixture(t)
+			fixture := `{"id":"detail-1","title":"Comment order","status":"open","priority":2,"issue_type":"task","comments":[{"id":"1","text":"OLD-MESSAGE","created_at":"2026-01-01T00:00:00Z"},{"id":"2","text":"NEW-MESSAGE","created_at":"2026-01-02T00:00:00Z"}]}`
+			if err := os.WriteFile(filepath.Join(dir, ".beads", "beads.jsonl"), []byte(fixture+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			keys := []keyStep{kd("\r", 300*time.Millisecond)}
+			if oldestFirst {
+				keys = append(keys, kd("s", 400*time.Millisecond))
+			}
+			out, err := runTreeTUIWithEnv(t, dir, 2500, keys, "B9S_TEST_MODE=1")
+			if err != nil {
+				t.Fatalf("TUI failed: %v\n%s", err, out)
+			}
+			frame := treeFinalFrame(out)
+			old, recent := strings.Index(frame, "OLD-MESSAGE"), strings.Index(frame, "NEW-MESSAGE")
+			if old < 0 || recent < 0 || (old < recent) != oldestFirst {
+				t.Fatalf("wrong comment order (%s):\n%s", name, frame)
+			}
+		})
+	}
+}
 
 // The detail footer advertises e:edit and O:open. Both must act on the detail
 // screen (GitHub #15). O opens the issue as a Markdown file, which needs no

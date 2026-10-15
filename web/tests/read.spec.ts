@@ -3,6 +3,41 @@ import net from "node:net";
 import { expect, freePort, open, row, SAMPLE, startProject, stopProject, test } from "./harness";
 
 test.describe("reading", () => {
+  test("comments default to newest first and the order choice survives reload", async ({ page, project }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.route("**/api/issue?id=t-1", async route => {
+      const response = await route.fetch();
+      const issue = await response.json();
+      issue.comments = [
+        { id: "1", author: "alice", text: "Old comment", created_at: "2026-01-01T00:00:00Z" },
+        { id: "3", author: "alice", text: "New comment", created_at: "2026-01-03T00:00:00Z" },
+        { id: "2", author: "alice", text: "Middle comment", created_at: "2026-01-02T00:00:00Z" },
+      ];
+      await route.fulfill({ response, json: issue });
+    });
+    await open(page, project);
+    await row(page, "t-1").click();
+    const comments = page.locator(".detail .cm .md");
+    await expect(comments).toHaveText(["New comment", "Middle comment", "Old comment"]);
+    await page.getByRole("button", { name: "Newest first", exact: true }).click();
+    await expect(comments).toHaveText(["Old comment", "Middle comment", "New comment"]);
+    await page.reload();
+    await row(page, "t-1").click();
+    await expect(comments).toHaveText(["Old comment", "Middle comment", "New comment"]);
+    await page.getByRole("button", { name: "Oldest first", exact: true }).click();
+    await expect(comments).toHaveText(["New comment", "Middle comment", "Old comment"]);
+    expect(errors).toEqual([]);
+    for (const [width, size] of [[390, "phone"], [820, "tablet"], [1440, "desktop"], [2560, "wide"]] as const) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(page.locator("#app")).toHaveClass(new RegExp(`\\b${size}\\b`));
+      const order = page.getByRole("button", { name: "Newest first", exact: true });
+      await order.scrollIntoViewIfNeeded();
+      await expect(order).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath(`comment-order-${width}.png`) });
+    }
+  });
+
   // The live stream re-renders the tree when it connects. A test that acts
   // before then can hold a row that the render replaces.
   test("open returns once the live stream has connected", async ({ page, project }) => {

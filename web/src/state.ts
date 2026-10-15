@@ -21,6 +21,7 @@ export const S = {
   text: "",
   qres: null as null | { text: string; version: number; ids: Set<string>; error: string },
   sort: store.get<SortKey>("sort", "priority"),
+  commentsOldestFirst: store.get("commentsOldestFirst", false),
   cols: initialCols(),
   wrap: store.get("wrap", false),
   textSize: store.get("textSize", 100),

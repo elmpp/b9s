@@ -473,28 +473,29 @@ type Model struct {
 	// Memory browser failed to open; a project switch clears it.
 	memoryRefused bool
 	// Data
-	issues           []model.Issue
-	pooledIssues     []*model.Issue // Issue pool refs for sync reloads (return to pool on replace)
-	issueMap         map[string]*model.Issue
-	pendingBranchID  string                  // ShowBranchMsg waiting for its issue to load
-	detailBack       []string                // issues left through a child's number key, for Backspace
-	detailPin        detailPin               // tree or board issue the filtered list does not hold
-	beadsPath        string                  // Path to beads.jsonl for reloading
-	watcher          *watcher.Watcher        // File watcher for live reload
-	doltWatcher      *datasource.DoltWatcher // Dolt polling watcher for live reload
-	sourceType       datasource.SourceType   // What backend we loaded from
-	sourceInfo       string                  // Human-readable datasource description for title bar
-	doltSource       datasource.DataSource   // Dolt DataSource used for on-demand health checks
-	identities       *identity.Registry      // alias registry from b9s.identities and claim.pools (ADR 0014)
-	identityConfig   datasource.IdentityConfig
-	identityErr      error // last identity load or parse error, shown in the health popup
-	commentsLoadErr  error // last comments query/scan error; issues still loaded, R picker must not read this as "no attachments"
-	actorLookup      actorLookup
-	doltFailure      *DoltFailure // Non-nil when Dolt was detected but connection failed
-	startupDoltUser  string       // User the startup project connects as; projects without a checkout reuse it
-	startupDoltHost  string       // Server the startup project connects to; :project lists its databases
-	showProjectTable bool
-	projectTable     ProjectTableModel
+	issues              []model.Issue
+	pooledIssues        []*model.Issue // Issue pool refs for sync reloads (return to pool on replace)
+	issueMap            map[string]*model.Issue
+	pendingBranchID     string   // ShowBranchMsg waiting for its issue to load
+	detailBack          []string // issues left through a child's number key, for Backspace
+	commentsOldestFirst bool
+	detailPin           detailPin               // tree or board issue the filtered list does not hold
+	beadsPath           string                  // Path to beads.jsonl for reloading
+	watcher             *watcher.Watcher        // File watcher for live reload
+	doltWatcher         *datasource.DoltWatcher // Dolt polling watcher for live reload
+	sourceType          datasource.SourceType   // What backend we loaded from
+	sourceInfo          string                  // Human-readable datasource description for title bar
+	doltSource          datasource.DataSource   // Dolt DataSource used for on-demand health checks
+	identities          *identity.Registry      // alias registry from b9s.identities and claim.pools (ADR 0014)
+	identityConfig      datasource.IdentityConfig
+	identityErr         error // last identity load or parse error, shown in the health popup
+	commentsLoadErr     error // last comments query/scan error; issues still loaded, R picker must not read this as "no attachments"
+	actorLookup         actorLookup
+	doltFailure         *DoltFailure // Non-nil when Dolt was detected but connection failed
+	startupDoltUser     string       // User the startup project connects as; projects without a checkout reuse it
+	startupDoltHost     string       // Server the startup project connects to; :project lists its databases
+	showProjectTable    bool
+	projectTable        ProjectTableModel
 
 	openProject         projectOpenFunc
 	projectSwitch       projectSwitch
@@ -2793,6 +2794,12 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 				m.tutorialModel = NewTutorialModel(m.theme) // Reset for next time
 			}
 			return m, tutorialCmd
+		}
+
+		if m.focused == focusDetail && msg.String() == "s" {
+			m.commentsOldestFirst = !m.commentsOldestFirst
+			m.updateViewportContent()
+			return m, nil
 		}
 
 		// Number keys 1-9: route to labels, assignees, or projects depending on pickerMode (bd-gj41, bd-gs45.1)
@@ -5399,6 +5406,7 @@ func (m *Model) renderFooter() string {
 			hints = append(hints, hint{"n/p", "next/prev sibling"})
 		}
 		hints = append(hints,
+			hint{"s", "comment order"},
 			hint{"e", "edit"},
 			hint{"c", "copy"},
 			hint{"O", "open"},
@@ -6108,7 +6116,7 @@ func (m *Model) updateViewportContent() {
 	} else if b := m.memoryBrowser; b != nil && b.graphLoad == graphReading {
 		decisions = []string{m.theme.MutedText.Render(memoryGraphProgressText(b.graphDone, b.graphTotal))}
 	}
-	m.viewport.SetContent(renderIssueDetail(item, m.issueMap, m.theme, m.viewport.Width, m.renderer, update, decisions))
+	m.viewport.SetContent(renderIssueDetail(item, m.issueMap, m.theme, m.viewport.Width, m.renderer, update, decisions, m.commentsOldestFirst))
 }
 
 // decisionLookupFor returns where the tree finds the Memory graph of source.

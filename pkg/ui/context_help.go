@@ -199,6 +199,7 @@ const contextHelpDetail = `## Detail View
 
 **Actions**
   c         Copy full ticket Markdown
+  s         Reverse comment order (newest first by default)
   O         Open in editor
 
 **Info Shown**

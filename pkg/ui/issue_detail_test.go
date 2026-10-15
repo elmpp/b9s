@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/vanderheijden86/b9s/internal/attachref"
 	"github.com/vanderheijden86/b9s/pkg/model"
@@ -36,7 +37,7 @@ func renderDetailFixture(t *testing.T, update *detailUpdateNotice) string {
 	theme := DefaultTheme(lipgloss.NewRenderer(nil))
 	issue, issueMap := detailFixture()
 	md := NewMarkdownRendererWithTheme(70, theme)
-	return stripANSI(renderIssueDetail(issue, issueMap, theme, 70, md, update, nil))
+	return stripANSI(renderIssueDetail(issue, issueMap, theme, 70, md, update, nil, false))
 }
 
 func TestRenderIssueDetail_HeaderShowsMetaWithoutTable(t *testing.T) {
@@ -71,6 +72,40 @@ func TestRenderIssueDetail_SectionsAndComments(t *testing.T) {
 	}
 }
 
+func TestDetailCommentsNewestFirst(t *testing.T) {
+	issue, _ := detailFixture()
+	issue.Comments = []*model.Comment{
+		{Text: "oldest-message", CreatedAt: time.Unix(1, 0)},
+		{Text: "newest-message", CreatedAt: time.Unix(3, 0)},
+		{Text: "middle-message", CreatedAt: time.Unix(2, 0)},
+	}
+	m := NewModel([]model.Issue{issue}, "")
+	m.viewport.Width = 100
+	m.viewport.Height = 100
+	m.updateViewportContent()
+	out := stripANSI(m.viewport.View())
+	for _, text := range []string{"newest-message", "middle-message", "oldest-message"} {
+		if !strings.Contains(out, text) {
+			t.Fatalf("missing comment %q: %s", text, out)
+		}
+	}
+	if strings.Index(out, "newest-message") >= strings.Index(out, "middle-message") || strings.Index(out, "middle-message") >= strings.Index(out, "oldest-message") {
+		t.Fatalf("comments must be newest first: %s", out)
+	}
+	m.focused = focusDetail
+	for _, want := range []bool{true, false} {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+		m = next.(Model)
+		out = stripANSI(m.viewport.View())
+		if got := strings.Index(out, "oldest-message") < strings.Index(out, "newest-message"); got != want {
+			t.Fatalf("oldest first = %v, want %v: %s", got, want, out)
+		}
+	}
+	if issue.Comments[0].Text != "oldest-message" {
+		t.Fatal("rendering changed source comment order")
+	}
+}
+
 func TestRenderIssueDetail_MermaidInTextSections(t *testing.T) {
 	for _, section := range []string{"description", "design", "acceptance", "notes"} {
 		t.Run(section, func(t *testing.T) {
@@ -87,7 +122,7 @@ func TestRenderIssueDetail_MermaidInTextSections(t *testing.T) {
 				issue.Notes = source
 			}
 			theme := DefaultTheme(lipgloss.NewRenderer(nil))
-			out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil))
+			out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil, false))
 			if !strings.Contains(out, "┌") || strings.Contains(out, "graph LR") {
 				t.Fatalf("diagram not rendered in %s:\n%s", section, out)
 			}
@@ -99,7 +134,7 @@ func TestRenderIssueDetail_MermaidInComment(t *testing.T) {
 	issue, issueMap := detailFixture()
 	issue.Comments[0].Text = "```mermaid\nsequenceDiagram\nAlice->>Bob: Hello\n```"
 	theme := DefaultTheme(lipgloss.NewRenderer(nil))
-	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil))
+	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil, false))
 	if !strings.Contains(out, "┌") || strings.Contains(out, "sequenceDiagram") {
 		t.Fatalf("comment diagram not rendered:\n%s", out)
 	}
@@ -119,7 +154,7 @@ func TestRenderIssueDetail_LinesFitWidth(t *testing.T) {
 	theme := DefaultTheme(lipgloss.NewRenderer(nil))
 	issue, issueMap := detailFixture()
 	issue.Title = strings.Repeat("very long title ", 12)
-	out := renderIssueDetail(issue, issueMap, theme, 40, NewMarkdownRendererWithTheme(40, theme), nil, nil)
+	out := renderIssueDetail(issue, issueMap, theme, 40, NewMarkdownRendererWithTheme(40, theme), nil, nil, false)
 	for _, line := range strings.Split(out, "\n") {
 		if w := lipgloss.Width(line); w > 40 {
 			t.Fatalf("line wider than pane (%d > 40): %q", w, stripANSI(line))
@@ -172,7 +207,7 @@ func TestRenderIssueDetail_ShowsAttachmentsBlockWithMachineLinesStripped(t *test
 	issue.Comments = append(issue.Comments, &model.Comment{
 		ID: "cmt-1", Author: "carol", Text: text, CreatedAt: time.Date(2026, 9, 26, 0, 0, 0, 0, time.UTC),
 	})
-	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil))
+	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil, false))
 	for _, want := range []string{"ATTACHMENTS · 1", "diagram.png", "image/png", "2.0 KB", "added by carol"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("attachments block missing %q:\n%s", want, out)
@@ -195,7 +230,7 @@ func TestRenderIssueDetail_ChildrenShowProgress(t *testing.T) {
 	issue, issueMap := detailFixture()
 	issueMap["bd-c2"] = &model.Issue{ID: "bd-c2", Title: "Second step", Status: model.StatusOpen, IssueType: model.TypeTask,
 		Dependencies: []*model.Dependency{{IssueID: "bd-c2", DependsOnID: "bd-e5u3.9", Type: model.DepParentChild}}}
-	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil))
+	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, NewMarkdownRendererWithTheme(70, theme), nil, nil, false))
 	for _, want := range []string{"CHILDREN · 1/2", "━", "Child step", "Second step"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("children section missing %q:\n%s", want, out)
@@ -211,7 +246,7 @@ func TestRenderIssueDetail_ExactUpdatedTimeBelowRelativeAge(t *testing.T) {
 	issue, issueMap := detailFixture()
 	issue.UpdatedAt = time.Now().Add(-5 * time.Hour)
 	exact := issue.UpdatedAt.Local().Format("2006-01-02 15:04")
-	lines := strings.Split(stripANSI(renderIssueDetail(issue, issueMap, theme, 70, nil, nil, nil)), "\n")
+	lines := strings.Split(stripANSI(renderIssueDetail(issue, issueMap, theme, 70, nil, nil, nil, false)), "\n")
 	rel := -1
 	for i, l := range lines {
 		if strings.Contains(l, "updated 5h ago") {
@@ -238,7 +273,7 @@ func TestRenderIssueDetail_ExactUpdatedTimeSurvivesLongTitle(t *testing.T) {
 	issue, issueMap := detailFixture()
 	issue.UpdatedAt = time.Now().Add(-5 * time.Hour)
 	issue.Title = strings.Repeat("very long title ", 12)
-	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, nil, nil, nil))
+	out := stripANSI(renderIssueDetail(issue, issueMap, theme, 70, nil, nil, nil, false))
 	if exact := issue.UpdatedAt.Local().Format("2006-01-02 15:04"); !strings.Contains(out, exact) {
 		t.Errorf("exact time %q missing with a long title:\n%s", exact, out)
 	}

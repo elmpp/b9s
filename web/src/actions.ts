@@ -832,6 +832,7 @@ export async function act(a: string): Promise<void> {
       break;
     }
     case "dclose": closeDetail(); break;
+    case "commentsort": S.commentsOldestFirst = !S.commentsOldestFirst; store.set("commentsOldestFirst", S.commentsOldestFirst); render(); break;
     case "dsize": if (S.detail) { S.detail.size = S.detail.size === "full" ? "half" : "full"; render(); } break;
     case "dfocus": setFocus(cur, "subtree"); break;
     case "dbranch": setFocus(cur, "branch"); break;

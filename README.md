@@ -68,6 +68,8 @@ b9s
 
 `?` lists every key, and `Ctrl-C` quits.
 
+Ticket comments show newest first. Press `s` while the terminal detail has focus to reverse the order for the session. In the web detail, click **Newest first** or **Oldest first** beside Comments. The web remembers this choice in your browser.
+
 No Beads project at hand? Download the [sample project](examples/sample-project/), the made-up web shop the [demo](https://demo.b9s.osen.co) runs, with epics split into features and tasks, two releases, blocked work and comments:
 
 ```bash

@@ -888,7 +888,10 @@ export function renderDetail(was = detailPlace()): void {
   const ob = i.blocked_by.filter(x => get(x)), bl = blocksOf(i).map(x => x.id);
   const existing = host.querySelector<HTMLElement>(".detail");
   const kept = was && was.id === id ? was.place : null;
-  const cms = f ? f.comments : [];
+  const cms = [...(f?.comments || [])].sort((a, b) => {
+    const delta = (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0);
+    return S.commentsOldestFirst ? delta : -delta;
+  });
   const ro = D.project.read_only;
   const full = S.detail.size === "full";
   const isSplit = split();
@@ -917,7 +920,7 @@ export function renderDetail(was = detailPlace()): void {
       ${i.related.some(x => get(x)) ? `<div class="dsec">Related</div>${i.related.map(relHTML).join("")}` : ""}
       ${memoryLinks(f)}
       ${textSec("Description", f?.description, !f)}${textSec("Design", f?.design, !f)}${textSec("Acceptance", f?.acceptance, !f)}${textSec("Notes", f?.notes, !f)}
-      <div class="dsec"><span>Comments ${f ? cms.length : i.comment_count}</span>${ro ? "" : `<button data-act="comment">+ add</button>`}</div>
+      <div class="dsec"><span>Comments ${f ? cms.length : i.comment_count}</span><button data-act="commentsort" title="Reverse comment order">${S.commentsOldestFirst ? "Oldest first" : "Newest first"}</button>${ro ? "" : `<button data-act="comment">+ add</button>`}</div>
       ${cms.map(c => `<div class="cm"><div class="who"><b>${esc(c.author || "unknown")}</b> · ${age(Date.parse(c.created_at) || 0)}</div><div class="md">${md(c.text)}</div></div>`).join("") || `<div class="md"><p style="color:var(--muted)">${f || !i.comment_count ? "No comments." : "Loading…"}</p></div>`}
     </div>
     <div class="dacts">${ro ? "" : `<button data-act="status"><span class="g" aria-hidden="true">◐</span>Status</button><button data-act="edit"><span class="g" aria-hidden="true">✎</span>Edit</button><button data-act="comment"><span class="g" aria-hidden="true">✉</span>Comment</button>`}<button data-act="dbranch"><span class="g" aria-hidden="true">⎇</span>Branch</button><button data-act="actions"><span class="g" aria-hidden="true">⋯</span>More</button></div>
