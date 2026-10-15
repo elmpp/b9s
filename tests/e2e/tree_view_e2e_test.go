@@ -201,6 +201,10 @@ const treeTUIDeadline = 15 * time.Second
 // runTreeTUIWithEnv runs the TUI like runTreeTUI; env entries are appended
 // after the inherited environment, so they override it.
 func runTreeTUIWithEnv(t *testing.T, dir string, autoCloseMs int, keys []keyStep, env ...string) ([]byte, error) {
+	return runTreeTUIAtSize(t, dir, autoCloseMs, keys, 160, 40, env...)
+}
+
+func runTreeTUIAtSize(t *testing.T, dir string, autoCloseMs int, keys []keyStep, columns, rows int, env ...string) ([]byte, error) {
 	t.Helper()
 	skipIfNoScript(t)
 	bv := buildBvBinary(t)
@@ -208,7 +212,9 @@ func runTreeTUIWithEnv(t *testing.T, dir string, autoCloseMs int, keys []keyStep
 	ctx, cancel := context.WithTimeout(context.Background(), treeTUIDeadline)
 	defer cancel()
 
-	cmd := sizedScriptTUICommand(ctx, bv)
+	quotedBinary := "'" + strings.ReplaceAll(bv, "'", "'\\''") + "'"
+	cmd := scriptTUICommand(ctx, "/bin/sh", "-c",
+		fmt.Sprintf("stty rows %d cols %d; exec %s", rows, columns, quotedBinary))
 	if cmd == nil {
 		t.Skip("skipping: script command not available on this platform")
 		return nil, nil

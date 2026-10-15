@@ -890,20 +890,6 @@ func defaultTutorialPages() []TutorialPage {
 			Section: "Views",
 			Content: viewsGraphExportContent,
 		},
-		{
-			ID:       "views-insights",
-			Title:    "Insights Panel",
-			Section:  "Views",
-			Contexts: []string{"insights"},
-			Content:  viewsInsightsContent,
-		},
-		{
-			ID:       "views-history",
-			Title:    "History View",
-			Section:  "Views",
-			Contexts: []string{"history"},
-			Content:  viewsHistoryContent,
-		},
 
 		// =============================================================
 		// ADVANCED FEATURES (bv-19gf)
@@ -913,18 +899,6 @@ func defaultTutorialPages() []TutorialPage {
 			Title:   "Semantic + Hybrid Search",
 			Section: "Advanced",
 			Content: advancedSemanticSearchContent,
-		},
-		{
-			ID:      "advanced-time-travel",
-			Title:   "Time Travel",
-			Section: "Advanced",
-			Content: advancedTimeTravelContent,
-		},
-		{
-			ID:      "advanced-label-analytics",
-			Title:   "Label Analytics",
-			Section: "Advanced",
-			Content: advancedLabelAnalyticsContent,
 		},
 		{
 			ID:      "advanced-export",
@@ -937,12 +911,6 @@ func defaultTutorialPages() []TutorialPage {
 			Title:   "Workspace Mode",
 			Section: "Advanced",
 			Content: advancedWorkspaceContent,
-		},
-		{
-			ID:      "advanced-recipes",
-			Title:   "Recipes",
-			Section: "Advanced",
-			Content: advancedRecipesContent,
 		},
 		{
 			ID:      "advanced-ai",
@@ -1000,7 +968,7 @@ func defaultTutorialPages() []TutorialPage {
 | **?** | Help overlay |
 | **q** | Quit |
 | **Esc** | Close/go back |
-| **b/g/i/h** | Switch views |
+| **E/b/g** | Tree / board / dependency graph |
 
 ### Navigation
 | Key | Action |
@@ -1008,7 +976,7 @@ func defaultTutorialPages() []TutorialPage {
 | **j/k** | Move down/up |
 | **h/l** | Move left/right |
 | **Home/End** | Top/bottom |
-| **Ctrl+F/Ctrl+B** | Page down/up |
+| **PgDn/Ctrl+B** | Page down/up |
 | **Enter** | Select |
 
 ### Filtering
@@ -1080,7 +1048,7 @@ Issues are stored as plain JSONL. You can ` + "`git diff`" + ` your backlog.
 You can ` + "`grep`" + ` for patterns across all issues.
 
 **4. Human and Agent Readable**
-The same data works for both humans (via ` + "`bv`" + `) and AI agents (via ` + "`--robot-*`" + ` flags).
+Browse issues in ` + "`b9s`" + ` and use ` + "`bd`" + ` for command-line access.
 
 > Press **→** to continue.`
 
@@ -1101,11 +1069,9 @@ state. No sync issues. No "who has the latest?"
 
 ### AI Coding Agents
 
-This is where bv shines. AI agents like Claude, Cursor, and Codex
-need structured task management. The ` + "`--robot-*`" + ` flags output
-machine-readable formats perfect for agent consumption:
+Use the Beads CLI to find ready work and read issue details:
 
-` + "```bash\nbv --robot-triage    # What should I work on?\nbv --robot-plan      # How can work be parallelized?\n```" + `
+` + "```bash\nbd ready\nbd show ISSUE_ID\n```" + `
 
 ### Anyone Tired of Context-Switching
 
@@ -1118,7 +1084,7 @@ terminal. Stay in flow.
 // introQuickstartContent is Page 4 of the Introduction section.
 const introQuickstartContent = `## Quick Start
 
-You're already running ` + "`bv`" + ` — you're ahead of the game!
+You're already running ` + "`b9s`" + `.
 
 ### Basic Navigation
 
@@ -1127,26 +1093,24 @@ You're already running ` + "`bv`" + ` — you're ahead of the game!
 | **j / k** | Move down / up |
 | **Enter** | Open issue details |
 | **Esc** | Close overlay / go back |
-| **q** | Quit bv |
+| **Ctrl+C** | Quit |
 
 ### Switching Views
 
 | Key | View |
 |-----|------|
-| **Esc** | Return to List |
+| **E** | Return to tree |
+| **t** | Flat list / tree |
 | **b** | Board (Kanban) |
 | **g** | Dependency graph |
-| **i** | Insights panel |
-| **h** | History |
 
 ### Getting Help
 
 | Key | What You Get |
 |-----|--------------|
 | **?** | Quick help overlay |
-| **Space** (in help) | This tutorial |
 | **` + "`" + `** (backtick) | Jump to tutorial |
-| **~** (tilde) | Context-sensitive help |
+| **Ctrl+S** (in help) | Search shortcuts |
 
 ### Next Steps
 
@@ -1297,26 +1261,7 @@ This issue is a high-priority auth bug that needs security review.
 
 | Key | Action |
 |-----|--------|
-| **L** | Open label picker (apply labels) |
-| **Shift+L** | Filter by label |
-| **[** | Switch to Labels dashboard view |
-
-### Label Analytics
-
-The **Labels view** (press **[**) shows:
-- Issue count per label
-- Health indicators (stale issues, blockers)
-- Distribution across priorities
-
-` + "```" + `
-┌─────────────────────────────────────────┐
-│ Label         │ Open │ In Progress │ %  │
-├───────────────┼──────┼─────────────┼────┤
-│ frontend      │   12 │           3 │ 28%│
-│ backend       │    8 │           5 │ 24%│
-│ needs-review  │    6 │           0 │ 11%│
-└─────────────────────────────────────────┘
-` + "```" + `
+| **L** | Label quick filter |
 
 > **Tip:** Keep your label set small. Too many labels = no one uses them.
 
@@ -1360,25 +1305,12 @@ Every issue has a **priority** and a **status**. Together, they answer:
 | **blocked** | Waiting on dependencies |
 | **closed** | Complete or won't fix |
 
-### Priority in the UI
-
-The **Insights panel** (press **i**) calculates a priority score:
-
-` + "```" + `
-Priority Score = Base Priority + Blocking Factor + Freshness
-` + "```" + `
-
-- **Blocking Factor**: How many issues are waiting on this?
-- **Freshness**: How long since last update?
-
-This surfaces issues that are both important AND blocking other work.
-
 ### Changing Priority/Status
 
 | Key | Action |
 |-----|--------|
-| **p** | Change priority |
-| **s** | Change status |
+| **e** | Edit issue, including priority |
+| **S** | Change status |
 
 Or from the command line:
 
@@ -1425,8 +1357,8 @@ but the concept is simple: work flows in one direction, with no cycles.
 
 ### Inspecting the Graph
 
-Use ` + "`bv --robot-graph`" + ` for dependency graph data or
-` + "`br dep list ID`" + ` for one issue's dependencies.
+Press **g** to inspect the selected issue's dependencies or use
+` + "`bd dep list ID`" + ` from the command line.
 
 ### Why This Matters
 
@@ -1478,10 +1410,9 @@ These work in every view:
 | **Enter** | Select / open |
 | **q** | Quit bv |
 
-### The Shortcuts Sidebar
+### Finding Shortcuts
 
-Press **;** (semicolon) to toggle a floating sidebar showing all available
-shortcuts for your current view. It updates as you navigate.
+Press **?** for help, then **Ctrl+S** to search shortcuts.
 
 > Press **→** to continue.`
 
@@ -1662,87 +1593,6 @@ Only blocking dependencies appear in the **BLOCKED BY** and **BLOCKS** sections.
 
 > Press **→** to continue.`
 
-// viewsInsightsContent is the Insights Panel page content.
-const viewsInsightsContent = `## Insights Panel
-
-Press **i** to open the Insights panel — AI-powered prioritization assistance.
-
-### Priority Score Algorithm
-
-Each issue gets a computed **priority score** based on:
-
-1. **Explicit priority** (P0-P4)
-2. **Blocking factor** — how many issues it unblocks
-3. **Freshness** — recently updated issues score higher
-4. **Type weight** — bugs often prioritized over features
-
-### Attention Scores
-
-The panel highlights issues that may need attention:
-
-- **Stale issues**: Open for too long without updates
-- **Blocked chains**: Issues creating bottlenecks
-- **Priority inversions**: Low-priority items blocking high-priority
-
-### Visual Heatmap
-
-Press **m** to toggle heatmap mode, which colors the list by:
-- Red = high attention needed
-- Yellow = moderate
-- Green = on track
-
-### When to Use Insights
-
-- **Weekly review**: Find neglected issues
-- **Sprint planning**: Data-driven prioritization
-- **Bottleneck hunting**: Identify blocking patterns
-
-> Press **→** to continue.`
-
-// viewsHistoryContent is the History View page content.
-const viewsHistoryContent = `## History View
-
-Press **h** to see the git-integrated timeline of your project.
-
-` + "```" + `
-┌─────────────────────────────────────────────────────┐
-│ 2025-01-15 14:32  abc1234  feat: Add login flow    │
-│   └─ bv-abc1 opened, bv-def2 closed                │
-│                                                     │
-│ 2025-01-15 10:15  def5678  fix: Timeout issue      │
-│   └─ bv-ghi3 status → in_progress                  │
-│                                                     │
-│ 2025-01-14 16:45  ghi9012  chore: Bump deps        │
-│   └─ (no bead changes)                             │
-└─────────────────────────────────────────────────────┘
-` + "```" + `
-
-### History Features
-
-- **Git commits** with associated bead changes
-- **Bead-only changes** from ` + "`br`" + ` commands
-- **Time-travel preview**: See project state at any point
-
-### History Navigation
-
-| Key | Action |
-|-----|--------|
-| **j/k** | Navigate timeline |
-| **Enter** | Preview project state at that commit |
-| **d** | Show diff for selected commit |
-| **Esc** | Return to current state |
-
-### Time Travel
-
-When you press **Enter** on a historical commit, bv shows you:
-- What issues existed at that moment
-- Their status at that time
-- The dependency graph as it was
-
-This is read-only — you're viewing the past, not changing it.
-
-> **Use case:** "What was our backlog like before the big refactor?"`
-
 // =============================================================================
 // ADVANCED FEATURES CONTENT (bv-19gf)
 // =============================================================================
@@ -1789,130 +1639,6 @@ Searching for "permissions":
 ### Tuning (Optional)
 
 ` + "```bash\nBW_SEARCH_MODE=hybrid\nBW_SEARCH_PRESET=impact-first\nBW_SEARCH_WEIGHTS='{\"text\":0.4,\"pagerank\":0.2,\"status\":0.15,\"impact\":0.1,\"priority\":0.1,\"recency\":0.05}'\n```" + `
-
-> Press **→** to continue.`
-
-// advancedTimeTravelContent is the Time Travel tutorial page.
-const advancedTimeTravelContent = `## Time Travel (t/T)
-
-See how your project looked at any point in history — compare past to present.
-
-### Accessing Time Travel
-
-| Key | Action |
-|-----|--------|
-| **t** | Full time travel with git ref input |
-| **T** | Quick time travel to HEAD~5 |
-| **h** | History view (visual timeline) |
-
-### Git Reference Syntax
-
-Time travel understands git references:
-
-| Reference | Meaning |
-|-----------|---------|
-| ` + "`HEAD~5`" + ` | 5 commits ago |
-| ` + "`main`" + ` | Tip of main branch |
-| ` + "`v1.2.0`" + ` | Tagged release |
-| ` + "`@{2.weeks.ago}`" + ` | Two weeks back |
-
-### Example: Sprint Retrospective
-
-` + "```" + `
-1. Press T and enter "HEAD~50" (start of sprint)
-2. See: 45 open issues, 12 blocked
-3. Press Esc to return to present
-4. Now: 22 open, 3 blocked
-5. Diff shows: 23 closed, 9 unblocked!
-` + "```" + `
-
-### The Diff View
-
-When in time-travel mode, press **d** to see changes:
-
-` + "```" + `
-┌─────────────────────────────────────────────────────┐
-│ Changes: HEAD~50 → HEAD                             │
-├─────────────────────────────────────────────────────┤
-│ + Added: 8 issues                                   │
-│ - Closed: 23 issues                                 │
-│ ~ Modified: 12 issues                               │
-│                                                     │
-│ Cycles: 1 resolved, 0 introduced                    │
-└─────────────────────────────────────────────────────┘
-` + "```" + `
-
-### Use Cases
-
-- **Sprint review**: "What did we accomplish?"
-- **Debugging**: "When did this issue get blocked?"
-- **Onboarding**: "What was the project like 6 months ago?"
-- **Post-mortem**: "Show me the state when the bug was introduced"
-
-### Robot Mode Equivalent
-
-` + "```bash\nbv --robot-diff --diff-since HEAD~50\n```" + `
-
-Returns structured JSON with added/closed/modified counts.
-
-> Press **→** to continue.`
-
-// advancedLabelAnalyticsContent is the Label Analytics tutorial page.
-const advancedLabelAnalyticsContent = `## Label Analytics
-
-Labels are more than tags — they're a lens for understanding your project.
-
-### The Labels Dashboard ([)
-
-Press **[** to open the Labels dashboard:
-
-` + "```" + `
-┌─────────────────────────────────────────────────────┐
-│ LABEL           │ OPEN │ PROG │ BLOCK │ HEALTH     │
-├─────────────────┼──────┼──────┼───────┼────────────┤
-│ frontend        │   12 │    3 │     2 │ ▓▓▓▓▓░░░ ⚠ │
-│ backend         │    8 │    5 │     0 │ ▓▓▓▓▓▓▓░ ✓ │
-│ security        │    4 │    1 │     3 │ ▓▓░░░░░░ ⛔ │
-│ tech-debt       │   15 │    0 │     0 │ ▓▓▓░░░░░ ⚠ │
-└─────────────────────────────────────────────────────┘
-` + "```" + `
-
-### Health Indicators
-
-| Symbol | Meaning |
-|--------|---------|
-| ✓ | Healthy — good progress, few blockers |
-| ⚠ | Warning — stale items or slow velocity |
-| ⛔ | Critical — high blocked ratio, needs attention |
-
-### Health Score Factors
-
-1. **Velocity**: How fast are issues closing?
-2. **Staleness**: Are old issues piling up?
-3. **Blocked ratio**: What % is stuck?
-4. **Work distribution**: Is work spread evenly?
-
-### Label Flow Analysis
-
-Press **f** in Labels view to see cross-label flow:
-
-` + "```" + `
-frontend → backend: 5 dependencies
-backend → database: 3 dependencies
-security → * : 2 dependencies (blocks many areas)
-` + "```" + `
-
-This reveals **architectural coupling** — which areas block others.
-
-### Robot Mode Commands
-
-` + "```bash\nbv --robot-label-health              # Health metrics\nbv --robot-label-flow                # Cross-label deps\nbv --robot-label-attention --limit=5 # Top labels needing work\n```" + `
-
-### Strategic Use
-
-- **Balanced labels**: Similar health across areas = smooth progress
-- **Bottleneck labels**: High block count = address first
-- **Orphan labels**: Zero activity = maybe archive them
 
 > Press **→** to continue.`
 
@@ -2008,7 +1734,7 @@ Issues can depend on issues in other repos:
 
 ` + "```bash\nbr dep add fe-abc1 be-def2   # Frontend blocked by backend\n```" + `
 
-Use the robot graph export to inspect these cross-repo relationships.
+Use ` + "`bd dep list ID`" + ` to inspect dependencies.
 
 ### Filtering by Repo
 
@@ -2021,134 +1747,40 @@ Press **w** to open the repo picker, then:
 | **Enter** | Apply filter |
 | **a** | Select all repos |
 
-### Robot Mode
-
-` + "```bash\nbv --robot-triage              # Workspace-wide triage\nbv --robot-plan               # Cross-repo execution plan\n```" + `
-
 > **Note:** Workspace mode requires all repos to be accessible locally.
-
-> Press **→** to continue.`
-
-// advancedRecipesContent is the Recipes tutorial page.
-const advancedRecipesContent = `## Recipes (R)
-
-Recipes are **saved filter combinations** — complex queries you use repeatedly.
-
-### Opening the Recipe Picker
-
-Press **R** (capital R) to open recipes:
-
-` + "```" + `
-┌─────────────────────────────────────────────────────┐
-│ RECIPES                                             │
-├─────────────────────────────────────────────────────┤
-│ ▶ Sprint Ready                                      │
-│   Open + Ready + Priority ≤ P2                      │
-│                                                     │
-│   This Week's Focus                                 │
-│   In Progress OR (Open + P0-P1)                     │
-│                                                     │
-│   Blocked Review                                    │
-│   Blocked + Updated > 3 days ago                    │
-│                                                     │
-│   Tech Debt Candidates                              │
-│   Labels: tech-debt + Priority ≥ P3                 │
-└─────────────────────────────────────────────────────┘
-` + "```" + `
-
-### Built-in Recipes
-
-| Recipe | What It Shows |
-|--------|---------------|
-| **Sprint Ready** | Actionable work for this sprint |
-| **Quick Wins** | Low-effort items (small scope) |
-| **Blocked Review** | Stuck items needing attention |
-| **High Impact** | Top PageRank scores (graph centrality) |
-| **Stale Items** | No updates in 2+ weeks |
-
-### Creating Custom Recipes
-
-Recipes are stored in ` + "`.beads/recipes.json`" + `:
-
-` + "```json\n{\n  \"recipes\": [\n    {\n      \"name\": \"My Team's Work\",\n      \"filter\": {\n        \"labels\": [\"team-alpha\"],\n        \"status\": [\"open\", \"in_progress\"],\n        \"priority_max\": 2\n      },\n      \"sort\": \"priority\"\n    }\n  ]\n}\n```" + `
-
-### Recipe Filters
-
-Available filter options:
-
-| Field | Example |
-|-------|---------|
-| ` + "`status`" + ` | ` + "`[\"open\", \"in_progress\"]`" + ` |
-| ` + "`labels`" + ` | ` + "`[\"frontend\", \"urgent\"]`" + ` |
-| ` + "`labels_exclude`" + ` | ` + "`[\"wontfix\"]`" + ` |
-| ` + "`priority_min`" + ` | ` + "`0`" + ` (P0 or higher) |
-| ` + "`priority_max`" + ` | ` + "`2`" + ` (P2 or lower) |
-| ` + "`type`" + ` | ` + "`[\"bug\", \"feature\"]`" + ` |
-| ` + "`assignee`" + ` | ` + "`\"@alice\"`" + ` |
-
-### Sharing Recipes
-
-Since recipes live in ` + "`.beads/`" + `, they're version controlled:
-
-- Commit your recipes to share with team
-- Different branches can have different recipes
-- Pull request to propose new team recipes
-
-### Robot Mode
-
-` + "```bash\nbv --recipe \"Sprint Ready\" --robot-triage\n```" + `
-
-Apply any recipe as a pre-filter for robot commands.
 
 > Press **→** to continue.`
 
 // advancedAIAgentContent is the AI Agent Integration tutorial page.
 const advancedAIAgentContent = `## AI Agent Integration
 
-bv is designed to work with **AI coding agents** — Claude, GPT, Codex, etc.
+b9s provides an interactive issue browser. Agents can use the Beads CLI.
 
-### The Robot Mode Philosophy
+### Beads Commands
 
-Regular bv is for humans. **Robot mode** is for agents:
-
-| Human | Agent |
-|-------|-------|
-| ` + "`bv`" + ` (interactive TUI) | ` + "`bv --robot-*`" + ` (JSON output) |
-| Visual navigation | Structured data parsing |
-| Keyboard shortcuts | Command flags |
-
-### Key Robot Commands
-
-` + "```bash\n# The mega-command: start here\nbv --robot-triage\n\n# Quick picks\nbv --robot-next         # Single top priority item\nbv --robot-plan         # Parallel execution tracks\n\n# Deep analysis\nbv --robot-insights     # PageRank, cycles, bottlenecks\nbv --robot-alerts       # Stale items, priority inversions\n```" + `
-
-### What --robot-triage Returns
-
-` + "```json\n{\n  \"quick_ref\": {\n    \"open_count\": 24,\n    \"actionable_count\": 18,\n    \"top_picks\": [...]\n  },\n  \"recommendations\": [\n    {\n      \"id\": \"bv-abc1\",\n      \"score\": 0.85,\n      \"reasons\": [\"High PageRank\", \"Unblocks 3 items\"],\n      \"action\": \"work\"\n    }\n  ],\n  \"quick_wins\": [...],\n  \"blockers_to_clear\": [...]\n}\n```" + `
+` + "```bash\nbd ready\nbd show ISSUE_ID\nbd dep list ISSUE_ID\n```" + `
 
 ### Agent Workflow Example
 
 ` + "```" + `
-1. Agent calls: bv --robot-next
-2. Receives: { "id": "bv-abc1", "title": "Fix auth" }
-3. Agent runs: br update bv-abc1 --status=in_progress
-4. Agent does the work...
-5. Agent runs: br close bv-abc1
-6. Agent calls: bv --robot-next (repeat)
+1. Read the project's AGENTS.md
+2. Find work: bd ready
+3. Read the issue: bd show ISSUE_ID
+4. Follow the project's task workflow
 ` + "```" + `
 
-### The br CLI (for Agents)
+### The bd CLI
 
 | Command | Purpose |
 |---------|---------|
-| ` + "`br ready`" + ` | List actionable issues |
-| ` + "`br update <id> --status=in_progress`" + ` | Claim work |
-| ` + "`br close <id>`" + ` | Complete work |
-| ` + "`br sync`" + ` | Commit changes to git |
+| ` + "`bd ready`" + ` | List actionable issues |
+| ` + "`bd update ISSUE_ID --status=in_progress`" + ` | Claim work |
+| ` + "`bd close ISSUE_ID`" + ` | Complete work |
 
 ### AGENTS.md Integration
 
 Every project should have an ` + "`AGENTS.md`" + ` file explaining:
-- How to use bv robot commands
+- How to use the Beads CLI
 - Project-specific workflows
 - Integration with other tools
 
@@ -2167,7 +1799,7 @@ Let's walk through implementing a feature from start to finish.
 
 ### Step 1: Find Available Work
 
-` + "```bash\nbr ready                        # Show actionable issues\nbv --robot-triage | jq '.recommendations[0]'\n```" + `
+` + "```bash\nbd ready                        # Show actionable issues\n```" + `
 
 Or in bv: press **r** to filter to ready issues.
 
@@ -2204,7 +1836,7 @@ As you work, you realize there are sub-tasks:
 ### Pro Tips
 
 - **Check ` + "`br ready`" + `** after each close — new work may have unblocked
-- **Use ` + "`bv --robot-graph`" + `** to inspect the sub-task structure
+- **Press g** to inspect the selected issue's dependencies
 - **Set realistic priorities** — P2 for standard work, P1 only for blockers
 
 > Press **→** to continue.`
@@ -2285,30 +1917,15 @@ Option B: Leave unassigned
 // workflowSprintPlanningContent is the Sprint Planning workflow tutorial page.
 const workflowSprintPlanningContent = `## Workflow: Sprint Planning Session
 
-Use bv's analytics to make data-driven sprint decisions.
+Review status, dependencies and ready work in b9s.
 
 ### Step 1: Review Project Health
 
-Open the Insights panel with **i**:
-
-` + "```" + `
-┌─────────────────────────────────────────────────────┐
-│ PROJECT HEALTH                                      │
-├─────────────────────────────────────────────────────┤
-│ Open: 45   In Progress: 8   Blocked: 12            │
-│                                                     │
-│ Top Blockers (unblock most work):                   │
-│   bv-auth  → would unblock 5 items                  │
-│   bv-api   → would unblock 3 items                  │
-│                                                     │
-│ Priority Distribution:                              │
-│   P0: 2   P1: 8   P2: 25   P3+: 18                  │
-└─────────────────────────────────────────────────────┘
-` + "```" + `
+Press **b** for the board and review issue status.
 
 ### Step 2: Identify Dependencies
 
-Run ` + "`bv --robot-graph`" + ` to inspect the dependency structure:
+Press **g** to inspect the selected issue's dependencies:
 
 - **Tall chains** = sequential work (can't parallelize)
 - **Wide clusters** = parallel opportunities
@@ -2337,22 +1954,6 @@ For each sprint candidate:
 3. Add sprint label: **L** → "sprint-42"
 4. Optionally assign: update with --assignee
 
-### Step 5: Export Sprint Plan
-
-Press **x** to export the filtered list to markdown:
-
-` + "```markdown\n# Sprint 42 Plan\n\n## P1 - Must Complete\n- [ ] bv-abc1: Fix auth timeout\n- [ ] bv-def2: API rate limiting\n\n## P2 - Should Complete  \n- [ ] bv-ghi3: Dashboard redesign\n...\n```" + `
-
-Share in Slack, email, or sprint planning doc.
-
-### Step 6: Time-Travel at Sprint End
-
-After the sprint, compare progress:
-
-` + "```bash\n# Press t, enter: HEAD~50 (start of sprint)\n# Or use robot mode:\nbv --robot-diff --diff-since HEAD~50\n```" + `
-
-See exactly how many issues closed, what unblocked, velocity achieved.
-
 > Press **→** to continue.`
 
 // workflowOnboardingContent is the Onboarding workflow tutorial page.
@@ -2376,7 +1977,7 @@ Tell them about the help system:
 |-----|---------------|
 | **?** | Quick reference overlay |
 | **` + "`" + `** | Full interactive tutorial |
-| **;** | Shortcuts sidebar |
+| **Ctrl+S** (in help) | Search shortcuts |
 
 > "If you forget anything, just press ? or ` + "`" + `"
 

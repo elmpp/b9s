@@ -671,20 +671,40 @@ func TestTutorialSetSizeUpdatesMarkdownRenderer(t *testing.T) {
 	}
 }
 
+func TestTutorialHasNoRemovedViews(t *testing.T) {
+	check := func(id, content string) {
+		t.Helper()
+		for _, stale := range []string{"--robot-", "robot mode", "insights panel", "history view", "recipes", "shortcuts sidebar", "shortcuts bar", "label analytics", "label dashboard", "labels dashboard", "attention view", "flow matrix", "alerts panel", "b/g/i/h"} {
+			if strings.Contains(strings.ToLower(content), stale) {
+				t.Errorf("%s advertises removed feature %q", id, stale)
+			}
+		}
+	}
+	for _, page := range defaultTutorialPages() {
+		check(page.ID, page.Title+"\n"+page.Content)
+	}
+	for _, page := range structuredTutorialPages() {
+		check(page.ID, page.Title+"\n"+RenderStructuredPage(page, Theme{Renderer: lipgloss.DefaultRenderer()}, 140))
+	}
+}
+
 func TestTutorialMarkdownWithCodeBlocks(t *testing.T) {
 	m := newTestTutorialModel()
 	m.SetSize(100, 60) // Larger to show more content
 
-	// Navigate to the "AI Agent Integration" page which has code blocks
-	// Page indices: intro x4, concepts x5, views x8, advanced x7 (semantic-search, time-travel, label-analytics, export, workspace, recipes, ai)
-	m.JumpToPage(23) // Index 23 is "advanced-ai"
+	for i, page := range m.pages {
+		if page.ID == "intro-audience" {
+			m.JumpToPage(i)
+			break
+		}
+	}
 
 	view := m.View()
 
 	// Code blocks should be present (content includes bash commands)
 	// The exact rendering depends on Glamour, but the content should include command text
-	if !strings.Contains(view, "robot") {
-		t.Error("View should contain 'robot' command from code blocks")
+	if !strings.Contains(view, "bd ready") {
+		t.Error("View should contain 'bd ready' command from code blocks")
 	}
 }
 

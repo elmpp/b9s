@@ -5013,10 +5013,10 @@ func (m *Model) renderHelpOverlay() string {
 		{"j / ↓", "Move down"},
 		{"k / ↑", "Move up"},
 		{"Home/End", "Go to first / last"},
-		{"Ctrl+f/PgDn", "Page down"},
+		{"PgDn", "Page down"},
 		{"Ctrl+b/PgUp", "Page up"},
-		{"Ctrl+d/u", "Half page down / up"},
-		{"Tab", "Switch focus"},
+		{"Ctrl+d/Ctrl+u", "Half page down / up"},
+		{"Tab", "Fold / cycle columns"},
 		{"Enter", "View details"},
 		{"Esc", "Back / close"},
 	}
@@ -5025,12 +5025,6 @@ func (m *Model) renderHelpOverlay() string {
 		{"E", "Tree view"},
 		{"b", "Kanban board"},
 		{"g", "Dependency graph"},
-		{"i", "Insights"},
-		{"h", "History view"},
-		{"a", "Actionable"},
-		{"f", "Flow matrix"},
-		{"[", "Label dashboard"},
-		{"]", "Attention view"},
 	}
 
 	globalSection := []struct{ key, desc string }{
@@ -5039,9 +5033,7 @@ func (m *Model) renderHelpOverlay() string {
 		{":", "Command prompt"},
 		{":mouse", "Mouse: select text / scroll"},
 		{"Ctrl+e", "Toggle header"},
-		{";", "Shortcuts bar"},
-		{"!", "Alerts panel"},
-		{"'", "Recipes"},
+		{"`", "Tutorial"},
 		{"w", "Repo picker"},
 		{"Esc", "Back (2x quit)"},
 		{"Ctrl+c", "Force quit"},
@@ -5049,49 +5041,27 @@ func (m *Model) renderHelpOverlay() string {
 
 	filterSection := []struct{ key, desc string }{
 		{"/", "Fuzzy search"},
-		{"H", "Hybrid ranking"},
-		{"Alt+H", "Hybrid preset"},
+		{"Ctrl+f", "Search: filter or find"},
 		{"o", "Open issues"},
 		{"C", "Closed issues"},
 		{"r", "Ready (unblocked)"},
-		{"l", "Filter by label"},
 		{"L/A", "Label, assignee quick filter"},
 		{"F1-F4", "Show only epics, features, tasks, bugs"},
-		{"s", "Cycle sort"},
-		{"S", "Triage sort"},
-	}
-
-	insightsSection := []struct{ key, desc string }{
-		{"h/l/Tab", "Switch panels"},
-		{"j/k", "Navigate items"},
-		{"e", "Explanations"},
-		{"x", "Calc details"},
-		{"m", "Toggle heatmap"},
-		{"Enter", "Jump to issue"},
-	}
-
-	historySection := []struct{ key, desc string }{
-		{"j/k", "Navigate beads"},
-		{"J/K", "Navigate commits"},
-		{"Tab", "Toggle focus"},
-		{"y", "Copy SHA"},
-		{"c", "Confidence filter"},
+		{"s", "Sort popup"},
 	}
 
 	actionsSection := []struct{ key, desc string }{
-		{"p", "Priority hints"},
 		{"K", "Close marked / selected"},
 		{"S", "Status of marked / selected"},
 		{"Delete", "Delete marked / selected"},
 		{"Ctrl+R", "Force refresh"},
 		{"F5", "Force refresh"},
-		{"x", "Export markdown"},
-		{"C", "Copy to clipboard"},
+		{"c", "Copy full Markdown (detail)"},
 		{"O", "Open issue in editor"},
 	}
 
 	treeSection := []struct{ key, desc string }{
-		{"j/k/↕", "Move up/down"},
+		{"j/k", "Move up/down"},
 		{"h", "Collapse / parent"},
 		{"l", "Expand / child"},
 		{"←/→", "Page back/forward"},
@@ -5103,10 +5073,8 @@ func (m *Model) renderHelpOverlay() string {
 		{"t", "Flat list / tree"},
 		{"v", "Wrap long titles"},
 		{"Tab", "Cycle node visibility"},
-		{"1-9", "Expand to level N"},
 		{"d", "Toggle detail panel"},
 		{"n/p", "Detail: next/prev sibling"},
-		{"1-9", "Detail: open numbered child"},
 		{"c", "Copy ID and title"},
 		{"o/C/r/a", "Filter: open/closed/ready/all"},
 		{"s", "Sort popup"},
@@ -5119,20 +5087,18 @@ func (m *Model) renderHelpOverlay() string {
 		{"&", "Occur: only the hits"},
 		{"ctrl+f", "Search: filter or find"},
 		{"x", "XRay drill-down"},
-		{"b/B", "Bookmark / cycle"},
+		{"B", "Cycle bookmarks"},
 		{"Space", "Mark / unmark"},
 		{"m / u", "Mark / unmark, next row"},
 		{"Bksp", "Unmark row above"},
 		{"^Space/V", "Mark range"},
 		{"^\\ / U", "Clear marks"},
-		{"M", "Memory wires, \\ detail"},
+		{"M", "Memory wires (\\ detail)"},
 		{"S", "Change status"},
 	}
 
 	editingSection := []struct{ key, desc string }{
 		{"e", "Edit issue"},
-		{"Space", "Status picker (list)"},
-		{"1-4", "Set priority (list)"},
 		{"Ctrl+n", "Create new issue"},
 		{"Ctrl+s / Enter", "Save (in editor; Enter not in text areas)"},
 		{"Esc", "Cancel (in editor)"},
@@ -5157,10 +5123,8 @@ func (m *Model) renderHelpOverlay() string {
 		{"Navigation", "🧭", 0, navSection},
 		{"Views", "👁", 1, viewsSection},
 		{"Global", "🌐", 2, globalSection},
-		{"History", "📜", 3, historySection},
 		{"Hotkeys", "⚙️", 3, m.hotkeyHelpRows()},
 		{"Tree View", "🌳", 4, treeSection},
-		{"Insights", "💡", 0, insightsSection},
 		{"Status", "🩺", 2, statusSection},
 		{"Filters & Sort", "🔍", 3, filterSection},
 		{"Actions", "⚡", 1, actionsSection},
