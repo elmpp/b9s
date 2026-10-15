@@ -77,6 +77,13 @@ preview_parse_args() {
   PREVIEW_INGRESS_PORT="${B9S_PREVIEW_INGRESS_PORT:-8081}"
   [[ $PREVIEW_INGRESS_PORT =~ ^[0-9]{1,5}$ ]] || preview_die usage "ingress port is not valid"
   PREVIEW_URL="http://${PREVIEW_HOST}:${PREVIEW_INGRESS_PORT}"
+  # The ingress controller may be public, and a preview serves a writable
+  # terminal. The default names the osenco-infra Middleware that admits only
+  # port-forward traffic; big-hetzner refuses a preview Ingress without it. An
+  # empty value renders no Middleware, for a cluster that does not define it.
+  PREVIEW_INGRESS_MIDDLEWARE="${B9S_PREVIEW_INGRESS_MIDDLEWARE-kube-system-preview-private@kubernetescrd}"
+  [[ -z $PREVIEW_INGRESS_MIDDLEWARE || $PREVIEW_INGRESS_MIDDLEWARE =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?@kubernetescrd$ ]] \
+    || preview_die usage "ingress middleware is not a Traefik CRD reference"
 
   PREVIEW_TAILSCALE_HOST="${B9S_PREVIEW_TAILSCALE_HOST:-}"
   PREVIEW_TAILSCALE_HOST="${PREVIEW_TAILSCALE_HOST%.}"
@@ -129,6 +136,12 @@ preview_require_cluster() {
 preview_render_manifests() {
   local output="$1"
   local tailscale_rule=""
+  local ingress_annotations=""
+  if [[ -n $PREVIEW_INGRESS_MIDDLEWARE ]]; then
+    ingress_annotations="$(printf '%s\n' \
+      "  annotations:" \
+      "    traefik.ingress.kubernetes.io/router.middlewares: ${PREVIEW_INGRESS_MIDDLEWARE}")"
+  fi
   if [[ -n $PREVIEW_TAILSCALE_HOST ]]; then
     tailscale_rule="$(printf '%s\n' \
       "    - host: ${PREVIEW_TAILSCALE_HOST}" \
@@ -336,6 +349,7 @@ kind: Ingress
 metadata:
   name: b9s
   namespace: ${PREVIEW_NAMESPACE}
+${ingress_annotations}
 spec:
   ingressClassName: traefik
   rules:

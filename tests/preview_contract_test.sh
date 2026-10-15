@@ -198,6 +198,27 @@ if [[ $fail -eq 0 ]]; then
   set -e
   if [[ $invalid_tailnet_rc -eq 2 ]]; then ok "unsafe tailnet host stops before cluster access"; else bad "unsafe tailnet host stops before cluster access" "exit $invalid_tailnet_rc"; fi
   contains "unsafe tailnet host reports the boundary" "tailnet host is not valid" "$invalid_tailnet"
+
+  contains "preview Ingress admits only port-forward traffic" \
+    "traefik.ingress.kubernetes.io/router.middlewares: kube-system-preview-private@kubernetescrd" "$rendered"
+  open_rendered="$(
+    B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview B9S_PREVIEW_INGRESS_MIDDLEWARE= \
+    bash -c 'source "$1"; preview_parse_args bd-b6jw "$2"; preview_render_manifests /dev/stdout' \
+      bash "$PREVIEW/lib.sh" "$sha"
+  )"
+  if [[ -n $open_rendered && $open_rendered != *router.middlewares* ]]; then
+    ok "an empty middleware override renders no Middleware"
+  else
+    bad "an empty middleware override renders no Middleware"
+  fi
+  set +e
+  invalid_middleware="$(B9S_PREVIEW_KUBECONFIG="$kubeconfig" B9S_PREVIEW_CONTEXT=preview \
+    B9S_PREVIEW_INGRESS_MIDDLEWARE='x"; evil' \
+    "$PREVIEW/preview-status" bd-b6jw "$sha" 2>&1)"
+  invalid_middleware_rc=$?
+  set -e
+  if [[ $invalid_middleware_rc -eq 2 ]]; then ok "unsafe middleware stops before cluster access"; else bad "unsafe middleware stops before cluster access" "exit $invalid_middleware_rc"; fi
+  contains "unsafe middleware reports the boundary" "ingress middleware is not a Traefik CRD reference" "$invalid_middleware"
 fi
 
 # Model kubectl's partial apply: a denied Namespace does not stop it applying

@@ -188,6 +188,23 @@ scripts/preview/preview-deploy bd-b6jw "$sha"
 The mobile URL is `https://TAILNET_HOST/b9s/`. Tailscale Serve is private to
 the tailnet. Do not use Funnel for this preview.
 
+## Ingress access
+
+The preview Ingress carries the Traefik Middleware named by
+`B9S_PREVIEW_INGRESS_MIDDLEWARE`. On big-hetzner, Traefik is a public
+LoadBalancer and a preview serves a writable terminal, so osenco-infra defines
+`kube-system/preview-private`, which admits only `kubectl port-forward` traffic,
+and refuses a preview Ingress without it (osenco-infra ADR 0010). Open a
+big-hetzner preview through a port-forward:
+
+```sh
+kubectl --context big-hetzner -n kube-system port-forward svc/traefik 8091:80
+# http://b9s-TASK.previews.osenco.test:8091/
+```
+
+The laptop cluster does not define that Middleware, and Traefik answers 404 for
+a route that names a missing one. Set the variable empty there.
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -199,6 +216,7 @@ the tailnet. Do not use Funnel for this preview.
 | `B9S_PREVIEW_BUILDKIT_ADDR` | `tcp://buildkitd.buildkit.svc.cluster.local:1234` | Unprivileged in-cluster builder |
 | `B9S_PREVIEW_HOST_SUFFIX` | `previews.osenco.test` | Browser hostname suffix |
 | `B9S_PREVIEW_INGRESS_PORT` | `8081` | Local Traefik host port |
+| `B9S_PREVIEW_INGRESS_MIDDLEWARE` | `kube-system-preview-private@kubernetescrd` | Traefik Middleware on the preview Ingress; empty renders none |
 | `B9S_PREVIEW_TAILSCALE_HOST` | empty | Optional MagicDNS hostname for the private `/b9s/` route |
 | `B9S_PREVIEW_ROLLOUT_TIMEOUT` | `180` | Bounded rollout wait in seconds |
 | `B9S_PREVIEW_DELETE_TIMEOUT` | `180` | Bounded namespace deletion wait in seconds |
@@ -212,6 +230,7 @@ kubeconfig instead.
 sha="$(git rev-parse HEAD)"
 export B9S_PREVIEW_KUBECONFIG="$HOME/.kube/config-local-mac-k3s"
 export B9S_PREVIEW_CONTEXT=k3d-local-mac-k3s
+export B9S_PREVIEW_INGRESS_MIDDLEWARE=
 
 scripts/preview/preview-provision-reader bd-b6jw
 scripts/preview/preview-build bd-b6jw "$sha"
