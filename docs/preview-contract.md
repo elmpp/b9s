@@ -11,11 +11,13 @@ Status: active
 ## Contents
 
 - [Interface](#interface)
+- [Deployment values](#deployment-values)
 - [Runtime shape](#runtime-shape)
+- [Mobile navigation](#mobile-navigation)
 - [Namespace and access boundary](#namespace-and-access-boundary)
-- [Read-only shared database catalog](#read-only-shared-database-catalog)
 - [Image delivery](#image-delivery)
 - [Clickable URL](#clickable-url)
+- [Ingress access](#ingress-access)
 - [Configuration](#configuration)
 - [Local verification](#local-verification)
 - [Recovering a stale browser session](#recovering-a-stale-browser-session)
@@ -42,16 +44,37 @@ excluded from the preview image build context by `Dockerfile.dockerignore`.
 Staged changes, Beads issue/configuration edits, and other untracked files still
 block delivery. Do not reset, delete, or hide files to satisfy the guard.
 
-The default kubeconfig is
-`/mnt/secrets/preview/preview.kubeconfig`, the project-scoped b9s credential
-issued by osenco-infra. The default context is `preview`.
+The default kubeconfig is `/mnt/secrets/preview/preview.kubeconfig`, a
+project-scoped credential the cluster mounts into the deploying Pod. The
+default context is `preview`.
+
+## Deployment values
+
+This repository does not know the cluster it deploys to. Every value that names
+a platform object comes from the environment, supplied by whatever runs the
+preview (a software factory, or an operator's shell). The commands stop before
+any cluster access when a required value is missing.
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `PREVIEW_HOST_SUFFIX` | yes | DNS suffix of preview hosts |
+| `PREVIEW_INGRESS_MIDDLEWARE` | no | Traefik Middleware reference (`namespace-name@kubernetescrd`) on every preview Ingress; empty renders none |
+| `PREVIEW_LABEL_DOMAIN` | yes | Prefix of the namespace labels the cluster's policies match |
+| `PREVIEW_RUNNER_NAMESPACE` | yes | Namespace whose Pods may reach the preview |
+| `PREVIEW_WORKLOAD_ROLE` | yes | ClusterRole bound inside the preview namespace |
+| `PREVIEW_DEPLOYER_SA` | yes | `namespace/name` of the deploying ServiceAccount |
+| `PREVIEW_READER_REF` | yes | Name of the Secret holding the read-only database credential |
+
+`PREVIEW_DEPLOYER_SA` and `PREVIEW_READER_REF` may contain `{project}`, which
+the scripts replace with `b9s`. A cluster that serves several projects can then
+set one template for all of them.
 
 ## Runtime shape
 
 ```mermaid
 graph TB
     USER["👤 **Reviewer**<br/>desktop or mobile browser"]
-    TRAEFIK["**Traefik**<br/>b9s-TASK.previews.osenco.test"]
+    TRAEFIK["**Traefik**<br/>b9s-TASK.PREVIEW_HOST_SUFFIX"]
 
     subgraph NS["🖥️ b9s task namespace"]
         DESKTOP["**Desktop ttyd**<br/>keyboard terminal on 7681"]
@@ -69,15 +92,13 @@ graph TB
         B9S --> CATALOG
     end
 
-    TUNNEL["**Laptop SSH tunnel**<br/>host.docker.internal:3306"]
     DOLT[("Shared Dolt<br/>SELECT only")]
 
     USER --> TRAEFIK
     TRAEFIK --> DESKTOP
     TRAEFIK --> MOBILE
     TRAEFIK --> ID
-    CATALOG --> TUNNEL
-    TUNNEL --> DOLT
+    CATALOG -->|"TCP 3306"| DOLT
 ```
 
 The image bakes `/app/.commit-sha`. Deployment supplies only the task and
@@ -99,32 +120,32 @@ The desktop URL remains unchanged. Append `/b9s/` to open the mobile shell.
 
 ## Namespace and access boundary
 
-`TASK_ID` becomes `b9s-TASK-SLUG`. The namespace carries these labels:
+`TASK_ID` becomes `b9s-TASK-SLUG`. The namespace carries these labels, with
+`PREVIEW_LABEL_DOMAIN` as the prefix:
 
 ```text
-omnigent.osenco.dev/preview=true
-omnigent.osenco.dev/project=b9s
-omnigent.osenco.dev/task-id=TASK_ID
-omnigent.osenco.dev/commit-sha=COMMIT_SHA
+PREVIEW_LABEL_DOMAIN/preview=true
+PREVIEW_LABEL_DOMAIN/project=b9s
+PREVIEW_LABEL_DOMAIN/task-id=TASK_ID
+PREVIEW_LABEL_DOMAIN/commit-sha=COMMIT_SHA
 ```
 
-The b9s deployer initially has only namespace lifecycle and constrained bind
-permissions. The first namespaced object is a RoleBinding to
-`omnigent-preview-workloads`. osenco-infra admission allows that binding only
-inside a labelled `b9s-*` namespace. LimitRange, ResourceQuota and NetworkPolicy
-ship with every preview.
+The deployer is expected to hold only namespace lifecycle and constrained bind
+permissions. The first namespaced object is a RoleBinding of
+`PREVIEW_DEPLOYER_SA` to `PREVIEW_WORKLOAD_ROLE`. The cluster's admission policy
+decides where that binding is allowed. LimitRange, ResourceQuota and
+NetworkPolicy ship with every preview.
 
 The credential is project-scoped, not lane-scoped. One b9s lane can still reach
 another b9s lane's preview. It cannot bind or deploy in a sibling project's
 namespace or in `default`.
 
 Redeploying the same task with another SHA updates the namespace's
-`omnigent.osenco.dev/commit-sha` label and kubectl's
-`kubectl.kubernetes.io/last-applied-configuration` annotation. The osenco-infra
-policy must allow these metadata updates only in labelled `b9s-*` preview
-namespaces. Namespace creation permission alone is insufficient. The owning
-infrastructure prerequisite is `bd-ay47`; this repository does not widen that
-policy.
+`commit-sha` label and kubectl's
+`kubectl.kubernetes.io/last-applied-configuration` annotation. The cluster's
+policy must allow these metadata updates in labelled `b9s-*` preview
+namespaces. Namespace creation permission alone is insufficient. This
+repository does not widen that policy.
 
 `preview-deploy` first applies the rendered Namespace with `--dry-run=server`.
 An admission or authorization failure stops before any workload is applied and
@@ -135,22 +156,21 @@ or make the subsequent multi-resource apply atomic.
 
 Before the first deployment, an operator runs
 `scripts/preview/preview-provision-reader TASK_ID`. The command finds databases
-that contain an `issues` table, grants the existing `bd_b9s_ro` identity
-`SELECT` on each database individually, proves a no-op `UPDATE` is denied, and
-only then writes `b9s-shared-dolt-reader` into the task namespace. Database
-names are enumerated because Dolt does not reliably enforce wildcard database
-grants. Re-run the command after adding a Beads database.
+that contain an `issues` table, grants the read-only identity named by
+`BEADS_DOLT_READ_USER` `SELECT` on each database individually, proves a no-op
+`UPDATE` is denied, and only then writes the `PREVIEW_READER_REF` Secret into
+the task namespace. Database names are enumerated because Dolt does not
+reliably enforce wildcard database grants. Re-run the command after adding a
+Beads database.
 
 The Secret exposes only `B9S_DOLT_HOST`, `B9S_DOLT_PORT`,
 `B9S_DOLT_READ_USER`, and `B9S_DOLT_READ_PASSWORD`. The NetworkPolicy permits
-database traffic only on TCP 3306. In the local cluster,
-`host.docker.internal` reaches the existing laptop SSH tunnel; the remote Dolt
-port remains unreachable directly.
+database traffic only on TCP 3306.
 
 ## Image delivery
 
-Inside an Omnigent Runner Pod, `preview-build` uses the BuildKit service and
-pushes the immutable SHA tag to the in-cluster registry:
+Inside a runner Pod, `preview-build` uses the BuildKit service and pushes the
+immutable SHA tag to the in-cluster registry:
 
 ```text
 registry.registry.svc.cluster.local:5000/b9s-preview:COMMIT_SHA
@@ -162,20 +182,21 @@ service-name image reference.
 
 ## Clickable URL
 
-The local URL is:
+The URL is:
 
 ```text
-http://b9s-TASK-SLUG.previews.osenco.test:8081
+http://b9s-TASK-SLUG.PREVIEW_HOST_SUFFIX:B9S_PREVIEW_INGRESS_PORT
 ```
 
-The reserved `.test` suffix is answered locally by dnsmasq. Do not replace it
-with nip.io or sslip.io. Labels ending in digits can be interpreted as part of
-the embedded address and route to an unrelated public IP.
+Use a suffix under a domain you resolve yourself, such as a reserved `.test`
+name answered by a local resolver. Do not use nip.io or sslip.io: a label
+ending in digits can be read as part of the embedded address and route to an
+unrelated public IP.
 
-For phone access, set `B9S_PREVIEW_TAILSCALE_HOST` to the laptop's MagicDNS
-name before deploying. The manifest adds only `/b9s`, `/b9s/terminal` and the
-allowlisted key endpoint to that host, so an existing application at the host
-root remains unchanged. Tailscale Serve forwards tailnet HTTPS to the shared
+For phone access, set `B9S_PREVIEW_TAILSCALE_HOST` to the workstation's
+MagicDNS name before deploying. The manifest adds only `/b9s`, `/b9s/terminal`
+and the allowlisted key endpoint to that host, so an existing application at
+the host root remains unchanged. Tailscale Serve forwards tailnet HTTPS to the
 local Traefik listener:
 
 ```sh
@@ -190,22 +211,18 @@ the tailnet. Do not use Funnel for this preview.
 
 ## Ingress access
 
-The preview Ingress carries the Traefik Middleware named by
-`B9S_PREVIEW_INGRESS_MIDDLEWARE`. On big-hetzner, Traefik is a public
-LoadBalancer and a preview serves a writable terminal, so osenco-infra defines
-`kube-system/preview-private`, which admits only `kubectl port-forward` traffic,
-and refuses a preview Ingress without it (osenco-infra ADR 0010). Open a
-big-hetzner preview through a port-forward:
+A preview serves a writable terminal. On a cluster whose ingress is publicly
+reachable, set `PREVIEW_INGRESS_MIDDLEWARE` to a Traefik Middleware that admits
+only trusted traffic, and have admission refuse a preview Ingress without it.
+How a reviewer then reaches the preview (a port-forward, a VPN) is the
+cluster operator's choice and is documented with the cluster, not here.
 
-```sh
-kubectl --context big-hetzner -n kube-system port-forward svc/traefik 8091:80
-# http://b9s-TASK.previews.osenco.test:8091/
-```
-
-The laptop cluster does not define that Middleware, and Traefik answers 404 for
-a route that names a missing one. Set the variable empty there.
+Traefik answers 404 for a route that names a Middleware the cluster does not
+define. Leave the variable empty on a cluster without one.
 
 ## Configuration
+
+Tuning knobs, all optional:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -214,23 +231,25 @@ a route that names a missing one. Set the variable empty there.
 | `B9S_PREVIEW_REGISTRY` | `registry.registry.svc.cluster.local:5000` | Image reference used by Kubernetes |
 | `B9S_PREVIEW_PUSH_REGISTRY` | same as registry | Docker push endpoint |
 | `B9S_PREVIEW_BUILDKIT_ADDR` | `tcp://buildkitd.buildkit.svc.cluster.local:1234` | Unprivileged in-cluster builder |
-| `B9S_PREVIEW_HOST_SUFFIX` | `previews.osenco.test` | Browser hostname suffix |
 | `B9S_PREVIEW_INGRESS_PORT` | `8081` | Local Traefik host port |
-| `B9S_PREVIEW_INGRESS_MIDDLEWARE` | `kube-system-preview-private@kubernetescrd` | Traefik Middleware on the preview Ingress; empty renders none |
 | `B9S_PREVIEW_TAILSCALE_HOST` | empty | Optional MagicDNS hostname for the private `/b9s/` route |
 | `B9S_PREVIEW_ROLLOUT_TIMEOUT` | `180` | Bounded rollout wait in seconds |
 | `B9S_PREVIEW_DELETE_TIMEOUT` | `180` | Bounded namespace deletion wait in seconds |
 
+`preview-provision-reader` reads `B9S_PREVIEW_ADMIN_KUBECONFIG` (default
+`KUBECONFIG`), the required `B9S_PREVIEW_ADMIN_CONTEXT`, `BEADS_DOLT_READ_USER`
+and `BEADS_DOLT_ROOT_PASSWORD`.
+
 ## Local verification
 
-Use the admin kubeconfig only for operator testing. A lane uses the mounted b9s
-kubeconfig instead.
+Use an admin kubeconfig only for operator testing. A lane uses the mounted
+project kubeconfig instead.
 
 ```sh
 sha="$(git rev-parse HEAD)"
-export B9S_PREVIEW_KUBECONFIG="$HOME/.kube/config-local-mac-k3s"
-export B9S_PREVIEW_CONTEXT=k3d-local-mac-k3s
-export B9S_PREVIEW_INGRESS_MIDDLEWARE=
+export B9S_PREVIEW_KUBECONFIG="$HOME/.kube/config-local"
+export B9S_PREVIEW_CONTEXT=local
+# plus the PREVIEW_* values from "Deployment values"
 
 scripts/preview/preview-provision-reader bd-b6jw
 scripts/preview/preview-build bd-b6jw "$sha"
@@ -239,18 +258,20 @@ scripts/preview/preview-verify bd-b6jw "$sha"
 scripts/preview/preview-status bd-b6jw "$sha"
 ```
 
-The contract tests use disposable local Git repositories and do not call an image
-builder or the cluster. They require Bash, Git, and GNU `timeout` (`gtimeout` is
-also accepted), with a five-second deadline for each boundary check:
+The contract tests use disposable local Git repositories and placeholder
+deployment values, and do not call an image builder or the cluster. They
+require Bash, Git, and GNU `timeout` (`gtimeout` is also accepted), with a
+five-second deadline for each boundary check:
 
 ```sh
 tests/preview_contract_test.sh
 ```
 
 It simulates two deployments of the same task with different SHAs and a
-namespace metadata denial, asserting that denial leaves workloads untouched.
-For live verification, use the scoped kubeconfig for both SHAs, check the
-namespace label and last-applied annotation, and verify the image's served
+namespace metadata denial, asserting that denial leaves workloads untouched,
+and checks that each required deployment value stops the commands when
+missing. For live verification, use the scoped kubeconfig for both SHAs, check
+the namespace label and last-applied annotation, and verify the image's served
 identity after each rollout. Use server-side dry-run metadata patches to prove
 that `default` and an outside-prefix namespace are denied. Do not substitute
 `kubectl auth can-i` for admission testing: RBAC permission alone does not
@@ -263,19 +284,19 @@ databases and compare the rendered totals with read-only Dolt queries:
 ```sh
 tests/mobile_project_switch_e2e.sh \
   "https://$tailnet_host" bd-b6jw "$sha" b9s-bd-b6jw \
-  "$HOME/.kube/config-local-mac-k3s"
+  "$B9S_PREVIEW_KUBECONFIG"
 ```
 
 ## Recovering a stale browser session
 
 After a preview Pod is replaced, an already-open ttyd frame can remain on
-`Press Enter to Reconnect` even though the deployment and Tailnet route are
+`Press Enter to Reconnect` even though the deployment and tailnet route are
 healthy. Confirm the two server boundaries before changing the deployment:
 
 ```sh
-curl -fsS https://macbook-pro-2.tailb7c04d.ts.net/b9s/__preview
-kubectl --kubeconfig "$HOME/.kube/config-local-mac-k3s" \
-  --context k3d-local-mac-k3s -n b9s-TASK-SLUG get deploy,pod
+curl -fsS "https://$tailnet_host/b9s/__preview"
+kubectl --kubeconfig "$B9S_PREVIEW_KUBECONFIG" \
+  --context "$B9S_PREVIEW_CONTEXT" -n b9s-TASK-SLUG get deploy,pod
 ```
 
 If the identity responds and the deployment is ready, use the mobile shell's

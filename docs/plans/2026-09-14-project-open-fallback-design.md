@@ -50,7 +50,7 @@ worked.
 | Reason | Message | Try |
 |---|---|---|
 | `NotAProject` | `~/x is not a Beads project` | `bd init`, or start b9s inside a project |
-| `ServerDown` | `Cannot reach the Dolt server at 127.0.0.1:3306` | `launchctl list \| grep dolt-tunnel`, or `bd-fallback local` |
+| `ServerDown` | `Cannot reach the Dolt server at 127.0.0.1:3306` | Start the Dolt server or the tunnel to it |
 | `Denied` | `bd_b9s may not read database ghost` | `direnv allow`, or check `BEADS_DOLT_PASSWORD` |
 | `NoIssuesTable` | `Database ghost is not a Beads database` | `bd init --server --database=ghost` |
 | `Unreadable` | `.beads/issues.jsonl cannot be parsed (line 12)` | Fix or re-export the file with `bd export` |
@@ -86,8 +86,7 @@ popup style, without the fallback.
 ```
 b9s: cannot open ghost
   Reason  the Dolt server at 127.0.0.1:1 is not reachable (connection refused)
-  Try     launchctl list | grep dolt-tunnel
-          bd-fallback local
+  Try     start the Dolt server or the tunnel to it
 Opening b9s instead, the last project that opened successfully (12 min ago).
 ```
 
@@ -121,8 +120,7 @@ stays a success with a warning in the health popup, as before.
 │ The Dolt server at 127.0.0.1:1 is not reachable. │
 │                                                  │
 │ Try                                              │
-│   launchctl list | grep dolt-tunnel              │
-│   bd-fallback local                              │
+│   Start the Dolt server or the tunnel to it.     │
 │                                                  │
 │ Still showing b9s.                               │
 │ r retry   Esc close   Shift+D connection details │

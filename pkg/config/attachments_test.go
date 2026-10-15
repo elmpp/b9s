@@ -53,11 +53,11 @@ func TestAttachments_FullyPopulated(t *testing.T) {
 		"  max_bytes: 1048576\n" +
 		"  gc_grace: 48h\n" +
 		"  local_dir: /tmp/should-be-ignored-for-s3\n" +
-		"  prefix: osenco\n" +
+		"  prefix: acme\n" +
 		"  s3:\n" +
-		"    endpoint: https://nbg1.your-objectstorage.com\n" +
-		"    region: nbg1\n" +
-		"    bucket: osenco-beads-attachments\n" +
+		"    endpoint: https://s3.eu-central.example.com\n" +
+		"    region: eu-central\n" +
+		"    bucket: acme-beads-attachments\n" +
 		"    path_style: true\n" +
 		"    url_ttl: 5m\n" +
 		"    credential_command: \"print-creds.sh\"\n"
@@ -81,13 +81,13 @@ func TestAttachments_FullyPopulated(t *testing.T) {
 	if a.URLTTLOrDefault() != 5*time.Minute {
 		t.Errorf("URLTTLOrDefault() = %s, want 5m", a.URLTTLOrDefault())
 	}
-	if a.Prefix != "osenco" {
-		t.Errorf("Prefix = %q, want osenco", a.Prefix)
+	if a.Prefix != "acme" {
+		t.Errorf("Prefix = %q, want acme", a.Prefix)
 	}
-	if a.S3.Endpoint != "https://nbg1.your-objectstorage.com" {
+	if a.S3.Endpoint != "https://s3.eu-central.example.com" {
 		t.Errorf("S3.Endpoint = %q", a.S3.Endpoint)
 	}
-	if a.S3.Region != "nbg1" || a.S3.Bucket != "osenco-beads-attachments" {
+	if a.S3.Region != "eu-central" || a.S3.Bucket != "acme-beads-attachments" {
 		t.Errorf("S3 = %+v", a.S3)
 	}
 	if !a.S3.PathStyle {
@@ -272,11 +272,11 @@ func TestAttachments_InvalidEndpointsAreRejected(t *testing.T) {
 }
 
 func TestAttachments_ValidEndpointIsAccepted(t *testing.T) {
-	cfg, err := writeConfigAndLoad(t, "attachments:\n  backend: s3\n  s3:\n    endpoint: https://nbg1.your-objectstorage.com\n")
+	cfg, err := writeConfigAndLoad(t, "attachments:\n  backend: s3\n  s3:\n    endpoint: https://s3.eu-central.example.com\n")
 	if err != nil {
 		t.Fatalf("LoadFrom: %v", err)
 	}
-	if cfg.Attachments.S3.Endpoint != "https://nbg1.your-objectstorage.com" {
+	if cfg.Attachments.S3.Endpoint != "https://s3.eu-central.example.com" {
 		t.Errorf("S3.Endpoint = %q", cfg.Attachments.S3.Endpoint)
 	}
 }

@@ -46,4 +46,4 @@ carries the rest:
 - a NetworkPolicy denying all egress, because `bd` runs on visitor input;
 - a size limit on `/data`, and CPU and memory limits.
 
-The small-hetzner manifests are in the osenco repository, `deploy/base/b9s-demo/`.
+The manifests that carry these live in the deployment repository, outside b9s.

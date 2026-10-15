@@ -9,14 +9,14 @@ import (
 )
 
 const assigneeIdentities = `[
-  {"name": "andre", "kind": "human", "aliases": ["vanderheijden86", "vanderheijden86@gmail.com"]},
+  {"name": "al", "kind": "human", "aliases": ["alice", "alice@example.invalid"]},
   {"name": "lanes", "kind": "agent", "aliases": ["ubuntu"]}
 ]`
 
 func identityIssues() []model.Issue {
 	return []model.Issue{
-		{ID: "a-1", Title: "one", Status: model.StatusOpen, Assignee: "vanderheijden86"},
-		{ID: "a-2", Title: "two", Status: model.StatusOpen, Assignee: "vanderheijden86@gmail.com"},
+		{ID: "a-1", Title: "one", Status: model.StatusOpen, Assignee: "alice"},
+		{ID: "a-2", Title: "two", Status: model.StatusOpen, Assignee: "alice@example.invalid"},
 		{ID: "a-3", Title: "three", Status: model.StatusOpen, Assignee: "ubuntu"},
 		{ID: "a-4", Title: "four", Status: model.StatusOpen, Assignee: "crew-7"},
 	}
@@ -35,7 +35,7 @@ func modelWithIdentities(t *testing.T) Model {
 
 func TestAssigneeFilter_CanonicalNameMatchesAliases(t *testing.T) {
 	m := modelWithIdentities(t)
-	m.assigneeFilter = "andre"
+	m.assigneeFilter = "al"
 	var matched []string
 	for _, issue := range m.issues {
 		if m.matchesCurrentFilter(issue) {
@@ -50,9 +50,9 @@ func TestAssigneeFilter_CanonicalNameMatchesAliases(t *testing.T) {
 func TestTreeAssigneeFilter_CanonicalNameMatchesAliases(t *testing.T) {
 	m := modelWithIdentities(t)
 	issue := m.issues[1]
-	m.tree.assigneeFilter = "andre"
+	m.tree.assigneeFilter = "al"
 	if !m.tree.passesScopeFilters(&issue) {
-		t.Fatal("tree filter on andre must match vanderheijden86@gmail.com")
+		t.Fatal("tree filter on al must match alice@example.invalid")
 	}
 }
 
@@ -63,7 +63,7 @@ func TestAssigneeEntries_MergeAliases(t *testing.T) {
 	for _, e := range m.assigneeEntries {
 		counts[e.Assignee] = e.Count
 	}
-	if counts["andre"] != 2 || counts["vanderheijden86"] != 0 {
+	if counts["al"] != 2 || counts["alice"] != 0 {
 		t.Fatalf("entries = %+v", m.assigneeEntries)
 	}
 }
@@ -75,7 +75,7 @@ func TestAssigneeEntries_GroupHumansAgentsPools(t *testing.T) {
 	for _, e := range m.assigneeEntries {
 		order = append(order, e.Assignee)
 	}
-	if len(order) != 3 || order[0] != "andre" || order[1] != "lanes" || order[2] != "crew-7" {
+	if len(order) != 3 || order[0] != "al" || order[1] != "lanes" || order[2] != "crew-7" {
 		t.Fatalf("order = %v, want human, agent, pool", order)
 	}
 }
@@ -83,7 +83,7 @@ func TestAssigneeEntries_GroupHumansAgentsPools(t *testing.T) {
 func TestEditSuggestions_UseCanonicalNames(t *testing.T) {
 	m := modelWithIdentities(t)
 	got := m.collectEditSuggestions().Assignees
-	if len(got) != 3 || got[0] != "andre" || got[1] != "crew-7" || got[2] != "lanes" {
+	if len(got) != 3 || got[0] != "al" || got[1] != "crew-7" || got[2] != "lanes" {
 		t.Fatalf("assignee suggestions = %v", got)
 	}
 }
@@ -98,7 +98,7 @@ func TestAssigneeBar_TagsAgentsAndPools(t *testing.T) {
 			t.Errorf("assignee bar lacks %q:\n%s", want, bar)
 		}
 	}
-	if strings.Contains(bar, "andre (human)") {
+	if strings.Contains(bar, "al (human)") {
 		t.Error("humans carry no tag")
 	}
 }

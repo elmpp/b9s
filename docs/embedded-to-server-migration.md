@@ -81,7 +81,7 @@ Point to an external server by specifying connection details:
 
 ```bash
 bd init --from-jsonl --server \
-  --server-host=osen.co \
+  --server-host=db.example.com \
   --server-port=3306 \
   --server-user=root \
   --database=myproject \

@@ -69,8 +69,8 @@ func TestCheckScratchAddrRefusesSharedOrRemoteServers(t *testing.T) {
 		"127.0.0.1:3306",
 		"localhost:3306",
 		"db.example.com:3307",
-		"[2a01:4f8:13a:643::2]:3307",
-		"195.201.110.43:3307",
+		"[2001:db8::2]:3307",
+		"203.0.113.43:3307",
 		"127.0.0.1",
 	} {
 		if err := checkScratchAddr(addr); err == nil {

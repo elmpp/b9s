@@ -731,12 +731,12 @@ func TestIssueUnmarshalReadsDeferUntil(t *testing.T) {
 
 func TestIssueUnmarshal_ReadsCreatorAndOwner(t *testing.T) {
 	var issue Issue
-	line := `{"id":"bd-1","title":"t","created_by":"vanderheijden86","owner":"v@example.com","assignee":"BrownBear"}`
+	line := `{"id":"bd-1","title":"t","created_by":"alice","owner":"v@example.com","assignee":"BrownBear"}`
 	if err := json.Unmarshal([]byte(line), &issue); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if issue.CreatedBy != "vanderheijden86" {
-		t.Errorf("CreatedBy = %q, want vanderheijden86", issue.CreatedBy)
+	if issue.CreatedBy != "alice" {
+		t.Errorf("CreatedBy = %q, want alice", issue.CreatedBy)
 	}
 	if issue.Owner != "v@example.com" {
 		t.Errorf("Owner = %q, want v@example.com", issue.Owner)

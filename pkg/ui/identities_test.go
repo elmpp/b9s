@@ -15,17 +15,17 @@ func doltModel(db string) Model {
 
 func TestIdentitiesLoadedMsg_AppliesRegistry(t *testing.T) {
 	m := doltModel("b9s")
-	reg, _ := identity.Parse(`[{"name":"andre","kind":"human","aliases":["vanderheijden86"]}]`, "")
+	reg, _ := identity.Parse(`[{"name":"al","kind":"human","aliases":["alice"]}]`, "")
 	next, _ := m.Update(identitiesLoadedMsg{source: m.doltSource, registry: reg})
-	got := next.(Model).Identities().DisplayName("vanderheijden86")
-	if got != "andre" {
-		t.Fatalf("DisplayName = %q, want andre", got)
+	got := next.(Model).Identities().DisplayName("alice")
+	if got != "al" {
+		t.Fatalf("DisplayName = %q, want al", got)
 	}
 }
 
 func TestIdentitiesLoadedMsg_IgnoresOtherProject(t *testing.T) {
 	m := doltModel("b9s")
-	reg, _ := identity.Parse(`[{"name":"andre","kind":"human","aliases":["vanderheijden86"]}]`, "")
+	reg, _ := identity.Parse(`[{"name":"al","kind":"human","aliases":["alice"]}]`, "")
 	stale := datasource.DataSource{Type: datasource.SourceTypeDolt, Path: "127.0.0.1:13306", Database: "other"}
 	next, _ := m.Update(identitiesLoadedMsg{source: stale, registry: reg})
 	if next.(Model).Identities() != nil {

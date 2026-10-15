@@ -13,15 +13,15 @@ now. Beads stores both, but under names that do not agree with each other:
 
 - `issues.created_by` holds the bd actor at creation time (`--actor`, then
   `$BEADS_ACTOR`, then `git config user.name`, then `$USER`). On the b9s
-  database it reads `vanderheijden86`, `ubuntu` (lane pods), `jemanuel`,
+  database it reads `alice`, `ubuntu` (lane pods), `bob`,
   `unknown` or empty.
 - `issues.owner` holds the creator's git email (`GIT_AUTHOR_EMAIL`, then
   `git config user.email`).
 - `issues.assignee` is free text: humans, lane agent names such as
   `BrownBear`, and role names.
 - The Dolt SQL login, for example `bd_b9s`, is one credential per workspace.
-  Every agent in a lane holds it (see agents-config
-  `docs/beads-workspace-credential-boundary.md`). It names a project, not a
+  Every agent in a lane holds it (see the operator's
+  workspace credential boundary). It names a project, not a
   person, and Dolt stores it on no issue row.
 
 Upstream Beads has no alias-to-person mapping. It compares actors with
@@ -56,8 +56,8 @@ The value is a JSON list:
 
 ```json
 [
-  {"name": "vanderheijden86", "kind": "human",
-   "aliases": ["vanderheijden86@gmail.com", "andre"]},
+  {"name": "alice", "kind": "human",
+   "aliases": ["alice@example.invalid", "asmith"]},
   {"name": "lane-agents", "kind": "agent", "aliases": ["ubuntu"]}
 ]
 ```

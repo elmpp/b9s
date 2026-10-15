@@ -32,13 +32,13 @@ func openSQLiteAt(t *testing.T, path string, stmts ...string) *sql.DB {
 func TestApplyCreators_FillsCreatedByAndOwner(t *testing.T) {
 	db := openCreatorsDB(t,
 		`CREATE TABLE issues (id TEXT, created_by TEXT, owner TEXT)`,
-		`INSERT INTO issues VALUES ('bd-1', 'vanderheijden86', 'v@example.com'), ('bd-2', NULL, NULL)`,
+		`INSERT INTO issues VALUES ('bd-1', 'alice', 'v@example.com'), ('bd-2', NULL, NULL)`,
 	)
 	issues := []model.Issue{{ID: "bd-1", Assignee: "BrownBear"}, {ID: "bd-2"}}
 
 	applyCreators(db, issues)
 
-	if issues[0].CreatedBy != "vanderheijden86" || issues[0].Owner != "v@example.com" {
+	if issues[0].CreatedBy != "alice" || issues[0].Owner != "v@example.com" {
 		t.Errorf("bd-1 creator = %q/%q", issues[0].CreatedBy, issues[0].Owner)
 	}
 	if issues[0].Assignee != "BrownBear" {
@@ -52,14 +52,14 @@ func TestApplyCreators_FillsCreatedByAndOwner(t *testing.T) {
 func TestApplyCreators_SchemaWithoutOwner(t *testing.T) {
 	db := openCreatorsDB(t,
 		`CREATE TABLE issues (id TEXT, created_by TEXT)`,
-		`INSERT INTO issues VALUES ('bd-1', 'jemanuel')`,
+		`INSERT INTO issues VALUES ('bd-1', 'bob')`,
 	)
 	issues := []model.Issue{{ID: "bd-1"}}
 
 	applyCreators(db, issues)
 
-	if issues[0].CreatedBy != "jemanuel" {
-		t.Errorf("CreatedBy = %q, want jemanuel", issues[0].CreatedBy)
+	if issues[0].CreatedBy != "bob" {
+		t.Errorf("CreatedBy = %q, want bob", issues[0].CreatedBy)
 	}
 }
 

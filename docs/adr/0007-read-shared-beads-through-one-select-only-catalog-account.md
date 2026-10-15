@@ -16,7 +16,7 @@ metadata.
 
 Dolt records wildcard database grants without reliably enforcing them. The
 local Kubernetes cluster can reach the shared server through the laptop's
-existing SSH tunnel at `host.docker.internal`, while the remote public port is
+existing SSH tunnel on the host, while the remote public port is
 blocked.
 
 ## Decision

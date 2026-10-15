@@ -5,9 +5,9 @@ Status: design, option not chosen yet. Beads: `bd-nwxc`.
 ## Why
 
 b9s shows a `Lane state` column in the tree and a `lane: <stage>` tag on board
-cards. Both read the `lane-stage=` label that the Omnigent lane dispatcher
-writes (`bd-butn.3`). That label exists only in projects that run Omnigent
-lanes, so it is too specific for a general Beads viewer.
+cards. Both read the `lane-stage=` label that an external task runner
+writes (`bd-butn.3`). That label exists only in projects that use such a
+runner, so it is too specific for a general Beads viewer.
 
 A general need sits in the same place: after a task closes, it still has to be
 deployed to acceptance and to production, and nothing shows where it is

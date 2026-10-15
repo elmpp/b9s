@@ -21,9 +21,12 @@ admin_host=${BEADS_DOLT_ADMIN_HOST:-127.0.0.1}
 admin_port=${BEADS_DOLT_ADMIN_PORT:-3306}
 app_host=${B9S_DOLT_HOST:-host.docker.internal}
 app_port=${B9S_DOLT_PORT:-3306}
-kubeconfig=${B9S_PREVIEW_ADMIN_KUBECONFIG:-$HOME/.kube/config-local-mac-k3s}
-context=${B9S_PREVIEW_ADMIN_CONTEXT:-k3d-local-mac-k3s}
-root_password=${BEADS_DOLT_ROOT_PASSWORD:-$(launchctl getenv BEADS_DOLT_PASSWORD 2>/dev/null || true)}
+kubeconfig=${B9S_PREVIEW_ADMIN_KUBECONFIG:-${KUBECONFIG:-$HOME/.kube/config}}
+context=${B9S_PREVIEW_ADMIN_CONTEXT:?required: the admin context of the cluster that hosts the preview}
+root_password=${BEADS_DOLT_ROOT_PASSWORD:-}
+: "${PREVIEW_LABEL_DOMAIN:?required: the label domain the cluster matches (docs/preview-contract.md)}"
+reader_ref=${PREVIEW_READER_REF:?required: the reader Secret name (docs/preview-contract.md)}
+reader_ref=${reader_ref//\{project\}/b9s}
 
 [[ -n $root_password ]] || { printf 'BEADS_DOLT_ROOT_PASSWORD is required\n' >&2; exit 1; }
 [[ -f $kubeconfig ]] || { printf 'admin kubeconfig is not a file: %s\n' "$kubeconfig" >&2; exit 1; }
@@ -85,9 +88,9 @@ printf '%s\n' \
   '  labels:' \
   '    app.kubernetes.io/name: b9s' \
   '    app.kubernetes.io/managed-by: b9s-preview' \
-  '    omnigent.osenco.dev/preview: "true"' \
-  '    omnigent.osenco.dev/project: b9s' \
-  "    omnigent.osenco.dev/task-id: $task_id" \
+  "    $PREVIEW_LABEL_DOMAIN/preview: \"true\"" \
+  "    $PREVIEW_LABEL_DOMAIN/project: b9s" \
+  "    $PREVIEW_LABEL_DOMAIN/task-id: $task_id" \
   | "${kc[@]}" apply --server-side --field-manager=b9s-preview-reader --filename=- >/dev/null
 
 encode() { printf '%s' "$1" | base64 | tr -d '\n'; }
@@ -95,7 +98,7 @@ printf '%s\n' \
   'apiVersion: v1' \
   'kind: Secret' \
   'metadata:' \
-  '  name: b9s-shared-dolt-reader' \
+  "  name: $reader_ref" \
   "  namespace: $namespace" \
   'type: Opaque' \
   'data:' \

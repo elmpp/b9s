@@ -5,8 +5,8 @@ web UI for their projects on the shared Dolt server, and `bd` inside the image
 carries out every write. It runs behind a proxy that signs the person in and
 trusts that proxy's email header (ADR 0021); the image itself has no login.
 
-The deployment that uses it is `beads.osen.co` on small-hetzner, described in
-osenco-infra ADR 0004 and `clusters/small-hetzner/platform/beads-web/`.
+A deployment runs one such pod per person, for example at
+`<person>.beads.example.com`; its manifests live in the deployment repository.
 
 ```
  browser ──▶ oauth2-proxy ──X-Forwarded-Email──▶ b9s web :7681 ──▶ bd

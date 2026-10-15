@@ -14,7 +14,7 @@ details) lived only in the README. The first copyable command sat at line 57 and
 useful action after the k9s comparison.
 
 The audience is existing Beads users who run coding agents against a project. The launch
-research in the osenco repository asks them for one thing, "try b9s on one of your projects",
+research in a private planning repository asks them for one thing, "try b9s on one of your projects",
 and measures repeat use. Its acceptance sequence is ten minutes long: install and open the
 project, find an issue and understand its status, change it and see the change through `bd`.
 A README that a reader scrolls for a minute before the first command works against that.

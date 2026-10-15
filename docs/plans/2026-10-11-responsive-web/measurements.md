@@ -8,7 +8,7 @@ status: partial
 
 # Measurements: b9s web on local beads stores
 
-The operator stopped this task on 2026-10-11 12:56 to start the implementation. Below is the raw summary of the last measure run (`npx playwright test --project measure`, `web/tests/measure.spec.ts`), copied from `.b9s-e2e/measure/report/summary.md` as the run was stopped. Local fixtures only (1000 and 5000 issues); beads.osen.co was not measured, by the operator's rule. The budgets for story 7 are set in the speed task (`b9m-vdp.1.2`) from these numbers.
+The operator stopped this task on 2026-10-11 12:56 to start the implementation. Below is the raw summary of the last measure run (`npx playwright test --project measure`, `web/tests/measure.spec.ts`), copied from `.b9s-e2e/measure/report/summary.md` as the run was stopped. Local fixtures only (1000 and 5000 issues); the hosted board was not measured, by the operator's rule. The budgets for story 7 are set in the speed task (`b9m-vdp.1.2`) from these numbers.
 
 ## Raw summary
 

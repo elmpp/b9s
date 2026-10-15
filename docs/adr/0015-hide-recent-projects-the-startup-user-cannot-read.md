@@ -10,7 +10,7 @@ date: 2026-09-24
 
 ADR 0008 keeps a recent project the startup user cannot read in the header,
 marked `✗`. Since then every project received its own Dolt user, granted on
-its own database only (the workspace credential boundary in `agents-config`).
+its own database only (the operator's workspace credential boundary).
 A b9s started in one checkout therefore reads exactly one database, and the
 header became a row of `✗` marks around it.
 

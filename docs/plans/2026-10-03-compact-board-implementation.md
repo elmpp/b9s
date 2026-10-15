@@ -111,10 +111,10 @@ func TestBoardEpicFacts_CountsOverTheEpicUniverse(t *testing.T) {
 func TestBoardEpicFacts_OwnerFallsBackToOwnerField(t *testing.T) {
 	issues := factsBoardIssues()
 	issues[0].Assignee = ""
-	issues[0].Owner = "polly"
+	issues[0].Owner = "carol"
 	b := NewBoardModel(issues, DefaultTheme(lipgloss.DefaultRenderer()))
-	if got := b.epics["p-e1"].Owner; got != "polly" {
-		t.Fatalf("owner = %q, want polly", got)
+	if got := b.epics["p-e1"].Owner; got != "carol" {
+		t.Fatalf("owner = %q, want carol", got)
 	}
 }
 ```
