@@ -42,7 +42,7 @@ type ProjectPickerModel struct {
 	filterInput     textinput.Model
 	filtering       bool
 	theme           Theme
-	sourceInfo      string // e.g. "dolt://osen.co:3306/b9s ✓" or "jsonl .beads/issues.jsonl"
+	sourceInfo      string // e.g. "dolt://db.example.com:3306/b9s ✓" or "jsonl .beads/issues.jsonl"
 	allProjectsMode bool   // True when showing all-projects view (bd-g68w)
 }
 

@@ -135,7 +135,7 @@ func TestOpen_KeyUsesPrefixAndDatabaseSegment(t *testing.T) {
 
 	t.Run("explicit prefix wins over the default", func(t *testing.T) {
 		cfg := &config.AttachmentsConfig{Backend: "local", LocalDir: t.TempDir(), LocalWithDoltServer: true}
-		cfg.Prefix = "osenco"
+		cfg.Prefix = "acme"
 		h, err := Open(context.Background(), cfg, SourceInfo{Kind: SourceDolt, Database: "b9s"})
 		if err != nil {
 			t.Fatalf("Open: %v", err)
@@ -144,7 +144,7 @@ func TestOpen_KeyUsesPrefixAndDatabaseSegment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "osenco/b9s/sha256/9f/" + hash
+		want := "acme/b9s/sha256/9f/" + hash
 		if got != want {
 			t.Errorf("Key() = %q, want %q", got, want)
 		}

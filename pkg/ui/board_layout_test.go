@@ -303,8 +303,8 @@ func TestBoardView_SelectedRowKeepsBackgroundAfterInnerResets(t *testing.T) {
 
 func TestBoardCardView_DropsTheIDPrefixAlreadyInTheTitle(t *testing.T) {
 	b := newSparseBoard()
-	issue := model.Issue{ID: "spectroscope-f7t.1", Title: "[f7t.1] Patch small-hetzner", Status: model.StatusOpen}
-	if got := b.cardView(issue).Title; got != "Patch small-hetzner" {
+	issue := model.Issue{ID: "spectroscope-f7t.1", Title: "[f7t.1] Patch staging", Status: model.StatusOpen}
+	if got := b.cardView(issue).Title; got != "Patch staging" {
 		t.Fatalf("title must not repeat the ID shown beside it, got %q", got)
 	}
 	other := model.Issue{ID: "spectroscope-f7t.1", Title: "[f7t.2] Mentions a sibling", Status: model.StatusOpen}

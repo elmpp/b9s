@@ -4,11 +4,11 @@ import "testing"
 
 func TestKeyIsContentAddressedAndScoped(t *testing.T) {
 	const hash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
-	got, err := Key("osenco", "b9s", "sha256", hash)
+	got, err := Key("acme", "b9s", "sha256", hash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "osenco/b9s/sha256/9f/" + hash
+	want := "acme/b9s/sha256/9f/" + hash
 	if got != want {
 		t.Fatalf("Key() = %q, want %q", got, want)
 	}

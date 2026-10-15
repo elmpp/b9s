@@ -14,9 +14,9 @@ func healthIdentityModel(t *testing.T) Model {
 	m := NewModel(nil, "")
 	m.width, m.height = 120, 40
 	m.activeProjectPath = "/projects/b9s"
-	m.actorLookup = stubActorLookup(nil, "vanderheijden86")
+	m.actorLookup = stubActorLookup(nil, "alice")
 	m.identityConfig = datasource.IdentityConfig{SQLUser: "bd_b9s@%"}
-	reg, _ := identity.Parse(`[{"name":"andre","kind":"human","aliases":["vanderheijden86"]}]`, "")
+	reg, _ := identity.Parse(`[{"name":"al","kind":"human","aliases":["alice"]}]`, "")
 	m.setIdentities(reg)
 	return m
 }
@@ -32,7 +32,7 @@ func TestIdentityHealth_SQLLoginDropsHost(t *testing.T) {
 func TestIdentityHealth_ResolvesActor(t *testing.T) {
 	var h DatabaseHealth
 	healthIdentityModel(t).fillIdentityHealth(&h)
-	if h.Actor != "andre" || h.ActorKind != identity.KindHuman {
+	if h.Actor != "al" || h.ActorKind != identity.KindHuman {
 		t.Fatalf("actor = %q (%q)", h.Actor, h.ActorKind)
 	}
 }
@@ -55,7 +55,7 @@ func TestHealthModal_ShowsSharedLoginAndIdentity(t *testing.T) {
 	m.dbHealth = DatabaseHealth{Backend: "Dolt (MySQL protocol)", Server: "127.0.0.1:3306", Database: "b9s", User: "bd_b9s", Connected: true}
 	m.fillIdentityHealth(&m.dbHealth)
 	view := stripANSI(m.renderDBHealthModal())
-	for _, want := range []string{"SQL login:", "bd_b9s (shared credential)", "You:", "andre (human)"} {
+	for _, want := range []string{"SQL login:", "bd_b9s (shared credential)", "You:", "al (human)"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("health popup lacks %q:\n%s", want, view)
 		}
@@ -68,7 +68,7 @@ func TestHealthModal_UnmappedActorSaysSo(t *testing.T) {
 	m.dbHealth = DatabaseHealth{Backend: "JSONL (flat file)", FilePath: "/p/issues.jsonl"}
 	m.fillIdentityHealth(&m.dbHealth)
 	view := stripANSI(m.renderDBHealthModal())
-	if !strings.Contains(view, "vanderheijden86 (not in b9s.identities)") {
+	if !strings.Contains(view, "alice (not in b9s.identities)") {
 		t.Fatalf("health popup:\n%s", view)
 	}
 }

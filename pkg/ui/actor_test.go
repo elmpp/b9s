@@ -17,22 +17,22 @@ func stubActorLookup(env map[string]string, gitUser string) actorLookup {
 }
 
 func TestActorLookup_BeadsActorWins(t *testing.T) {
-	l := stubActorLookup(map[string]string{"BEADS_ACTOR": "lane-7", "BD_ACTOR": "old", "USER": "ubuntu"}, "Andre")
+	l := stubActorLookup(map[string]string{"BEADS_ACTOR": "lane-7", "BD_ACTOR": "old", "USER": "ubuntu"}, "Alice")
 	if got := l.actor("/p"); got != "lane-7" {
 		t.Fatalf("actor = %q", got)
 	}
 }
 
 func TestActorLookup_BDActorBeforeGit(t *testing.T) {
-	l := stubActorLookup(map[string]string{"BD_ACTOR": "old", "USER": "ubuntu"}, "Andre")
+	l := stubActorLookup(map[string]string{"BD_ACTOR": "old", "USER": "ubuntu"}, "Alice")
 	if got := l.actor("/p"); got != "old" {
 		t.Fatalf("actor = %q", got)
 	}
 }
 
 func TestActorLookup_GitUserBeforeUSER(t *testing.T) {
-	l := stubActorLookup(map[string]string{"USER": "ubuntu"}, "Andre")
-	if got := l.actor("/p"); got != "Andre" {
+	l := stubActorLookup(map[string]string{"USER": "ubuntu"}, "Alice")
+	if got := l.actor("/p"); got != "Alice" {
 		t.Fatalf("actor = %q", got)
 	}
 }
@@ -60,18 +60,18 @@ func TestActorLookup_GitRunsInProjectDir(t *testing.T) {
 }
 
 func TestCreateModalFor_PrefillsAssignee(t *testing.T) {
-	modal := NewCreateModalFor(DefaultTheme(lipgloss.DefaultRenderer()), "andre")
-	if *modal.assignee != "andre" {
+	modal := NewCreateModalFor(DefaultTheme(lipgloss.DefaultRenderer()), "al")
+	if *modal.assignee != "al" {
 		t.Fatalf("assignee = %q", *modal.assignee)
 	}
 }
 
 func TestCreateModalFor_PassesActor(t *testing.T) {
-	modal := NewCreateModalFor(DefaultTheme(lipgloss.DefaultRenderer()), "andre")
+	modal := NewCreateModalFor(DefaultTheme(lipgloss.DefaultRenderer()), "al")
 	*modal.title = "t"
 	*modal.assignee = "someone-else"
 	args := modal.BuildCreateArgs()
-	if args["actor"] != "andre" {
+	if args["actor"] != "al" {
 		t.Fatalf("actor arg = %q; the creator must not follow the assignee", args["actor"])
 	}
 }
@@ -85,9 +85,9 @@ func TestCreateModal_NoActorWithoutOne(t *testing.T) {
 }
 
 func TestCreateModalFor_HeaderShowsCreator(t *testing.T) {
-	modal := NewCreateModalFor(DefaultTheme(lipgloss.DefaultRenderer()), "andre")
+	modal := NewCreateModalFor(DefaultTheme(lipgloss.DefaultRenderer()), "al")
 	modal.SetSize(100, 40)
-	if view := stripANSI(modal.View()); !strings.Contains(view, "as @andre") {
+	if view := stripANSI(modal.View()); !strings.Contains(view, "as @al") {
 		t.Fatalf("create header should name the creator:\n%s", view)
 	}
 }
@@ -95,11 +95,11 @@ func TestCreateModalFor_HeaderShowsCreator(t *testing.T) {
 func TestCtrlN_PrefillsResolvedActor(t *testing.T) {
 	m := NewModel(nil, "")
 	m.activeProjectPath = "/projects/b9s"
-	m.actorLookup = stubActorLookup(nil, "vanderheijden86")
-	m.identities, _ = identity.Parse(`[{"name":"andre","kind":"human","aliases":["vanderheijden86"]}]`, "")
+	m.actorLookup = stubActorLookup(nil, "alice")
+	m.identities, _ = identity.Parse(`[{"name":"al","kind":"human","aliases":["alice"]}]`, "")
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
 	got := next.(Model)
-	if !got.showEditModal || *got.editModal.assignee != "andre" {
+	if !got.showEditModal || *got.editModal.assignee != "al" {
 		t.Fatalf("assignee = %q, want the resolved actor", *got.editModal.assignee)
 	}
 }

@@ -40,7 +40,7 @@ func TestCanonicalActor_MatchesUpstream(t *testing.T) {
 }
 
 const sampleIdentities = `[
-  {"name": "vanderheijden86", "kind": "human", "aliases": ["vanderheijden86@gmail.com", "andre"]},
+  {"name": "alice", "kind": "human", "aliases": ["alice@example.invalid", "al"]},
   {"name": "lane-agents", "kind": "agent", "aliases": ["ubuntu", "BrownBear"]}
 ]`
 
@@ -49,8 +49,8 @@ func TestResolve_AliasMapsToName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := r.Resolve("vanderheijden86@gmail.com")
-	if got.Name != "vanderheijden86" || got.Kind != KindHuman {
+	got := r.Resolve("alice@example.invalid")
+	if got.Name != "alice" || got.Kind != KindHuman {
 		t.Fatalf("Resolve(email) = %+v", got)
 	}
 }
@@ -71,8 +71,8 @@ func TestResolve_MatchesCanonicalSpelling(t *testing.T) {
 
 func TestResolve_UnknownAliasResolvesToItself(t *testing.T) {
 	r, _ := Parse(sampleIdentities, "")
-	got := r.Resolve("jemanuel")
-	if got.Name != "jemanuel" || got.Kind != KindUnknown || got.Known() {
+	got := r.Resolve("bob")
+	if got.Name != "bob" || got.Kind != KindUnknown || got.Known() {
 		t.Fatalf("Resolve(unknown) = %+v", got)
 	}
 }
@@ -162,24 +162,24 @@ func TestIdentities_ListsConfiguredInOrder(t *testing.T) {
 	for _, id := range r.Identities() {
 		names = append(names, id.Name)
 	}
-	if strings.Join(names, ",") != "vanderheijden86,lane-agents,fable-crew" {
+	if strings.Join(names, ",") != "alice,lane-agents,fable-crew" {
 		t.Fatalf("Identities() = %v", names)
 	}
 }
 
 func TestMatches_AliasOfSameIdentity(t *testing.T) {
 	r, _ := Parse(sampleIdentities, "")
-	if !r.Matches("andre", "vanderheijden86") {
+	if !r.Matches("al", "alice") {
 		t.Fatal("an alias should match its identity name")
 	}
-	if r.Matches("andre", "ubuntu") {
+	if r.Matches("al", "ubuntu") {
 		t.Fatal("aliases of different identities must not match")
 	}
 }
 
 func TestMatches_EmptyNeverMatchesNonEmpty(t *testing.T) {
 	r, _ := Parse(sampleIdentities, "")
-	if r.Matches("", "andre") {
+	if r.Matches("", "al") {
 		t.Fatal("an unassigned value must not match a person")
 	}
 }

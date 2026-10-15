@@ -21,7 +21,7 @@ type MultiDoltReader struct {
 // DoltDBInfo holds connection info for one Dolt database, extracted from a project.
 type DoltDBInfo struct {
 	Name     string // database name (e.g., "LP_Team")
-	Host     string // e.g., "osen.co"
+	Host     string // e.g., "db.example.com"
 	Port     int    // e.g., 3306
 	User     string // e.g., "root"
 	Database string // e.g., "LP_Team"
