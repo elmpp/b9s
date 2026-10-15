@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+: "${B9S_DOLT_HOST:?required}"
+: "${B9S_DOLT_PORT:?required}"
+: "${B9S_DOLT_READ_PASSWORD:?required}"
+
+# kubectl exec does not inherit exports from the container entrypoint.
+export HOME=/tmp TERM=xterm-256color BW_NO_BROWSER=1 BW_TEST_MODE=1
+export BEADS_DOLT_PASSWORD="$B9S_DOLT_READ_PASSWORD"
+export B9S_TRUSTED_DOLT_ENDPOINTS="$B9S_DOLT_HOST:$B9S_DOLT_PORT"
+
+project_dir="$(cat /tmp/b9s-preview-project)"
+case "$project_dir" in
+  /data/projects/?*) ;;
+  *) printf 'preview startup has not selected a project\n' >&2; exit 1 ;;
+esac
+test -d "$project_dir/.beads"
+export BEADS_DIR="$project_dir/.beads"
+cd "$project_dir"
+exec b9s "$@"

@@ -75,6 +75,7 @@ if [ "$database_count" -eq 0 ]; then
 fi
 
 export BEADS_DIR="/data/projects/$current_database/.beads"
+printf '%s\n' "/data/projects/$current_database" > /tmp/b9s-preview-project
 printf '{"commit":"%s","taskId":"%s","namespace":"%s","databaseCount":%s}\n' \
   "$commit_sha" "$PREVIEW_TASK_ID" "$PREVIEW_NAMESPACE" "$database_count" > /www/__preview
 httpd -f -p 7682 -h /www &
@@ -82,7 +83,7 @@ httpd -f -p 7682 -h /www &
 # The terminal UI waits in a detached session. A reviewer or the deployer
 # attaches with kubectl exec, so the TUI is tested in a real terminal and
 # never through a browser.
-tmux new-session -d -s b9s -c "/data/projects/$current_database" /usr/local/bin/b9s
+tmux new-session -d -s b9s -c "/data/projects/$current_database" /usr/local/bin/preview-tui
 
 (
   attempts=0

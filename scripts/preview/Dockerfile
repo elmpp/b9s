@@ -17,7 +17,8 @@ RUN apk add --no-cache busybox-extras mariadb-client tmux \
     && chown -R 65532:65532 /data /www
 COPY --from=builder /out/b9s /usr/local/bin/b9s
 COPY scripts/preview/entrypoint.sh /usr/local/bin/b9s-preview-entrypoint
-RUN chmod 0755 /usr/local/bin/b9s /usr/local/bin/b9s-preview-entrypoint
+COPY scripts/preview/preview-tui /usr/local/bin/preview-tui
+RUN chmod 0755 /usr/local/bin/b9s /usr/local/bin/b9s-preview-entrypoint /usr/local/bin/preview-tui
 
 EXPOSE 7681 7682
 ENTRYPOINT ["/usr/local/bin/b9s-preview-entrypoint"]

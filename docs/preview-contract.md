@@ -119,6 +119,17 @@ kubectl -n b9s-TASK-SLUG exec -it deploy/b9s -- tmux attach -t b9s
 Detach with `Ctrl-b d`. The session keeps running, so a second viewer attaching
 later sees the same screen. The browser URL never serves a terminal.
 
+To start a separate TUI, use the image's wrapper:
+
+```sh
+kubectl -n b9s-TASK-SLUG exec -it deploy/b9s -- preview-tui
+```
+
+The wrapper uses the project selected during startup, preferring `b9s` when
+available. It sets the terminal, home directory, browser suppression and Dolt
+environment inside the Pod. The password stays inside the Pod. Quit this TUI
+with `q`. Both commands require a terminal and `pods/exec` access.
+
 ## Web board access
 
 `b9s web` runs in trust-header mode (ADR 0021). It answers only a request whose
@@ -266,9 +277,21 @@ five-second deadline for each boundary check:
 
 ```sh
 tests/preview_contract_test.sh
+bash tests/preview_tui_test.sh
 ```
 
-It simulates two deployments of the same task with different SHAs and a
+The TUI wrapper test additionally requires Docker and `alpine:3.22`. It runs
+with networking disabled and checks the environment, selected project,
+argument handling, exit status and missing prerequisites in an isolated container.
+Pass an image tag and its expected baked identity to also run the installed
+wrapper and real TUI as the unprivileged preview user, using a local JSONL
+fixture and a 15-second deadline:
+
+```sh
+bash tests/preview_tui_test.sh IMAGE_TAG EXPECTED_COMMIT_SHA
+```
+
+The contract test simulates two deployments of the same task with different SHAs and a
 namespace metadata denial, asserting that denial leaves workloads untouched,
 and checks that each required deployment value stops the commands when
 missing. For live verification, use the scoped kubeconfig for both SHAs, check
