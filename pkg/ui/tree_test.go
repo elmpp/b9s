@@ -1724,6 +1724,43 @@ func TestPositionIndicatorAtEnd(t *testing.T) {
 	}
 }
 
+// TestPositionIndicatorReachesLastPage verifies that the window showing the
+// last row reports the last page when the row count is not a multiple of the
+// page size, which clamps the final window short of a page boundary (bd-nr95).
+func TestPositionIndicatorReachesLastPage(t *testing.T) {
+	var issues []model.Issue
+	for i := 0; i < 100; i++ {
+		issues = append(issues, model.Issue{
+			ID:        fmt.Sprintf("issue-%02d", i),
+			Title:     fmt.Sprintf("Issue %d", i),
+			Priority:  2,
+			IssueType: model.TypeTask,
+		})
+	}
+
+	tree := NewTreeModel(testTheme())
+	tree.Build(issues)
+	tree.SetSize(80, 10) // effective visible = 8, so 13 pages
+
+	tree.JumpToBottom()
+	if output := tree.View(); !strings.Contains(output, "Page 13/13 (93-100 of 100)") {
+		t.Errorf("expected Page 13/13 at the bottom, got:\n%s", output)
+	}
+
+	tree.JumpToTop()
+	for i := 0; i < 20; i++ {
+		tree.PageForwardFull()
+	}
+	if output := tree.View(); !strings.Contains(output, "Page 13/13 (93-100 of 100)") {
+		t.Errorf("expected Page 13/13 after paging to the end, got:\n%s", output)
+	}
+
+	tree.PageBackwardFull()
+	if output := tree.View(); !strings.Contains(output, "Page 12/13") {
+		t.Errorf("expected Page 12/13 one page back from the end, got:\n%s", output)
+	}
+}
+
 // TestPositionIndicatorUpdatesOnPageForward verifies page indicator changes after PageForwardFull (bd-apg)
 func TestPositionIndicatorUpdatesOnPageForward(t *testing.T) {
 	var issues []model.Issue

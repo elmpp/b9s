@@ -1716,6 +1716,10 @@ func (t *TreeModel) renderPositionIndicator(start, end int) string {
 }
 
 // pageInfo returns the current page number and total pages based on visible count.
+// The current page is the one holding the last visible row. The viewport offset
+// is clamped to total-pageSize, so when total is not a multiple of pageSize the
+// final window starts short of the last page boundary; numbering by the first
+// visible row would then never reach the last page.
 func (t *TreeModel) pageInfo(pageSize int) (currentPage, totalPages int) {
 	total := len(t.flatList)
 	if pageSize <= 0 {
@@ -1725,7 +1729,8 @@ func (t *TreeModel) pageInfo(pageSize int) (currentPage, totalPages int) {
 	if totalPages < 1 {
 		totalPages = 1
 	}
-	currentPage = (t.viewportOffset / pageSize) + 1
+	end := min(max(t.viewportOffset, 0)+pageSize, total)
+	currentPage = max((end+pageSize-1)/pageSize, 1)
 	if currentPage > totalPages {
 		currentPage = totalPages
 	}
