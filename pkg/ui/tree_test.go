@@ -4437,6 +4437,7 @@ func TestTreeViewRendersLaneStageColumn(t *testing.T) {
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
 	tree.SetSize(140, 20)
+	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
 
 	view := stripANSI(tree.View())
 	if !strings.Contains(view, "LANE") {
@@ -4468,6 +4469,7 @@ func TestTreeViewUpdatedColumnShowsUpdatedAt(t *testing.T) {
 	tree.SetSize(140, 20)
 	tree.SetColumnPreference(TreeColumnCreated, ColumnHide)
 	tree.SetColumnPreference(TreeColumnUpdated, ColumnShow)
+	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
 
 	row := ""
 	for _, line := range strings.Split(stripANSI(tree.View()), "\n") {
@@ -4501,6 +4503,7 @@ func TestTreeViewRendersLaneStageAtMinimumColumnWidth(t *testing.T) {
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
 	tree.SetSize(100, 20)
+	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
 
 	view := stripANSI(tree.View())
 	if !strings.Contains(view, "LANE STATE") || !strings.Contains(view, "RUNNING") {
@@ -4514,53 +4517,16 @@ func TestTreeViewRendersLaneStageAtMinimumColumnWidth(t *testing.T) {
 	}
 }
 
-func TestTreeViewAutoHidesLaneStageWhenMostDisplayedWorkTitlesWouldTruncate(t *testing.T) {
-	longTitle := strings.Repeat("long task title ", 5)
+func TestTreeViewHidesLaneStageByDefault(t *testing.T) {
 	issues := []model.Issue{
-		{ID: "bd-long-1", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=QUEUED"}},
-		{ID: "bd-long-2", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeFeature, CreatedAt: time.Now(), Labels: []string{"lane-stage=RUNNING"}},
-		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=DONE"}},
+		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=RUNNING"}},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
-	tree.SetSize(100, 20)
+	tree.SetSize(200, 20)
 
-	view := stripANSI(tree.View())
-	if strings.Contains(view, "LANE STATE") {
-		t.Fatalf("lane stage should be hidden when it truncates more than half of displayed task and feature titles:\n%s", view)
-	}
-}
-
-func TestTreeViewAdaptiveLaneStageUsesAllDisplayedRowsToAvoidScrollJitter(t *testing.T) {
-	now := time.Now()
-	longTitle := strings.Repeat("long task title ", 5)
-	issues := []model.Issue{
-		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: now, Labels: []string{"lane-stage=DONE"}},
-		{ID: "bd-long-1", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: now.Add(-time.Second), Labels: []string{"lane-stage=QUEUED"}},
-		{ID: "bd-long-2", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeFeature, CreatedAt: now.Add(-2 * time.Second), Labels: []string{"lane-stage=RUNNING"}},
-	}
-	tree := NewTreeModel(newTreeTestTheme())
-	tree.Build(issues)
-	tree.SetSize(100, 2)
-
-	view := stripANSI(tree.View())
-	if strings.Contains(view, "LANE STATE") {
-		t.Fatalf("lane stage should use the whole displayed tree instead of changing as the viewport scrolls:\n%s", view)
-	}
-}
-
-func TestTreeViewKeepsLaneStageAtExactlyHalfTruncated(t *testing.T) {
-	issues := []model.Issue{
-		{ID: "bd-long", Title: strings.Repeat("long task title ", 5), Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=QUEUED"}},
-		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeFeature, CreatedAt: time.Now(), Labels: []string{"lane-stage=RUNNING"}},
-	}
-	tree := NewTreeModel(newTreeTestTheme())
-	tree.Build(issues)
-	tree.SetSize(100, 20)
-
-	view := stripANSI(tree.View())
-	if !strings.Contains(view, "LANE STATE") {
-		t.Fatalf("lane stage should remain visible when exactly half of displayed task and feature titles truncate:\n%s", view)
+	if view := stripANSI(tree.View()); strings.Contains(view, "LANE STATE") {
+		t.Fatalf("lane state should be hidden unless asked for, even with room to spare:\n%s", view)
 	}
 }
 

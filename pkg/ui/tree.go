@@ -2195,11 +2195,12 @@ func (t *TreeModel) resolveColumnLayout() treeColumnLayout {
 		effectiveWidth = 80
 	}
 	layout := treeColumnLayout{
-		created: resolveColumnPreference(t.ColumnPreference(TreeColumnCreated), effectiveWidth > 60),
-		id:      resolveColumnPreference(t.ColumnPreference(TreeColumnID), true),
-		// The default sort already orders siblings by priority, so the column
-		// appears only on request.
-		priority: resolveColumnPreference(t.ColumnPreference(TreeColumnPriority), false),
+		created:  resolveColumnPreference(t.ColumnPreference(TreeColumnCreated), effectiveWidth > 60),
+		id:       resolveColumnPreference(t.ColumnPreference(TreeColumnID), true),
+		priority: resolveColumnPreference(t.ColumnPreference(TreeColumnPriority), true),
+		// Lane state matters only to issues an Omnigent lane has picked up,
+		// so it costs title width on every other row and appears on request.
+		laneStage: resolveColumnPreference(t.ColumnPreference(TreeColumnLaneStage), false),
 		// People and the other time columns cost title width on every row, so
 		// they appear only on request.
 		creator:  resolveColumnPreference(t.ColumnPreference(TreeColumnCreator), false),
@@ -2214,11 +2215,6 @@ func (t *TreeModel) resolveColumnLayout() treeColumnLayout {
 	if layout.id {
 		layout.maxIDWidth = t.displayedMaxIDWidth()
 	}
-
-	layout.laneStage = resolveColumnPreference(
-		t.ColumnPreference(TreeColumnLaneStage),
-		t.laneStageFitsDisplayedWorkTitles(layout),
-	)
 	t.columnLayoutCache = layout
 	t.columnLayoutValid = true
 	return layout
@@ -2401,77 +2397,6 @@ func (t *TreeModel) displayedMaxIDWidth() int {
 		}
 	}
 	return maxIDWidth
-}
-
-func (t *TreeModel) laneStageFitsDisplayedWorkTitles(layout treeColumnLayout) bool {
-	layout.laneStage = true
-	eligible := 0
-	truncated := 0
-	for _, node := range t.flatList {
-		if node == nil || node.Issue == nil {
-			continue
-		}
-		if node.Issue.IssueType != model.TypeTask && node.Issue.IssueType != model.TypeFeature {
-			continue
-		}
-		eligible++
-		if lipgloss.Width(node.Issue.Title) > t.titleWidthForLayout(node, layout) {
-			truncated++
-		}
-	}
-	return eligible == 0 || truncated*2 <= eligible
-}
-
-func (t *TreeModel) titleWidthForLayout(node *IssueTreeNode, layout treeColumnLayout) int {
-	width := t.width
-	if width <= 0 {
-		width = 80
-	}
-	width = width - 1 - selectionGutterWidth
-
-	fixedWidth := 9 + computedBlockerBadgeWidth + lipgloss.Width(t.buildTreePrefix(node))
-	if t.IsMarked(node.Issue.ID) {
-		fixedWidth++
-	}
-	if t.bookmarks[node.Issue.ID] {
-		fixedWidth += 2
-	}
-
-	rightWidths := make([]int, 0, 10)
-	if layout.priority {
-		rightWidths = append(rightWidths, treePriorityColumnWidth)
-	}
-	if layout.laneStage {
-		rightWidths = append(rightWidths, 12)
-	}
-	if layout.creator {
-		rightWidths = append(rightWidths, treePersonColumnWidth)
-	}
-	if layout.assignee {
-		rightWidths = append(rightWidths, treePersonColumnWidth)
-	}
-	for range layout.timeColumns() {
-		rightWidths = append(rightWidths, treeTimeColumnWidth)
-	}
-	if layout.decisions {
-		rightWidths = append(rightWidths, treeDecisionsColumnWidth)
-	}
-	if layout.id {
-		rightWidths = append(rightWidths, layout.maxIDWidth)
-	}
-	rightWidth := 0
-	for _, columnWidth := range rightWidths {
-		rightWidth += columnWidth
-	}
-	if len(rightWidths) > 1 {
-		rightWidth += 2 * (len(rightWidths) - 1)
-	}
-
-	titleWidth := width - fixedWidth - rightWidth - 2
-	if titleWidth < 5 {
-		return 5
-	}
-	return titleWidth
 }
 
 func dispatcherLaneStage(labels []string) string {

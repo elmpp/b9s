@@ -113,7 +113,7 @@ Ready means open with no open blocker. Filters compose with each other and with 
 | Keys | Action |
 |------|--------|
 | `s` | Pick the sort field and direction for this session |
-| `\|` | Choose for each optional column whether it is automatic, shown or hidden: Lane state, Updated, ID, Priority, Creator, Assignee, Created, Deferred and Due |
+| `\|` | Choose for each optional column whether it is automatic, shown or hidden: Lane state, Updated, ID, Priority, Creator, Assignee, Created, Deferred and Due. Priority, ID and Created show by default; Lane state and the others show on request |
 | `T` | Switch every time column between an age (`2h ago`, `in 3d`) and the local date and minute (`30-09 14:05`, or `09-30 14:05` in a month-first locale) |
 | `Ctrl-W` | Toggle wide columns |
 

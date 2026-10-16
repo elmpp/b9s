@@ -163,7 +163,7 @@ func adaptiveColumnFixture(t *testing.T) []treeFixtureIssue {
 	}
 }
 
-func TestTreeViewAutoHidesLaneStageInNarrowContentLayout(t *testing.T) {
+func TestTreeViewHidesLaneStageByDefault(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, adaptiveColumnFixture(t))
 
@@ -172,7 +172,7 @@ func TestTreeViewAutoHidesLaneStageInNarrowContentLayout(t *testing.T) {
 		t.Fatalf("run tree TUI: %v", err)
 	}
 	if strings.Contains(string(out), "LANE STATE") {
-		t.Fatalf("lane stage should be auto-hidden when most work titles truncate:\n%s", out)
+		t.Fatalf("lane stage should be hidden unless asked for:\n%s", out)
 	}
 }
 
