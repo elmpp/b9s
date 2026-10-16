@@ -66,4 +66,9 @@ web-e2e:
 # The book on the architecture (docs/book). Needs pandoc; the EPUB is committed.
 book:
 	cd docs/book && pandoc 00-metadata.yaml [0-9][0-9]-*.md --from markdown --to epub3 \
+# The projects that gate a pull request (docs/adr/0059): Chromium and WebKit,
+# a phone and a desktop each. ci.yml runs this; nightly.yml runs the rest.
+web-gate:
+	npm --prefix web run test:e2e -- --project tokens --project pixel --project iphone --project desktop --project ipad
+
 	  --toc --toc-depth=1 --number-sections --css=style.css -o how-b9s-works.epub

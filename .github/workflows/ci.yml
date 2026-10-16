@@ -52,8 +52,11 @@ jobs:
         echo "pkg/* coverage: ${total}% (threshold 65%)"
         awk -v c="$total" 'BEGIN { if (c < 65.0) { printf("FAIL: pkg/* coverage %.2f%% is below 65%%\n", c); exit 1 } }'
 
-  # The web UI's Playwright suite: Chromium (Pixel 7, desktop) and WebKit
-  # (iPhone 14, iPad). globalSetup builds the bundle and the binary itself.
+  # The pull request gate of the web suite (docs/adr/0059): the projects that
+  # fail for a wrong change and for nothing else. Chromium as a Pixel 7 and a
+  # desktop, WebKit as an iPhone 14 and an iPad. Firefox, Safari, the size
+  # classes and the perf budgets run in nightly.yml. globalSetup builds the
+  # bundle and the binary itself.
   web-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -79,10 +82,10 @@ jobs:
 
     - name: Install browsers
       working-directory: web
-      run: npx playwright install --with-deps chromium webkit firefox
+      run: npx playwright install --with-deps chromium webkit
 
     - name: Web E2E
-      run: make web-e2e
+      run: make web-gate
 
     - name: Upload traces
       if: failure()

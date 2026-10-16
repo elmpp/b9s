@@ -2,6 +2,8 @@
 
 ![Go Version](https://img.shields.io/github/go-mod/go-version/vanderheijden86/b9s?style=for-the-badge&color=6272a4)
 ![License](https://img.shields.io/badge/License-MIT-50fa7b?style=for-the-badge)
+[![CI](https://img.shields.io/github/actions/workflow/status/vanderheijden86/b9s/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/vanderheijden86/b9s/actions/workflows/ci.yml)
+[![Nightly](https://img.shields.io/github/actions/workflow/status/vanderheijden86/b9s/nightly.yml?branch=main&style=for-the-badge&label=Nightly)](https://github.com/vanderheijden86/b9s/actions/workflows/nightly.yml)
 
 **See what every agent is doing in your [Beads](https://github.com/steveyegge/beads) project, and change it, from your terminal, your phone or any browser.** b9s shows the issues as a tree, a board and a dependency graph, follows changes from `bd` or another agent as they happen, and makes every write through the `bd` CLI. No new tracker: your Beads project as it is.
 

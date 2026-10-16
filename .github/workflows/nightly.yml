@@ -1,0 +1,183 @@
+# The tests that do not gate a pull request (docs/adr/0059): the whole web
+# matrix, the perf budgets measured alone, the measure report, the race
+# detector and a flake detector that repeats the gate's projects under load.
+# A failure here is a bug to file: scripts/nightly-to-beads.sh <run-id>.
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Every project of web/playwright.config.ts except the perf ones, which the
+  # perf job below runs alone, and measure, which is listed only when asked.
+  web-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25.5'
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - run: npm --prefix web ci
+    - name: Install browsers
+      working-directory: web
+      run: npx playwright install --with-deps chromium webkit firefox
+    - name: Web matrix
+      working-directory: web
+      run: >
+        npx playwright test
+        --project tokens --project pixel --project iphone
+        --project desktop --project desktop-safari --project desktop-firefox --project ipad
+        --project phone-360 --project phone-412 --project tablet-768 --project tablet-1024
+        --project desktop-1440 --project desktop-1920 --project wide-2560
+    - name: Upload traces
+      if: failure()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: playwright-traces-matrix
+        path: web/test-results
+        retention-days: 14
+
+  # A budget is a claim about the app alone, so the timed projects run on one
+  # worker with nothing beside them. --no-deps skips the matrix they would
+  # otherwise wait for, which the job above has run.
+  web-perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25.5'
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - run: npm --prefix web ci
+    - name: Install browsers
+      working-directory: web
+      run: npx playwright install --with-deps chromium webkit
+    - name: Perf budgets
+      working-directory: web
+      run: npx playwright test --no-deps --workers 1 --project pixel-perf --project iphone-perf --project tablet-perf --project desktop-perf
+    - name: Upload traces
+      if: failure()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: playwright-traces-perf
+        path: web/test-results
+        retention-days: 14
+
+  # measure.spec.ts times the app against 1000 and 5000 issues on emulated
+  # devices and writes a report; the numbers are the artifact.
+  web-measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25.5'
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - run: npm --prefix web ci
+    - name: Install browsers
+      working-directory: web
+      run: npx playwright install --with-deps chromium webkit firefox
+    - name: Measure
+      working-directory: web
+      run: npx playwright test --project measure
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: measure-report
+        path: .b9s-e2e/measure/report
+        retention-days: 14
+
+  # The gate's projects, each test five times on twice the workers the gate
+  # uses. A test that both passes and fails in this run is a flake, and the
+  # job fails naming it (scripts/playwright-flakes.mjs).
+  web-flakes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25.5'
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - run: npm --prefix web ci
+    - name: Install browsers
+      working-directory: web
+      run: npx playwright install --with-deps chromium webkit
+    - name: Repeat the gate under load
+      working-directory: web
+      env:
+        PLAYWRIGHT_JSON_OUTPUT_NAME: ../.b9s-e2e/flakes.json
+      # The exit status is the detector's: a consistent failure and a flake both fail it, with their own names.
+      run: >
+        npx playwright test --repeat-each 5 --workers 8 --reporter list,json
+        --project tokens --project pixel --project iphone --project desktop --project ipad
+        || true
+    - name: Report flakes
+      run: node scripts/playwright-flakes.mjs .b9s-e2e/flakes.json
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: flake-report
+        path: .b9s-e2e/flakes.json
+        retention-days: 14
+
+  go-race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25.5'
+    - name: Race detector
+      run: go test -race -timeout 25m -skip DoltIntegration -p 2 $(go list ./... | grep -v /tests/e2e)
+
+  go-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25.5'
+    - name: Terminal E2E
+      run: go test -timeout 20m -v ./tests/e2e -count=1
