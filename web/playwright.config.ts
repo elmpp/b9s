@@ -53,7 +53,8 @@ export default defineConfig({
   // perf.spec.ts times a render against a budget, so it runs in projects of
   // its own that start once every other project has finished. Timed beside
   // three other workers on a four-core CI runner, the same render misses the
-  // budget.
+  // budget, so a pull request does not run them at all: nightly.yml runs
+  // them alone on one worker (docs/adr/0059).
   projects: [
     { name: "tokens", use: { ...devices["Desktop Chrome"] }, testMatch: /tokens\.spec/ },
     { name: "pixel", use: { ...devices["Pixel 7"] }, testIgnore: /(wide|keys|perf|measure|tokens|shell|desktop|accessibility)\.spec/ },
