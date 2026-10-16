@@ -168,8 +168,21 @@ export { expect };
  */
 export async function open(page: Page, p: Project): Promise<void> {
   await page.goto(p.url);
+  await settle(page);
+}
+
+async function settle(page: Page): Promise<void> {
   await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
   await expect(page.locator("body")).toHaveAttribute("data-live", "live", { timeout: 10000 });
+}
+
+/** The load waiter must be armed before the action that can replace the document. */
+export async function reloadAndSettle(page: Page, trigger: () => unknown | Promise<unknown>): Promise<void> {
+  await Promise.all([
+    page.waitForEvent("load", { timeout: 10000 }),
+    Promise.resolve().then(trigger),
+  ]);
+  await settle(page);
 }
 
 export const row = (page: Page, id: string) => page.locator(`#treeRows .row[data-id="${id}"]`);
