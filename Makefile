@@ -25,8 +25,11 @@ clean:
 	rm -f b9s
 	go clean
 
+# -p 2: on macOS a full run at default parallelism has stalled fresh test
+# binaries at launch, which the timeout then kills with no test started
+# (bd-zoom.2.1). Two packages at a time has not.
 test:
-	go test ./...
+	go test -p 2 ./...
 
 # The suite automated agents run. It leaves out tests/e2e (minutes of PTY runs)
 # and tests whose result depends on the host rather than the code: MIME
@@ -63,12 +66,12 @@ web-types:
 web-e2e:
 	npm --prefix web run test:e2e
 
-# The book on the architecture (docs/book). Needs pandoc; the EPUB is committed.
-book:
-	cd docs/book && pandoc 00-metadata.yaml [0-9][0-9]-*.md --from markdown --to epub3 \
 # The projects that gate a pull request (docs/adr/0059): Chromium and WebKit,
 # a phone and a desktop each. ci.yml runs this; nightly.yml runs the rest.
 web-gate:
 	npm --prefix web run test:e2e -- --project tokens --project pixel --project iphone --project desktop --project ipad
 
+# The book on the architecture (docs/book). Needs pandoc; the EPUB is committed.
+book:
+	cd docs/book && pandoc 00-metadata.yaml [0-9][0-9]-*.md --from markdown --to epub3 \
 	  --toc --toc-depth=1 --number-sections --css=style.css -o how-b9s-works.epub

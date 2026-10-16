@@ -7,7 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -254,12 +256,75 @@ func TestRun_CancelledDuringRun_ReturnsCancelledError(t *testing.T) {
 	}
 }
 
-// lingeringChildDeadline must expire after the fake bd exits and before Run
-// returns, which is WaitDelay after that exit because a child still holds the
-// pipe. Starting a fresh temp-dir script takes 150-200ms on macOS and more
-// under parallel test load; a deadline near that races bd's own startup and
-// kills it, which turns these tests into timeout tests.
-const lingeringChildDeadline = waitDelay
+// The lingering-child tests need a ctx that expires after the fake bd exits
+// and before Run returns, which is WaitDelay after that exit because a child
+// still holds the pipe. A wall-clock deadline cannot promise the first half:
+// starting a fresh temp-dir script takes 150-200ms on macOS and seconds
+// under a parallel full-suite run, and a deadline that lands before the exit
+// kills bd and turns the test into a timeout test (bd-iylb, bd-j545,
+// bd-v3vs). So the deadline is bd's own exit: the script writes its pid to a
+// marker file, and the context expires once that pid is gone.
+
+// exitMarkerContext expires when done is closed, and reports
+// context.DeadlineExceeded from then on, like a deadline that elapsed.
+type exitMarkerContext struct {
+	context.Context
+	done chan struct{}
+}
+
+func (c *exitMarkerContext) Done() <-chan struct{} { return c.done }
+
+func (c *exitMarkerContext) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+
+// contextExpiringWhenScriptExits returns a context that expires once the
+// process whose pid the script wrote to marker has exited, and the script
+// to prepend: `echo $$ > marker`. Reading the pid and polling kill(pid, 0)
+// is bounded by markerWait so a script that never starts fails the test
+// rather than hanging it.
+func contextExpiringWhenScriptExits(t *testing.T, marker string) context.Context {
+	t.Helper()
+	const markerWait = 20 * time.Second
+	ctx := &exitMarkerContext{Context: context.Background(), done: make(chan struct{})}
+	stop := make(chan struct{})
+	t.Cleanup(func() { close(stop) })
+	go func() {
+		deadline := time.Now().Add(markerWait)
+		pid := 0
+		for time.Now().Before(deadline) {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if pid == 0 {
+				if b, err := os.ReadFile(marker); err == nil {
+					pid, _ = strconv.Atoi(strings.TrimSpace(string(b)))
+				}
+			}
+			// Run reaps bd the moment it exits, so a signal-0 probe fails for a pid that is gone.
+			if pid != 0 && syscall.Kill(pid, 0) != nil {
+				close(ctx.done)
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		t.Errorf("fake bd never wrote its pid to %s within %s", marker, markerWait)
+	}()
+	return ctx
+}
+
+func pidMarker(t *testing.T) (string, string) {
+	t.Helper()
+	marker := filepath.Join(t.TempDir(), "pid")
+	return marker, "echo $$ > " + marker + "\n"
+}
 
 // TestRun_QuickNonZeroExitWithLingeringSameGroupChild_ReturnsExitError guards
 // the other half of trusting bd's own exit over ctx: bd itself exits 3 well
@@ -272,13 +337,13 @@ func TestRun_QuickNonZeroExitWithLingeringSameGroupChild_ReturnsExitError(t *tes
 		t.Skip("fake bd script needs a POSIX shell")
 	}
 	binDir := t.TempDir()
-	script := "#!/bin/sh\nsleep 3 &\nprintf 'boom'\nexit 3\n"
+	marker, writePid := pidMarker(t)
+	script := "#!/bin/sh\n" + writePid + "sleep 3 &\nprintf 'boom'\nexit 3\n"
 	if err := os.WriteFile(filepath.Join(binDir, "bd"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), lingeringChildDeadline)
-	defer cancel()
+	ctx := contextExpiringWhenScriptExits(t, marker)
 
 	start := time.Now()
 	out, err := Run(ctx, filepath.Join(binDir, "bd"), t.TempDir(), "list")
@@ -313,13 +378,13 @@ func TestRun_QuickSuccessWithLingeringSameGroupChild_ReturnsOutputNoError(t *tes
 		t.Skip("fake bd script needs a POSIX shell")
 	}
 	binDir := t.TempDir()
-	script := "#!/bin/sh\nsleep 3 &\nprintf 'written'\n"
+	marker, writePid := pidMarker(t)
+	script := "#!/bin/sh\n" + writePid + "sleep 3 &\nprintf 'written'\n"
 	if err := os.WriteFile(filepath.Join(binDir, "bd"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), lingeringChildDeadline)
-	defer cancel()
+	ctx := contextExpiringWhenScriptExits(t, marker)
 
 	start := time.Now()
 	out, err := Run(ctx, filepath.Join(binDir, "bd"), t.TempDir(), "list")
@@ -352,7 +417,8 @@ func TestRun_ErrWaitDelay_QuickSuccessWithLingeringDetachedChild_ReturnsOutputNo
 		t.Skip("perl not on PATH: needed to detach the lingering child into its own process group")
 	}
 	binDir := t.TempDir()
-	script := "#!/bin/sh\nperl -e 'setpgrp(0,0); exec(\"sleep\",\"3\")' &\nprintf 'written'\n"
+	marker, writePid := pidMarker(t)
+	script := "#!/bin/sh\n" + writePid + "perl -e 'setpgrp(0,0); exec(\"sleep\",\"3\")' &\nprintf 'written'\n"
 	if err := os.WriteFile(filepath.Join(binDir, "bd"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -360,19 +426,18 @@ func TestRun_ErrWaitDelay_QuickSuccessWithLingeringDetachedChild_ReturnsOutputNo
 
 	cases := []struct {
 		name string
-		ctx  func() (context.Context, context.CancelFunc)
+		ctx  func(t *testing.T) context.Context
 	}{
-		{"background", func() (context.Context, context.CancelFunc) {
-			return context.Background(), func() {}
-		}},
-		{"with deadline", func() (context.Context, context.CancelFunc) {
-			return context.WithTimeout(context.Background(), lingeringChildDeadline)
-		}},
+		{"background", func(*testing.T) context.Context { return context.Background() }},
+		{"with deadline", func(t *testing.T) context.Context { return contextExpiringWhenScriptExits(t, marker) }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := tc.ctx()
-			defer cancel()
+			// Each case runs the script once, so each wants its own marker.
+			if err := os.Remove(marker); err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			ctx := tc.ctx(t)
 
 			start := time.Now()
 			out, err := Run(ctx, bdPath, t.TempDir(), "list")
