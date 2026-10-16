@@ -270,6 +270,7 @@ const (
 	TreeColumnLaneStage TreeColumn = iota
 	TreeColumnUpdated
 	TreeColumnID
+	TreeColumnPriority
 	TreeColumnCreator
 	TreeColumnAssignee
 	TreeColumnCreated
@@ -287,6 +288,8 @@ func (c TreeColumn) String() string {
 		return "Updated"
 	case TreeColumnID:
 		return "ID"
+	case TreeColumnPriority:
+		return "Priority"
 	case TreeColumnCreator:
 		return "Creator"
 	case TreeColumnAssignee:
@@ -306,6 +309,7 @@ func (c TreeColumn) String() string {
 
 type treeColumnLayout struct {
 	laneStage  bool
+	priority   bool
 	creator    bool
 	assignee   bool
 	created    bool
@@ -1267,6 +1271,10 @@ func (t *TreeModel) RenderColumnPopup() string {
 				if layout.id {
 					resolved = "shown"
 				}
+			case TreeColumnPriority:
+				if layout.priority {
+					resolved = "shown"
+				}
 			case TreeColumnCreator:
 				if layout.creator {
 					resolved = "shown"
@@ -1851,7 +1859,10 @@ func (t *TreeModel) renderHeader(layout treeColumnLayout) string {
 
 	// Right side matches the row. The dispatcher-owned lane stage gets its own
 	// column on layouts wide enough to keep the issue title useful.
-	rightParts := make([]string, 0, 9)
+	rightParts := make([]string, 0, 10)
+	if layout.priority {
+		rightParts = append(rightParts, fmt.Sprintf("%-*s", treePriorityColumnWidth, "PRI"))
+	}
 	if layout.laneStage {
 		rightParts = append(rightParts, fmt.Sprintf("%-12s", "LANE STATE"))
 	}
@@ -1997,6 +2008,13 @@ func (t *TreeModel) renderNodeWithLayout(node *IssueTreeNode, isSelected bool, l
 	rightWidth := 0
 	var rightParts []string
 	darkFg := lipgloss.AdaptiveColor{Light: "#000000", Dark: "#1A1A1A"}
+	if layout.priority {
+		priorityStyle := r.NewStyle().Foreground(t.GetPriorityColor(issue.Priority))
+		if isSelected {
+			priorityStyle = r.NewStyle().Foreground(darkFg)
+		}
+		rightParts = append(rightParts, priorityStyle.Render(formatPriorityCell(issue.Priority)))
+	}
 	if layout.laneStage {
 		stage := truncateRunesHelper(dispatcherLaneStage(issue.Labels), 12, "…")
 		stageStyle := t.theme.SecondaryText
@@ -2179,6 +2197,9 @@ func (t *TreeModel) resolveColumnLayout() treeColumnLayout {
 	layout := treeColumnLayout{
 		created: resolveColumnPreference(t.ColumnPreference(TreeColumnCreated), effectiveWidth > 60),
 		id:      resolveColumnPreference(t.ColumnPreference(TreeColumnID), true),
+		// The default sort already orders siblings by priority, so the column
+		// appears only on request.
+		priority: resolveColumnPreference(t.ColumnPreference(TreeColumnPriority), false),
 		// People and the other time columns cost title width on every row, so
 		// they appear only on request.
 		creator:  resolveColumnPreference(t.ColumnPreference(TreeColumnCreator), false),
@@ -2249,6 +2270,13 @@ func (t *TreeModel) renderDecisionCell(id string, isSelected bool) string {
 		return t.theme.Renderer.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#1A1A1A"}).Render(cell)
 	}
 	return t.theme.MutedText.Render(cell)
+}
+
+// treePriorityColumnWidth fits the "PRI" header and a "P0".."P4" value.
+const treePriorityColumnWidth = 3
+
+func formatPriorityCell(priority int) string {
+	return fmt.Sprintf("%-*s", treePriorityColumnWidth, fmt.Sprintf("P%d", priority))
 }
 
 // treePersonColumnWidth fits "@" plus an eleven-rune name; longer names end in "…".
@@ -2409,7 +2437,10 @@ func (t *TreeModel) titleWidthForLayout(node *IssueTreeNode, layout treeColumnLa
 		fixedWidth += 2
 	}
 
-	rightWidths := make([]int, 0, 6)
+	rightWidths := make([]int, 0, 10)
+	if layout.priority {
+		rightWidths = append(rightWidths, treePriorityColumnWidth)
+	}
 	if layout.laneStage {
 		rightWidths = append(rightWidths, 12)
 	}
