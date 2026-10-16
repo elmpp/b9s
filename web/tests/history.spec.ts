@@ -2,7 +2,7 @@
 // opened issue and followed relation is a history entry with its own URL,
 // so a reload or a shared link lands on the same view and issue.
 
-import { expect, open, row, test } from "./harness";
+import { expect, open, row, test, waitForApp } from "./harness";
 
 test("Back and Forward step through views, issues and relations", async ({ page, project }) => {
   await open(page, project);
@@ -58,12 +58,12 @@ test("the in-app back and close buttons use the same history as the browser", as
 
 test("a link with a view and an issue opens them", async ({ page, project }) => {
   await page.goto(project.url + "#/board/t-2");
-  await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
+  await waitForApp(page);
   await expect(page.locator("#vBoard")).toBeVisible();
   await expect(page.locator(".detail")).toHaveAttribute("data-id", "t-2");
   await page.goto(project.url + "#/tree/no-such-issue");
   await page.reload();
-  await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
+  await waitForApp(page);
   await expect(page.locator("#vTree")).toBeVisible();
   await expect(page.locator(".detail")).toHaveCount(0);
 });
@@ -120,7 +120,7 @@ test("a reload keeps the issue that was open", async ({ page, project }) => {
   await row(page, "t-3").click();
   await expect(d).toHaveAttribute("data-id", "t-3");
   await page.reload();
-  await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
+  await waitForApp(page);
   await expect(d).toHaveAttribute("data-id", "t-3");
   await expect(page).toHaveURL(/#\/tree\/t-3$/);
 });

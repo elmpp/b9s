@@ -2,7 +2,7 @@
 // epic lanes as swimlanes, mouse drag between columns, TUI keys, and the
 // detail as a side panel that leaves the board in view.
 
-import { expect, open, SAMPLE, test, type Project } from "./harness";
+import { expect, open, SAMPLE, test, waitForApp, type Project } from "./harness";
 import type { Locator, Page } from "@playwright/test";
 
 const col = (page: Page, k: string) => page.locator(`#wboard .wcell[data-dcol="${k}"]`);
@@ -180,7 +180,7 @@ test("v switches between the epic rail and epic rows, and the choice stays", asy
   await expect(page.locator('#wboard .lane[data-lane="t-epic"]')).toBeVisible();
   await expect(page.locator("#wboard .wepic")).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
+  await waitForApp(page);
   await page.locator('#bar [data-view="board"]').click();
   await expect(page.locator('#wboard .lane[data-lane="t-epic"]')).toBeVisible();
   await page.keyboard.press("v");

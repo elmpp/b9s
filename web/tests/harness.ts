@@ -168,6 +168,14 @@ export { expect };
  */
 export async function open(page: Page, p: Project): Promise<void> {
   await page.goto(p.url);
+  await waitForApp(page);
+}
+
+/** Wait for startup or reload recovery without forcing layout on every poll. */
+export async function waitForApp(page: Page): Promise<void> {
+  // Failing locator assertions build ARIA snapshots, which measure the page
+  // while it is still rendering. The live marker needs no layout.
+  await page.waitForFunction(() => document.body?.dataset.live === "live", undefined, { timeout: 10000, polling: 100 });
   await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
   await expect(page.locator("body")).toHaveAttribute("data-live", "live", { timeout: 10000 });
 }

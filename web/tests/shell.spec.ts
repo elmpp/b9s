@@ -6,7 +6,7 @@
 
 import type { Page } from "@playwright/test";
 import { sizeClassOf } from "../src/util";
-import { expect, open, row, SAMPLE, test, type FixtureIssue } from "./harness";
+import { expect, open, row, SAMPLE, test, waitForApp, type FixtureIssue } from "./harness";
 
 const box = async (page: Page, sel: string) => (await page.locator(sel).boundingBox())!;
 type FakeVisualViewport = { offsetLeft: number; offsetTop: number; width: number; height: number; scale: number };
@@ -157,7 +157,7 @@ test.describe("phone native layout", () => {
     await expect(boxes.first()).toHaveAttribute("data-dcol", "open");
     await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] [data-card="t-1"]')).toBeVisible();
     await page.reload();
-    await expect(page.locator("body")).toHaveAttribute("data-live", "live", { timeout: 10000 });
+    await waitForApp(page);
     await expect(openHead).toHaveAttribute("aria-expanded", "false");
     await openHead.click();
     await expect(openHead).toHaveAttribute("aria-expanded", "true");
