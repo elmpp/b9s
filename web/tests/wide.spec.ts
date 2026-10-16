@@ -2,7 +2,7 @@
 // epic lanes as swimlanes, mouse drag between columns, TUI keys, and the
 // detail as a side panel that leaves the board in view.
 
-import { expect, open, SAMPLE, test, type Project } from "./harness";
+import { expect, open, SAMPLE, settled, test, type Project } from "./harness";
 import type { Locator, Page } from "@playwright/test";
 
 const col = (page: Page, k: string) => page.locator(`#wboard .wcell[data-dcol="${k}"]`);
@@ -180,7 +180,7 @@ test("v switches between the epic rail and epic rows, and the choice stays", asy
   await expect(page.locator('#wboard .lane[data-lane="t-epic"]')).toBeVisible();
   await expect(page.locator("#wboard .wepic")).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
+  await settled(page);
   await page.locator('#bar [data-view="board"]').click();
   await expect(page.locator('#wboard .lane[data-lane="t-epic"]')).toBeVisible();
   await page.keyboard.press("v");
@@ -531,8 +531,8 @@ test.describe("hierarchy in a cell", () => {
 
   test("a child sits straight below its parent, indented, and the epic cell carries its first sentence", async ({ page, project }) => {
     await board(page, project);
-    const ids = await col(page, "open").first().locator("[data-card]").evaluateAll(els => els.map(e => (e as HTMLElement).dataset.card));
-    expect(ids).toEqual(["h-feat", "h-task", "h-other"]);
+    // The lane fills once the fixture's rows arrive over the live stream, so the order is polled, not read once (bd-zoom.1.3).
+    await expect.poll(() => col(page, "open").first().locator("[data-card]").evaluateAll(els => els.map(e => (e as HTMLElement).dataset.card))).toEqual(["h-feat", "h-task", "h-other"]);
     const fx = (await card(page, "h-feat").locator(".id").boundingBox())!.x;
     const tx = (await card(page, "h-task").locator(".id").boundingBox())!.x;
     expect(tx).toBeGreaterThan(fx + 8);

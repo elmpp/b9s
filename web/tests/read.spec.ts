@@ -1,6 +1,6 @@
 import http from "node:http";
 import net from "node:net";
-import { expect, freePort, open, row, SAMPLE, startProject, stopProject, test } from "./harness";
+import { expect, freePort, open, row, SAMPLE, settled, startProject, stopProject, test } from "./harness";
 
 test.describe("reading", () => {
   test("comments default to newest first and the order choice survives reload", async ({ page, project }, testInfo) => {
@@ -23,6 +23,7 @@ test.describe("reading", () => {
     await page.getByRole("button", { name: "Newest first", exact: true }).click();
     await expect(comments).toHaveText(["Old comment", "Middle comment", "New comment"]);
     await page.reload();
+    await settled(page);
     await row(page, "t-1").click();
     await expect(comments).toHaveText(["Old comment", "Middle comment", "New comment"]);
     await page.getByRole("button", { name: "Oldest first", exact: true }).click();
@@ -42,7 +43,7 @@ test.describe("reading", () => {
   // before then can hold a row that the render replaces.
   test("open returns once the live stream has connected", async ({ page, project }) => {
     await open(page, project);
-    expect(await page.locator("body").getAttribute("data-live")).toBe("live");
+    await expect(page.locator("body")).toHaveAttribute("data-live", "live");
   });
 
   test("tree nests children under their epic and hides closed issues", async ({ page, project }) => {

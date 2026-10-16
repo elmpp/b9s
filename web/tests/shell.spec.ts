@@ -6,7 +6,7 @@
 
 import type { Page } from "@playwright/test";
 import { sizeClassOf } from "../src/util";
-import { expect, open, row, SAMPLE, test, type FixtureIssue } from "./harness";
+import { expect, open, row, SAMPLE, settled, test, type FixtureIssue } from "./harness";
 
 const box = async (page: Page, sel: string) => (await page.locator(sel).boundingBox())!;
 type FakeVisualViewport = { offsetLeft: number; offsetTop: number; width: number; height: number; scale: number };
@@ -139,7 +139,7 @@ test.describe("phone native layout", () => {
     await expect(page.locator("#tabs")).toHaveCount(0);
     const boxes = page.locator("#bcol .bbox");
     await expect(boxes).toHaveCount(4);
-    expect(await boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
+    await expect.poll(() => boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
     // Each box starts below the one before it and takes the whole width.
     const col = await box(page, "#bcol");
     const rects = await boxes.evaluateAll(els => els.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
@@ -157,7 +157,7 @@ test.describe("phone native layout", () => {
     await expect(boxes.first()).toHaveAttribute("data-dcol", "open");
     await expect(page.locator('#bcol .bbox[data-dcol="in_progress"] [data-card="t-1"]')).toBeVisible();
     await page.reload();
-    await expect(page.locator("body")).toHaveAttribute("data-live", "live", { timeout: 10000 });
+    await settled(page);
     await expect(openHead).toHaveAttribute("aria-expanded", "false");
     await openHead.click();
     await expect(openHead).toHaveAttribute("aria-expanded", "true");
@@ -174,7 +174,7 @@ test.describe("phone native layout", () => {
     await page.locator('#bar [data-view="board"]').click();
     await expect(page.locator("#chips")).toBeVisible();
     await expect(page.locator("#tabs")).toHaveCount(0);
-    expect(await page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["0", "1", "2", "3", "4"]);
+    await expect.poll(() => page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["0", "1", "2", "3", "4"]);
     await expect(page.locator('#bcol .bbox[data-dcol="1"] [data-card="t-1"]')).toBeVisible();
   });
 
@@ -190,7 +190,7 @@ test.describe("phone native layout", () => {
       await page.locator('#bar [data-view="board"]').click();
 
       const boxes = page.locator("#bcol .bbox");
-      expect(await boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
+      await expect.poll(() => boxes.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol))).toEqual(["open", "in_progress", "blocked", "closed"]);
       const closed = page.locator('#bcol .bbox[data-dcol="closed"]');
       await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "false");
       await expect(closed.locator(".bhead b")).toHaveText("55");
@@ -216,7 +216,7 @@ test.describe("phone native layout", () => {
       const order = () => page.locator("#bcol .bbox").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.dcol));
       const closed = page.locator('#bcol .bbox[data-dcol="closed"]');
       const closedChip = page.locator('#chips [data-chip="closed"]');
-      expect(await order()).toEqual(["open", "in_progress", "blocked", "closed"]);
+      await expect.poll(() => order()).toEqual(["open", "in_progress", "blocked", "closed"]);
       await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "false");
       await expect(closed.locator(".bhead b")).toHaveText("55");
       await expect(closed.locator("[data-card]")).toHaveCount(0);
@@ -226,10 +226,10 @@ test.describe("phone native layout", () => {
 
       await page.locator('#chips [data-chip="open"]').click();
       await expect(closed).toHaveCount(0);
-      expect(await order()).toEqual(["in_progress", "blocked"]);
+      await expect.poll(() => order()).toEqual(["in_progress", "blocked"]);
       await closedChip.click();
       await expect(closed.locator(".bhead b")).toHaveText("55");
-      expect(await order()).toEqual(["in_progress", "blocked", "closed"]);
+      await expect.poll(() => order()).toEqual(["in_progress", "blocked", "closed"]);
       await expect(closed.locator(".bhead")).toHaveAttribute("aria-expanded", "false");
     });
   });

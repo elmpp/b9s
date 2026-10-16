@@ -162,14 +162,30 @@ export const test = base.extend<{ project: Project; fixture: { issues: FixtureIs
 export { expect };
 
 /**
+ * settled resolves once the first snapshot has rendered (#boot is gone) and
+ * the live stream has connected (body carries data-live="live"). Call it
+ * after every page.goto and page.reload. It reads two scalars in the page
+ * through one waitForFunction rather than through locator assertions: an
+ * assertion whose element is not on the page yet snapshots the whole ARIA
+ * tree on every poll, and on a loaded runner that costs the app the CPU its
+ * own timers need between the test's steps (bd-zoom.1.4).
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const boot = document.getElementById("boot");
+    const bootGone = !boot || boot.hidden || boot.getClientRects().length === 0;
+    return bootGone && document.body.dataset.live === "live";
+  }, undefined, { timeout: 10000 });
+}
+
+/**
  * open loads the app and waits until the first snapshot has rendered and the
  * live stream has connected. The connect renders the tree again, so a row
  * found before it may be detached by the time a test measures it.
  */
 export async function open(page: Page, p: Project): Promise<void> {
   await page.goto(p.url);
-  await expect(page.locator("#boot")).toBeHidden({ timeout: 10000 });
-  await expect(page.locator("body")).toHaveAttribute("data-live", "live", { timeout: 10000 });
+  await settled(page);
 }
 
 export const row = (page: Page, id: string) => page.locator(`#treeRows .row[data-id="${id}"]`);

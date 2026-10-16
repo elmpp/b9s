@@ -219,7 +219,7 @@ test("1000 issue reads meet load and tap feedback budgets", async ({ page, proje
     return Date.now() - t0;
   });
   const loadMs = expectMedianWithinBudget("load", loadSamples, BUDGET.loadMs, browserName);
-  expect(await page.locator("#treeRows .row").count()).toBeGreaterThan(600);
+  await expect.poll(() => page.locator("#treeRows .row").count()).toBeGreaterThan(600);
 
   const detailId = await firstOpenLeaf(page);
   const detailSamples = await samples("detail feedback", async () => {
