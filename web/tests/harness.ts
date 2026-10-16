@@ -188,6 +188,15 @@ export async function open(page: Page, p: Project): Promise<void> {
   await settled(page);
 }
 
+/** The load waiter must be armed before the action that can replace the document. */
+export async function reloadAndSettle(page: Page, trigger: () => unknown | Promise<unknown>): Promise<void> {
+  await Promise.all([
+    page.waitForEvent("load", { timeout: 10000 }),
+    Promise.resolve().then(trigger),
+  ]);
+  await settled(page);
+}
+
 export const row = (page: Page, id: string) => page.locator(`#treeRows .row[data-id="${id}"]`);
 
 /** swipe drags a row horizontally by a fraction of its width, with real pointer events. */
