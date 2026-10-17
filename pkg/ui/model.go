@@ -6194,7 +6194,10 @@ func formatIssueMarkdown(item model.Issue, issueMap map[string]*model.Issue) str
 	}
 
 	if item.DeferUntil != nil {
-		sb.WriteString(fmt.Sprintf("**Deferred until:** %s\n\n", item.DeferUntil.Format("2006-01-02 15:04")))
+		sb.WriteString(fmt.Sprintf("**Deferred until:** %s\n\n", item.DeferUntil.Local().Format("2006-01-02 15:04")))
+	}
+	if item.DueDate != nil {
+		sb.WriteString(fmt.Sprintf("**Due:** %s\n\n", item.DueDate.Local().Format("2006-01-02 15:04")))
 	}
 
 	// Labels (bv-f103 fix: display labels in detail view)

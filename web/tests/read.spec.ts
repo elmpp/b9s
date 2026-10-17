@@ -3,6 +3,37 @@ import net from "node:net";
 import { expect, freePort, open, row, SAMPLE, settled, startProject, stopProject, test } from "./harness";
 
 test.describe("reading", () => {
+  test("detail shows scheduling dates in local time and omits unset dates", async ({ page, project }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.route("**/api/snapshot**", async route => {
+      const response = await route.fetch();
+      const snapshot = await response.json();
+      const issue = snapshot.issues.find((i: { id: string }) => i.id === "t-1");
+      issue.due = "2026-10-20T23:45:00-07:00";
+      issue.defer_until = "2026-10-19T22:30:00-07:00";
+      await route.fulfill({ response, json: snapshot });
+    });
+    await open(page, project);
+    await row(page, "t-1").click();
+    const meta = page.locator(".detail .meta");
+    const local = await page.evaluate(() => {
+      const fmt = (s: string) => {
+        const d = new Date(s), p = (n: number) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+      };
+      return [fmt("2026-10-20T23:45:00-07:00"), fmt("2026-10-19T22:30:00-07:00")];
+    });
+    await expect(meta.locator("dt", { hasText: /^due$/ }).locator("+ dd")).toHaveText(local[0]);
+    await expect(meta.locator("dt", { hasText: /^deferred$/ }).locator("+ dd")).toHaveText("until " + local[1]);
+    await page.screenshot({ path: testInfo.outputPath("scheduling-dates.png") });
+    await page.keyboard.press("Escape");
+    await row(page, "t-2").click();
+    await expect(meta.locator("dt", { hasText: /^(due|deferred)$/ })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test("comments default to newest first and the order choice survives reload", async ({ page, project }, testInfo) => {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));

@@ -112,7 +112,10 @@ func renderIssueDetail(item model.Issue, issueMap map[string]*model.Issue, t The
 		blocks = append(blocks, wrap.Render(muted.Render(strings.Join(facts, " · "))))
 	}
 	if item.DeferUntil != nil {
-		blocks = append(blocks, wrap.Render(r.NewStyle().Foreground(t.Deferred).Render("deferred until "+item.DeferUntil.Format("2006-01-02 15:04"))))
+		blocks = append(blocks, wrap.Render(r.NewStyle().Foreground(t.Deferred).Render("deferred until "+item.DeferUntil.Local().Format("2006-01-02 15:04"))))
+	}
+	if item.DueDate != nil {
+		blocks = append(blocks, wrap.Render(r.NewStyle().Foreground(t.Secondary).Render("due "+item.DueDate.Local().Format("2006-01-02 15:04"))))
 	}
 	if len(item.Labels) > 0 {
 		tags := make([]string, len(item.Labels))

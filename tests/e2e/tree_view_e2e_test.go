@@ -31,12 +31,41 @@ type treeFixtureIssue struct {
 	Priority     int               `json:"priority"`
 	IssueType    string            `json:"issue_type"`
 	CreatedAt    string            `json:"created_at"`
+	DueDate      string            `json:"due_date,omitempty"`
+	DeferUntil   string            `json:"defer_until,omitempty"`
 	Labels       []string          `json:"labels,omitempty"`
 	Description  string            `json:"description,omitempty"`
 	Notes        string            `json:"notes,omitempty"`
 	Assignee     string            `json:"assignee,omitempty"`
 	CreatedBy    string            `json:"created_by,omitempty"`
 	Dependencies []*treeFixtureDep `json:"dependencies,omitempty"`
+}
+
+func TestDetailSchedulingDatesE2E(t *testing.T) {
+	dir := t.TempDir()
+	writeTreeFixture(t, dir, []treeFixtureIssue{{
+		ID: "schedule-1", Title: "Scheduled issue", Status: "open", Priority: 2, IssueType: "task",
+		CreatedAt: "2026-10-17T12:00:00Z",
+		DueDate: "2026-10-20T23:45:00-07:00", DeferUntil: "2026-10-19T22:30:00-07:00",
+	}})
+	out, err := runTreeTUI(t, dir, 2500, []keyStep{kd("\r", 200*time.Millisecond)})
+	if err != nil {
+		t.Fatalf("detail TUI failed: %v\n%s", err, out)
+	}
+	frame := treeFinalFrame(out)
+	for _, field := range []struct{ label, value string }{
+		{"due ", "2026-10-20T23:45:00-07:00"},
+		{"deferred until ", "2026-10-19T22:30:00-07:00"},
+	} {
+		date, err := time.Parse(time.RFC3339, field.value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := field.label + date.Local().Format("2006-01-02 15:04")
+		if !strings.Contains(frame, want) {
+			t.Errorf("detail missing %q:\n%s", want, frame)
+		}
+	}
 }
 
 // writeTreeFixture writes a .beads/beads.jsonl with the given issues.
