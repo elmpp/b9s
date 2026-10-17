@@ -579,8 +579,9 @@ type Model struct {
 	countClosed  int
 
 	// Label picker (bv-126)
-	showLabelPicker bool
-	labelPicker     LabelPickerModel
+	showLabelPicker        bool
+	labelPicker            LabelPickerModel
+	labelPickerReturnFocus focus
 
 	// Status picker for quick status changes (bd-a83)
 	showStatusPicker bool
@@ -3236,6 +3237,7 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 				m.labelPicker.Reset()
 				m.labelPicker.SetSize(m.width, m.height-1)
 				m.showLabelPicker = true
+				m.labelPickerReturnFocus = m.focused
 				m.focused = focusLabelPicker
 				return m, nil
 
@@ -3992,24 +3994,35 @@ func (m Model) handleLabelPickerKeys(msg tea.KeyMsg) Model {
 	switch msg.String() {
 	case "esc":
 		m.showLabelPicker = false
-		m.focused = focusTree
+		m.focused = m.labelPickerReturnFocus
 	case "j", "down", "ctrl+n":
 		m.labelPicker.MoveDown()
 	case "k", "up", "ctrl+p":
 		m.labelPicker.MoveUp()
 	case "enter":
 		if selected := m.labelPicker.SelectedLabel(); selected != "" {
+			detailID := ""
+			if m.labelPickerReturnFocus == focusDetail {
+				if issue := m.detailIssue(); issue != nil {
+					detailID = issue.ID
+				}
+			}
 			m.labelFilter = selected
 			m.pickerMode = pickerModeLabels
 			m.rebuildPickerEntries()
 			m.applyFilter()
 			m.tree.SetLabelFilter(m.labelFilter)
-			m.syncTreeToDetail()
+			if detailID != "" {
+				m.selectDetailIssue(detailID)
+				m.updateViewportContent()
+			} else if m.labelPickerReturnFocus == focusTree {
+				m.syncTreeToDetail()
+			}
 			m.statusMsg = fmt.Sprintf("Filtered by label: %s", selected)
 			m.statusIsError = false
 		}
 		m.showLabelPicker = false
-		m.focused = focusTree
+		m.focused = m.labelPickerReturnFocus
 	default:
 		// Pass other keys to text input for fuzzy search
 		m.labelPicker.UpdateInput(msg)
@@ -6153,6 +6166,9 @@ func (m Model) FocusState() string {
 // getSelectedIssue returns the currently selected issue from the active view.
 // Returns nil if no issue is selected.
 func (m *Model) getSelectedIssue() *model.Issue {
+	if m.focused == focusDetail {
+		return m.detailIssue()
+	}
 	if m.isGraphView {
 		return m.graph.SelectedIssue()
 	}
@@ -7319,7 +7335,7 @@ func (c issueConfirmation) targetIDs() []string {
 // treeSelectionActive reports whether actions target the tree rather than the
 // board, graph or list selection. Marks exist only in the tree.
 func (m *Model) treeSelectionActive() bool {
-	return !m.isGraphView && !m.isBoardView && (m.focused == focusTree || m.treeViewActive)
+	return m.focused != focusDetail && !m.isGraphView && !m.isBoardView && (m.focused == focusTree || m.treeViewActive)
 }
 
 // actionTargets resolves the issues an issue action applies to, following

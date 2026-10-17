@@ -393,6 +393,45 @@ func TestProjectPickerFilterSelectionRouting(t *testing.T) {
 	}
 }
 
+func TestProjectFilterReopensWithAllEntries(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		query   string
+		matches int
+	}{
+		{"current project", "gamma", 2},
+		{"no matches", "zzzzzz", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newK9sKeysModel(t)
+			m.activeProjectName = "gamma"
+			m.projectPicker = NewProjectPicker([]ProjectEntry{
+				{Project: config.Project{Name: "alpha"}},
+				{Project: config.Project{Name: "gamma"}},
+				{Project: config.Project{Name: "gamma-two"}},
+			}, m.theme)
+			m = pressK9sKey(m, runeMsg("P"), runeMsg(tc.query))
+			if m.projectPicker.FilteredCount() != tc.matches {
+				t.Fatalf("query must produce %d rows", tc.matches)
+			}
+			next, cmd := m.Update(routingKey("enter"))
+			m = next.(Model)
+			if cmd != nil {
+				m = pressK9sKey(m, cmd())
+			}
+			m = pressK9sKey(m, runeMsg("P"))
+			if !m.projectPicker.Filtering() || m.projectPicker.filterInput.Value() != "" ||
+				m.projectPicker.FilteredCount() != 3 {
+				t.Fatalf("reopened empty filter must show all three projects, query=%q rows=%d",
+					m.projectPicker.filterInput.Value(), m.projectPicker.FilteredCount())
+			}
+			if entry := m.projectPicker.SelectedEntry(); entry == nil || entry.Project.Name != "alpha" {
+				t.Fatalf("reopened filter must select the first project, got %v", entry)
+			}
+		})
+	}
+}
+
 func TestProjectFilterEntryRespectsOverlays(t *testing.T) {
 	for _, overlay := range []string{"?", "`", "D"} {
 		t.Run(overlay, func(t *testing.T) {
@@ -460,6 +499,148 @@ func TestStatusHelpMatchesSupportedViews(t *testing.T) {
 				t.Fatalf("S help must match dispatch in view %v: advertised=%v handled=%v", view, advertised, m.showStatusPicker)
 			}
 		})
+	}
+}
+
+func labelRoutingModel(t *testing.T, view focus) Model {
+	t.Helper()
+	issues := k9sKeyIssues()
+	issues[1].Labels = []string{"keep"}
+	m := NewModel(issues, "")
+	m.projectPicker = NewProjectPicker(nil, m.theme)
+	m.tree.SetBeadsDir(t.TempDir())
+	m = pressK9sKey(m, tea.WindowSizeMsg{Width: k9sKeysWidth, Height: 20})
+	switch view {
+	case focusTree:
+		m.tree.ExpandPathTo("key-20")
+		m.tree.SelectByID("key-20")
+		m.syncTreeToDetail()
+	case focusBoard:
+		routingBoard(&m)
+		m.board.SelectIssueByID("key-20")
+	case focusGraph:
+		m = pressK9sKey(m, runeMsg("g"))
+		m.graph.SelectIssue("key-20")
+	}
+	return m
+}
+
+func TestLabelPickerRestoresOpeningFocus(t *testing.T) {
+	for _, view := range []focus{focusGraph, focusTree, focusBoard} {
+		for _, detail := range []bool{false, true} {
+			if view != focusGraph && !detail {
+				continue // l belongs to tree and board navigation.
+			}
+			for _, dismiss := range []string{"esc", "enter"} {
+				t.Run(fmt.Sprintf("%v/detail=%v/%s", view, detail, dismiss), func(t *testing.T) {
+					m := labelRoutingModel(t, view)
+					if detail {
+						m = pressK9sKey(m, routingKey("enter"))
+					}
+					openingFocus := m.focused
+					m = pressK9sKey(m, runeMsg("l"))
+					if !m.showLabelPicker {
+						t.Fatal("l must open the label picker")
+					}
+					m = pressK9sKey(m, routingKey(dismiss))
+					if m.showLabelPicker || m.focused != openingFocus {
+						t.Fatalf("label picker must return to %v, got %v", openingFocus, m.focused)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDetailSelectionSurvivesLabelPicker(t *testing.T) {
+	for _, view := range []focus{focusTree, focusBoard, focusGraph} {
+		for _, dismiss := range []string{"esc", "enter"} {
+			t.Run(fmt.Sprintf("%v/%s", view, dismiss), func(t *testing.T) {
+				m := labelRoutingModel(t, view)
+				m = pressK9sKey(m, routingKey("enter"))
+				if shown := m.detailIssue(); shown == nil || shown.ID != "key-20" {
+					t.Fatalf("fixture must show key-20, got %v", shown)
+				}
+				m = pressK9sKey(m, runeMsg("l"), routingKey(dismiss))
+				if shown := m.detailIssue(); shown == nil || shown.ID != "key-20" {
+					t.Fatalf("label picker must retain displayed key-20, got %v", shown)
+				}
+				if dismiss == "enter" && m.labelFilter != "keep" {
+					t.Fatal("fixture must apply a label excluding the displayed issue")
+				}
+			})
+		}
+	}
+}
+
+func TestDetailActionsAfterExcludedLabel(t *testing.T) {
+	for _, view := range []focus{focusTree, focusBoard, focusGraph} {
+		for _, key := range []string{"e", "K", "delete"} {
+			t.Run(fmt.Sprintf("%v/%s", view, key), func(t *testing.T) {
+				m := labelRoutingModel(t, view)
+				m = pressK9sKey(m, routingKey("enter"), runeMsg("l"), routingKey("enter"))
+				if shown := m.detailIssue(); m.focused != focusDetail || shown == nil || shown.ID != "key-20" {
+					t.Fatalf("label dismissal must retain displayed key-20, got %v", shown)
+				}
+				if m.labelFilter != "keep" || m.tree.GetSelectedID() == "key-20" {
+					t.Fatal("fixture must exclude the displayed issue from the tree")
+				}
+				m = pressK9sKey(m, routingKey(key))
+				if key == "e" {
+					if !m.showEditModal || m.editModal.issueID != "key-20" {
+						t.Fatalf("edit must target displayed key-20, got %q", m.editModal.issueID)
+					}
+				} else if m.issueConfirm.id != "key-20" || len(m.issueConfirm.ids) != 0 {
+					t.Fatalf("%s must target displayed key-20, got id=%q ids=%v", key, m.issueConfirm.id, m.issueConfirm.ids)
+				}
+			})
+		}
+	}
+}
+
+func TestDetailActionsIgnoreTreeMarks(t *testing.T) {
+	for _, key := range []string{"K", "delete"} {
+		t.Run(key, func(t *testing.T) {
+			m := labelRoutingModel(t, focusTree)
+			m.tree.SelectByID("key-01")
+			m.tree.ToggleMark()
+			m.tree.SelectByID("key-20")
+			m = pressK9sKey(m, routingKey("enter"), routingKey(key))
+			if m.issueConfirm.id != "key-20" || len(m.issueConfirm.ids) != 0 {
+				t.Fatalf("detail action must target displayed key-20, got id=%q ids=%v", m.issueConfirm.id, m.issueConfirm.ids)
+			}
+		})
+	}
+}
+
+func TestGraphKeysAfterLabelPicker(t *testing.T) {
+	for _, dismiss := range []string{"esc", "enter"} {
+		for _, key := range []string{"enter", "E", "j"} {
+			t.Run(dismiss+"/"+key, func(t *testing.T) {
+				m := labelRoutingModel(t, focusGraph)
+				m = pressK9sKey(m, runeMsg("l"), routingKey(dismiss))
+				selected := m.graph.SelectedIssue()
+				if selected == nil {
+					t.Fatal("graph must have a row after label dismissal")
+				}
+				id := selected.ID
+				m = pressK9sKey(m, routingKey(key))
+				switch key {
+				case "enter":
+					if shown := m.detailIssue(); m.focused != focusDetail || shown == nil || shown.ID != id {
+						t.Fatalf("Enter must open graph row %s, got %v", id, shown)
+					}
+				case "E":
+					if m.isGraphView || m.focused != focusTree {
+						t.Fatal("E must return from graph to tree")
+					}
+				case "j":
+					if row := m.graph.SelectedIssue(); m.focused != focusGraph || row == nil || row.ID == id {
+						t.Fatal("j must move the graph cursor after label dismissal")
+					}
+				}
+			})
+		}
 	}
 }
 

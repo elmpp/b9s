@@ -151,6 +151,7 @@ func (m ProjectPickerModel) updateNormal(msg tea.KeyMsg) (ProjectPickerModel, te
 		m.scrollOffset = 0
 		m.filterInput.SetValue("")
 		m.filterInput.Focus()
+		m.applyFilter()
 	case "j", "down":
 		// Scroll the visible window down through the project list (bd-i8t3).
 		maxScroll := len(m.filtered) - m.visibleProjectCapacity()

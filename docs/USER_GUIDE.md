@@ -263,6 +263,11 @@ The edit form has the fields Title, Status, Description, Priority, Type, Assigne
 
 The view reloads by itself once `bd` has written, because b9s watches the data source. The all-projects view (`0`) is read-only.
 
+The label picker returns to the pane that opened it, on `Esc` or `Enter`.
+In the detail pane, applying a label keeps the displayed issue, even when that label excludes it from the tree or board.
+`e`, `K` and `Delete` target the displayed issue.
+Tree marks apply when the tree has focus.
+
 ## Attachments
 
 Files attach to an issue through a reference comment, and the bytes go to a blob store that b9s configures and Beads never sees ([ADR 0024](adr/0024-attach-files-through-reference-comments.md)). Attachments are off until the [configuration file](#configuration) has an `attachments` section.
@@ -613,6 +618,7 @@ Each b9s registers in `~/.local/state/b9s/instances` (or `$XDG_STATE_HOME/b9s/in
 
 `P` shows the project header and starts its filter. Type to narrow the projects,
 use `Up` and `Down` to choose, then `Enter` to open. `Esc` cancels.
+Reopening the filter with `P` starts with an empty query and all projects.
 The filter owns every key while it is open, including letters and digits that
 otherwise switch views or projects.
 Count and issue refreshes preserve the filter and its selection.
