@@ -141,6 +141,40 @@ func TestDependencyGraphView(t *testing.T) {
 	})
 }
 
+func TestGraphEnterRoutingE2E(t *testing.T) {
+	dir := t.TempDir()
+	writeTreeFixture(t, dir, makeFilterFixture(t))
+	out, err := runTreeTUI(t, dir, 2500, []keyStep{
+		kd("g", 200*time.Millisecond),
+		kd("\x1b[H", 200*time.Millisecond),
+		kd("j", 200*time.Millisecond),
+		kd("\r", 200*time.Millisecond),
+	})
+	if err != nil {
+		t.Fatalf("TUI failed: %v\n%s", err, out)
+	}
+	frame := plainFinalFrame(out)
+	if !strings.Contains(frame, "Closed Epic") {
+		t.Fatalf("graph Enter must open epic-f2 selected after Home,j:\n%s", frame)
+	}
+}
+
+func TestTreeBookmarkRoutingE2E(t *testing.T) {
+	dir := t.TempDir()
+	writeTreeFixture(t, dir, makeFilterFixture(t))
+	out, err := runTreeTUI(t, dir, 1800, []keyStep{kd("\x1bb", 200*time.Millisecond)})
+	if err != nil {
+		t.Fatalf("TUI failed: %v\n%s", err, out)
+	}
+	state, err := os.ReadFile(filepath.Join(dir, ".beads", "tree-state.json"))
+	if err != nil || !strings.Contains(string(state), `"bookmarks"`) {
+		t.Fatalf("Alt+b must persist a bookmark: state=%s err=%v", state, err)
+	}
+	if strings.Contains(plainFinalFrame(out), "BOARD") {
+		t.Fatal("Alt+b must leave the tree visible")
+	}
+}
+
 func TestTreeViewShowsComputedBlockerBadge(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, makeFilterFixture(t))

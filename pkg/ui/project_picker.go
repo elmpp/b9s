@@ -115,6 +115,21 @@ func (m *ProjectPickerModel) SetSize(w, h int) {
 	m.height = h
 }
 
+// SetEntries refreshes project data without interrupting keyboard input.
+func (m *ProjectPickerModel) SetEntries(entries []ProjectEntry) {
+	selected := m.SelectedEntry()
+	m.entries = entries
+	m.applyFilter()
+	if selected != nil {
+		for cursor, index := range m.filtered {
+			if m.entries[index].Project == selected.Project {
+				m.cursor = cursor
+				break
+			}
+		}
+	}
+}
+
 // Update handles keyboard input for the project picker.
 func (m ProjectPickerModel) Update(msg tea.Msg) (ProjectPickerModel, tea.Cmd) {
 	switch msg := msg.(type) {
