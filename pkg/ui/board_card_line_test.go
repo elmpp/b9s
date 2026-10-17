@@ -30,7 +30,7 @@ func TestBoardCard_UnselectedIsOneLine(t *testing.T) {
 	if !strings.HasPrefix(got, "✔ eg0.4.1 Add packet append API with cursor semantics") {
 		t.Fatalf("line must start with icon, ID and title, got %q", got)
 	}
-	if !strings.HasSuffix(got, "lane: reviewing · blocks 1 · P1") {
+	if !strings.HasSuffix(got, "dispatch: reviewing · blocks 1 · P1") {
 		t.Fatalf("tags must be right-aligned in order, got %q", got)
 	}
 	if w := lipgloss.Width(lines[0]); w != 100 {
@@ -49,7 +49,7 @@ func TestBoardCard_TagsDropFromTheRightBeforeTheTitle(t *testing.T) {
 	if strings.Contains(got, "P1") || strings.Contains(got, "blocks") {
 		t.Fatalf("at 44 cells the later tags go first, got %q", got)
 	}
-	if !strings.Contains(got, "lane: reviewing") || !strings.Contains(got, "Add packe") || !strings.Contains(got, "…") {
+	if !strings.Contains(got, "dispatch: reviewing") || !strings.Contains(got, "Add packe") || !strings.Contains(got, "…") {
 		t.Fatalf("the first tag and a cut title must stay, got %q", got)
 	}
 	narrow := strings.TrimRight(stripANSI(b.cardLines(is, 14, false, 0, 0)[0]), " ")

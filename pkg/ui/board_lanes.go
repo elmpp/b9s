@@ -720,8 +720,8 @@ func (b *BoardModel) cardTags(card boardCardView, inner int) []cardTag {
 	if card.BlockedBy != "" {
 		add("blocked by "+card.BlockedBy, t.Blocked)
 	}
-	if card.LaneStage != "" {
-		add("lane: "+card.LaneStage, t.InProgress)
+	if card.DispatchState != "" {
+		add(DispatchStateDimension+": "+card.DispatchState, t.InProgress)
 	}
 	if card.BlocksCount > 0 {
 		add(fmt.Sprintf("blocks %d", card.BlocksCount), t.Feature)
@@ -775,8 +775,8 @@ func (b *BoardModel) lineTags(issue model.Issue, card boardCardView) []textPart 
 	if card.BlockedBy != "" {
 		tags = append(tags, textPart{text: "blocked " + card.BlockedBy, color: t.Blocked})
 	}
-	if card.LaneStage != "" {
-		tags = append(tags, textPart{text: "lane: " + card.LaneStage, color: t.InProgress})
+	if card.DispatchState != "" {
+		tags = append(tags, textPart{text: DispatchStateDimension + ": " + card.DispatchState, color: t.InProgress})
 	}
 	if card.BlocksCount > 0 {
 		tags = append(tags, textPart{text: fmt.Sprintf("blocks %d", card.BlocksCount), color: t.Feature})

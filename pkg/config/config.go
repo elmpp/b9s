@@ -29,12 +29,63 @@ type Project struct {
 
 // UIConfig holds UI preference settings.
 type UIConfig struct {
-	DefaultView string     `yaml:"default_view,omitempty"` // list, tree, board, split
-	BoardEpics  string     `yaml:"board_epics,omitempty"`  // rail or rows; v switches at runtime
-	SplitRatio  float64    `yaml:"split_ratio,omitempty"`  // Default split pane ratio (0.2-0.8)
-	Headless    bool       `yaml:"headless,omitempty"`     // Compact header mode
-	Sort        SortConfig `yaml:"sort,omitempty"`         // Tree sort applied at startup
-	DateOrder   DateOrder  `yaml:"date_order,omitempty"`   // auto, dmy or mdy for absolute dates
+	Columns     map[string]string `yaml:"columns,omitempty"`      // auto, show or hide, keyed by column
+	DefaultView string            `yaml:"default_view,omitempty"` // list, tree, board, split
+	BoardEpics  string            `yaml:"board_epics,omitempty"`  // rail or rows; v switches at runtime
+	SplitRatio  float64           `yaml:"split_ratio,omitempty"`  // Default split pane ratio (0.2-0.8)
+	Headless    bool              `yaml:"headless,omitempty"`     // Compact header mode
+	Sort        SortConfig        `yaml:"sort,omitempty"`         // Tree sort applied at startup
+	DateOrder   DateOrder         `yaml:"date_order,omitempty"`   // auto, dmy or mdy for absolute dates
+}
+
+// SaveColumnPreference updates one preference without replacing unrelated
+// settings or comments from another session's config.
+func SaveColumnPreference(path, column, preference string) error {
+	if path == "" {
+		return fmt.Errorf("cannot determine config directory")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+	var doc yaml.Node
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return fmt.Errorf("parsing config: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("reading config: %w", err)
+	}
+	if len(doc.Content) == 0 {
+		doc = yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}}
+	}
+	node := doc.Content[0]
+	for _, key := range []string{"ui", "columns"} {
+		if node.Kind != yaml.MappingNode {
+			return fmt.Errorf("config parent of %s is not a mapping", key)
+		}
+		var child *yaml.Node
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if node.Content[i].Value == key {
+				child = node.Content[i+1]
+				break
+			}
+		}
+		if child == nil {
+			child = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+			setMappingValue(node, key, child)
+		}
+		node = child
+	}
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("ui.columns is not a mapping")
+	}
+	setMappingValue(node, column, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: preference})
+	data, err = yaml.Marshal(&doc)
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+	return writeFileAtomic(path, data)
 }
 
 // SortConfig is the tree sort b9s starts with. The sort popup overrides it for

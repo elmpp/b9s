@@ -456,7 +456,7 @@ func structuredTutorialPages() []StructuredTutorialPage {
 				Section{Title: "Row Facts"},
 				KeyTable{Bindings: []KeyBinding{
 					{Key: "blocked by X", Desc: "An open blocker"},
-					{Key: "lane: stage", Desc: "Dispatcher lane stage"},
+					{Key: "dispatch: stage", Desc: "Dispatcher stage"},
 					{Key: "blocks N", Desc: "Issues waiting on this one"},
 				}},
 			},

@@ -10,7 +10,7 @@ The query language is small and closed. Its whole grammar fits in a paragraph.
 
 Plain words match fuzzily against the issue ID, the title and the labels, and nothing else. `mob web` finds "Mobile web UI". `foit` finds `bd-foit` and its children, because the ID is a field. A word does not search the description, the comments or the assignee, and that restriction is decision record 0004: a hit must be explained by data visible in its row. A fuzzy match on a paragraph of description is a result you cannot see the reason for, and a result you cannot see the reason for feels like a bug.
 
-Predicates target a field: `status:open`, `priority:1`, `type:epic`, `label:lane-stage`, `assignee:andre`, `project:b9s`, `id:foit`, `title:web`. Two values in one field combine with OR, so `status:open,in_progress` is either. Different fields combine with AND. A leading `!` negates: `!status:closed`. Priority is exact, so `p1` never matches `p10`, and an incomplete predicate such as `status:` adds no constraint rather than matching nothing, so the list does not empty out while you are still typing.
+Predicates target a field: `status:open`, `priority:1`, `type:epic`, `label:dispatch-queue`, `assignee:andre`, `project:b9s`, `id:foit`, `title:web`. Two values in one field combine with OR, so `status:open,in_progress` is either. Different fields combine with AND. A leading `!` negates: `!status:closed`. Priority is exact, so `p1` never matches `p10`, and an incomplete predicate such as `status:` adds no constraint rather than matching nothing, so the list does not empty out while you are still typing.
 
 Type filters have `:` commands as shortcuts. `:epic` is `type:epic`, `:bug` is `type:bug`, and `:issues` clears the type. They set the same query.
 

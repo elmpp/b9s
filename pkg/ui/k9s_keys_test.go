@@ -115,9 +115,9 @@ func TestTreeCtrlWAgainRestoresColumnPreferences(t *testing.T) {
 	m.tree.SetColumnPreference(TreeColumnUpdated, ColumnHide)
 	m = pressK9sKey(m, tea.KeyMsg{Type: tea.KeyCtrlW}, tea.KeyMsg{Type: tea.KeyCtrlW})
 	want := map[TreeColumn]ColumnPreference{
-		TreeColumnLaneStage: ColumnAuto,
-		TreeColumnUpdated:   ColumnHide,
-		TreeColumnID:        ColumnAuto,
+		TreeColumnDispatch: ColumnAuto,
+		TreeColumnUpdated:  ColumnHide,
+		TreeColumnID:       ColumnAuto,
 	}
 	for c, pref := range want {
 		if got := m.tree.ColumnPreference(c); got != pref {

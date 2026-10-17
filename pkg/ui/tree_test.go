@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/vanderheijden86/b9s/pkg/config"
 	"github.com/vanderheijden86/b9s/pkg/model"
 )
 
@@ -30,13 +31,65 @@ func newTreeTestTheme() Theme {
 	return DefaultTheme(lipgloss.NewRenderer(nil))
 }
 
+func TestColumnPickerReportsSaveFailure(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	m := NewModel(nil, "").WithConfig(config.DefaultConfig(), "", "")
+	if err := os.MkdirAll(config.ConfigPath(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m.tree.OpenColumnPopup()
+	m = m.handleTreeKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.statusIsError || !strings.Contains(m.statusMsg, "Saving columns:") {
+		t.Fatalf("save failure must be visible: %q (error=%v)", m.statusMsg, m.statusIsError)
+	}
+}
+
+func TestColumnPickerPersistsPreferenceAcrossRestart(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	path := config.ConfigPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("# Keep this comment\ncustom: preserved\nui:\n  sort:\n    field: title\n  columns:\n    updated: show\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := NewModel(nil, "").WithConfig(cfg, "", "")
+	m.tree.OpenColumnPopup()
+	m = m.handleTreeKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m.handleTreeKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	cfg, err = config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	restarted := NewModel(nil, "").WithConfig(cfg, "", "")
+	if got := restarted.tree.ColumnPreference(TreeColumnDispatch); got != ColumnHide {
+		t.Fatalf("dispatch = %v, want Hide", got)
+	}
+	if got := restarted.tree.ColumnPreference(TreeColumnUpdated); got != ColumnShow {
+		t.Fatalf("updated = %v, want Show", got)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"# Keep this comment", "custom: preserved", "field: title"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("config lost %q: %s", want, data)
+		}
+	}
+}
+
 func TestTreeViewRemovesTerminalControlPayloads(t *testing.T) {
 	issue := model.Issue{
 		ID:        "bd-1\x1b[2J",
 		Title:     "safe\x1b]52;c;YXR0YWNr\x07title",
 		Status:    model.StatusOpen,
 		IssueType: model.TypeTask,
-		Labels:    []string{"lane:stage:\u009b31mbad"},
+		Labels:    []string{"dispatch:stage:\u009b31mbad"},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.SetSize(120, 20)
@@ -4422,7 +4475,7 @@ func TestTreeNode_ShortIDAtEnd(t *testing.T) {
 	}
 }
 
-func TestTreeViewRendersLaneStageColumn(t *testing.T) {
+func TestTreeViewRendersDispatchColumn(t *testing.T) {
 	issues := []model.Issue{
 		{
 			ID:        "agents-config-eg0.1.1",
@@ -4431,26 +4484,26 @@ func TestTreeViewRendersLaneStageColumn(t *testing.T) {
 			IssueType: model.TypeTask,
 			Priority:  1,
 			CreatedAt: time.Now(),
-			Labels:    []string{"lane-queue=default", "lane-stage=BLOCKED"},
+			Labels:    []string{"dispatch-queue=default", "dispatch:BLOCKED"},
 		},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
 	tree.SetSize(140, 20)
-	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
+	tree.SetColumnPreference(TreeColumnDispatch, ColumnShow)
 
 	view := stripANSI(tree.View())
-	if !strings.Contains(view, "LANE") {
-		t.Fatalf("tree header missing lane column: %q", view)
+	if !strings.Contains(view, "DISPATCH") {
+		t.Fatalf("tree header missing dispatch column: %q", view)
 	}
 	if !strings.Contains(view, "BLOCKED") {
-		t.Fatalf("tree row missing dispatcher lane stage: %q", view)
+		t.Fatalf("tree row missing dispatcher stage: %q", view)
 	}
 }
 
 // A dispatcher lane transition bumps updated_at but never created_at, so the
 // Updated column must follow updated_at or a freshly moved lane task reads as
-// weeks stale beside its new lane state.
+// weeks stale beside its new dispatch state.
 func TestTreeViewUpdatedColumnShowsUpdatedAt(t *testing.T) {
 	now := time.Now()
 	issues := []model.Issue{
@@ -4461,7 +4514,7 @@ func TestTreeViewUpdatedColumnShowsUpdatedAt(t *testing.T) {
 			IssueType: model.TypeBug,
 			CreatedAt: now.Add(-21 * 24 * time.Hour),
 			UpdatedAt: now.Add(-5*time.Minute - 10*time.Second),
-			Labels:    []string{"lane-stage=ABANDONED"},
+			Labels:    []string{"dispatch:ABANDONED"},
 		},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
@@ -4469,7 +4522,7 @@ func TestTreeViewUpdatedColumnShowsUpdatedAt(t *testing.T) {
 	tree.SetSize(140, 20)
 	tree.SetColumnPreference(TreeColumnCreated, ColumnHide)
 	tree.SetColumnPreference(TreeColumnUpdated, ColumnShow)
-	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
+	tree.SetColumnPreference(TreeColumnDispatch, ColumnShow)
 
 	row := ""
 	for _, line := range strings.Split(stripANSI(tree.View()), "\n") {
@@ -4489,7 +4542,7 @@ func TestTreeViewUpdatedColumnShowsUpdatedAt(t *testing.T) {
 	}
 }
 
-func TestTreeViewRendersLaneStageAtMinimumColumnWidth(t *testing.T) {
+func TestTreeViewRendersDispatchAtMinimumColumnWidth(t *testing.T) {
 	issues := []model.Issue{
 		{
 			ID:        "bd-lane",
@@ -4497,57 +4550,81 @@ func TestTreeViewRendersLaneStageAtMinimumColumnWidth(t *testing.T) {
 			Status:    model.StatusOpen,
 			IssueType: model.TypeTask,
 			CreatedAt: time.Now(),
-			Labels:    []string{"lane-stage=RUNNING"},
+			Labels:    []string{"dispatch:RUNNING"},
 		},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
 	tree.SetSize(100, 20)
-	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
+	tree.SetColumnPreference(TreeColumnDispatch, ColumnShow)
 
 	view := stripANSI(tree.View())
-	if !strings.Contains(view, "LANE STATE") || !strings.Contains(view, "RUNNING") {
-		t.Fatalf("lane header and row must use the same width threshold: %q", view)
+	if !strings.Contains(view, "DISPATCH") || !strings.Contains(view, "RUNNING") {
+		t.Fatalf("dispatch header and row must use the same width threshold: %q", view)
 	}
 	lines := strings.Split(view, "\n")
 	// Compare cells, not bytes: the header's sort badge holds a multi-byte arrow.
 	cellIndex := func(line, s string) int { return lipgloss.Width(line[:strings.Index(line, s)]) }
-	if got, want := cellIndex(lines[1], "RUNNING"), cellIndex(lines[0], "LANE STATE"); got != want {
-		t.Fatalf("lane state must align with its header: header column=%d row column=%d\n%s", want, got, view)
+	if got, want := cellIndex(lines[1], "RUNNING"), cellIndex(lines[0], "DISPATCH"); got != want {
+		t.Fatalf("dispatch state must align with its header: header column=%d row column=%d\n%s", want, got, view)
 	}
 }
 
-func TestTreeViewHidesLaneStageByDefault(t *testing.T) {
+func TestTreeViewShowsDispatchByDefault(t *testing.T) {
 	issues := []model.Issue{
-		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=RUNNING"}},
+		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"dispatch:RUNNING"}},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
 	tree.SetSize(200, 20)
 
-	if view := stripANSI(tree.View()); strings.Contains(view, "LANE STATE") {
-		t.Fatalf("lane state should be hidden unless asked for, even with room to spare:\n%s", view)
+	view := stripANSI(tree.View())
+	if !strings.Contains(view, "DISPATCH") || !strings.Contains(view, "RUNNING") {
+		t.Fatalf("dispatch state should show under Auto:\n%s", view)
 	}
 }
 
-func TestTreeColumnPopupCanForceLaneStageVisible(t *testing.T) {
+// The dispatcher writes the stage with `bd set-state <id> dispatch=<STAGE>`,
+// which stores the label dispatch:<STAGE>; its other labels are not stages.
+func TestDispatchStateReadsStateDimensionLabel(t *testing.T) {
+	cases := []struct {
+		name   string
+		labels []string
+		want   string
+	}{
+		{"state dimension", []string{"dispatch-queue=default", "dispatch:DELIVERED"}, "DELIVERED"},
+		{"other dispatcher labels are not a stage", []string{"dispatch-queue=default", "dispatch-attempt=2", "dispatch-failure=timeout"}, ""},
+		{"retired lane-stage label is not read", []string{"lane-stage=BLOCKED"}, ""},
+		{"no labels", nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := dispatchState(tc.labels); got != tc.want {
+				t.Fatalf("dispatchState(%q) = %q, want %q", tc.labels, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTreeColumnPopupCanForceDispatchVisible(t *testing.T) {
 	longTitle := strings.Repeat("long task title ", 5)
 	issues := []model.Issue{
-		{ID: "bd-long-1", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=QUEUED"}},
-		{ID: "bd-long-2", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeFeature, CreatedAt: time.Now(), Labels: []string{"lane-stage=RUNNING"}},
-		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"lane-stage=DONE"}},
+		{ID: "bd-long-1", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"dispatch:QUEUED"}},
+		{ID: "bd-long-2", Title: longTitle, Status: model.StatusOpen, IssueType: model.TypeFeature, CreatedAt: time.Now(), Labels: []string{"dispatch:RUNNING"}},
+		{ID: "bd-short", Title: "Short task", Status: model.StatusOpen, IssueType: model.TypeTask, CreatedAt: time.Now(), Labels: []string{"dispatch:DONE"}},
 	}
 	tree := NewTreeModel(newTreeTestTheme())
 	tree.Build(issues)
 	tree.SetSize(100, 20)
 
-	if strings.Contains(stripANSI(tree.View()), "LANE STATE") {
-		t.Fatal("test setup should start with lane stage auto-hidden")
+	tree.SetColumnPreference(TreeColumnDispatch, ColumnHide)
+	if strings.Contains(stripANSI(tree.View()), "DISPATCH") {
+		t.Fatal("a Hide preference must hide the dispatch column")
 	}
 
-	tree.SetColumnPreference(TreeColumnLaneStage, ColumnShow)
+	tree.SetColumnPreference(TreeColumnDispatch, ColumnShow)
 	view := stripANSI(tree.View())
-	if !strings.Contains(view, "LANE STATE") || !strings.Contains(view, "RUNNING") {
+	if !strings.Contains(view, "DISPATCH") || !strings.Contains(view, "RUNNING") {
 		t.Fatalf("an explicit Show preference must override narrow-mode adaptation:\n%s", view)
 	}
 }
@@ -4557,28 +4634,28 @@ func TestTreeColumnPopupListsOptionalColumnsAndCyclesPreference(t *testing.T) {
 	tree.OpenColumnPopup()
 
 	popup := stripANSI(tree.RenderColumnPopup())
-	for _, label := range []string{"Lane state", "Updated", "ID"} {
+	for _, label := range []string{"Dispatch", "Updated", "ID"} {
 		if !strings.Contains(popup, label) {
 			t.Fatalf("column popup missing %q: %q", label, popup)
 		}
 	}
-	if got := tree.ColumnPreference(TreeColumnLaneStage); got != ColumnAuto {
-		t.Fatalf("lane stage should default to Auto, got %v", got)
+	if got := tree.ColumnPreference(TreeColumnDispatch); got != ColumnAuto {
+		t.Fatalf("dispatch should default to Auto, got %v", got)
 	}
 	if !strings.Contains(popup, "Auto (shown)") {
 		t.Fatalf("Auto should disclose its resolved visibility: %q", popup)
 	}
 
 	tree.CycleColumnPreference()
-	if got := tree.ColumnPreference(TreeColumnLaneStage); got != ColumnShow {
+	if got := tree.ColumnPreference(TreeColumnDispatch); got != ColumnShow {
 		t.Fatalf("first cycle should force Show, got %v", got)
 	}
 	tree.CycleColumnPreference()
-	if got := tree.ColumnPreference(TreeColumnLaneStage); got != ColumnHide {
+	if got := tree.ColumnPreference(TreeColumnDispatch); got != ColumnHide {
 		t.Fatalf("second cycle should force Hide, got %v", got)
 	}
 	tree.CycleColumnPreference()
-	if got := tree.ColumnPreference(TreeColumnLaneStage); got != ColumnAuto {
+	if got := tree.ColumnPreference(TreeColumnDispatch); got != ColumnAuto {
 		t.Fatalf("third cycle should return to Auto, got %v", got)
 	}
 }

@@ -711,7 +711,8 @@ type Model struct {
 	// overlay left open across a project switch can never write into the new
 	// project under the old project's issue ID (bd-l66t).
 	projectGeneration uint64
-	appConfig         config.Config    // Loaded app configuration
+	appConfig         config.Config // Loaded app configuration
+	columnConfigPath  string
 	allProjects       []config.Project // All known projects
 	projectPicker     ProjectPickerModel
 	projectCountCache map[string]projectCounts
@@ -1235,6 +1236,17 @@ func (m Model) WithHotkeys(hotkeys Hotkeys) Model {
 // Call this after NewModel to enable project switching and favorites.
 func (m Model) WithConfig(cfg config.Config, projectName, projectPath string) Model {
 	m.appConfig = cfg
+	m.columnConfigPath = config.ConfigPath()
+	for column := TreeColumn(0); column < treeColumnCount; column++ {
+		preference := ColumnAuto
+		switch cfg.UI.Columns[column.ConfigKey()] {
+		case "show":
+			preference = ColumnShow
+		case "hide":
+			preference = ColumnHide
+		}
+		m.tree.SetColumnPreference(column, preference)
+	}
 	m.doltPollInterval = cfg.RefreshPollInterval()
 	m.tree.SetSort(sortFromConfig(cfg.UI.Sort))
 	m.activeProjectName = projectName
@@ -3685,7 +3697,7 @@ func (m *Model) syncBoardToDetail() {
 
 // handleTreeKeys handles keyboard input when tree view is focused (bv-gllx)
 func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
-	// Column popup mode keeps changes local to the running session.
+	// Only explicit picker actions persist; wide mode is a temporary override.
 	if m.tree.IsColumnPopupOpen() {
 		switch msg.String() {
 		case "j", "down":
@@ -3694,6 +3706,14 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 			m.tree.ColumnPopupUp()
 		case " ", "space", "enter":
 			m.tree.CycleColumnPreference()
+			if m.columnConfigPath != "" {
+				column := TreeColumn(m.tree.columnPopupCursor)
+				preference := strings.ToLower(m.tree.ColumnPreference(column).String())
+				if err := config.SaveColumnPreference(m.columnConfigPath, column.ConfigKey(), preference); err != nil {
+					m.statusMsg = "Saving columns: " + err.Error()
+					m.statusIsError = true
+				}
+			}
 		case "esc", "|":
 			m.tree.CloseColumnPopup()
 		}

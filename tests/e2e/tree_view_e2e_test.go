@@ -157,13 +157,13 @@ func adaptiveColumnFixture(t *testing.T) []treeFixtureIssue {
 	now := time.Now()
 	longTitle := strings.Repeat("Long acceptance task title ", 8)
 	return []treeFixtureIssue{
-		{ID: "column-short", Title: "Short task", Status: "open", Priority: 2, IssueType: "task", CreatedAt: now.Format(time.RFC3339), Labels: []string{"lane-stage=DONE"}},
-		{ID: "column-long-1", Title: longTitle, Status: "open", Priority: 2, IssueType: "task", CreatedAt: now.Add(-time.Second).Format(time.RFC3339), Labels: []string{"lane-stage=QUEUED"}},
-		{ID: "column-long-2", Title: longTitle, Status: "open", Priority: 2, IssueType: "feature", CreatedAt: now.Add(-2 * time.Second).Format(time.RFC3339), Labels: []string{"lane-stage=RUNNING"}},
+		{ID: "column-short", Title: "Short task", Status: "open", Priority: 2, IssueType: "task", CreatedAt: now.Format(time.RFC3339), Labels: []string{"dispatch:DONE"}},
+		{ID: "column-long-1", Title: longTitle, Status: "open", Priority: 2, IssueType: "task", CreatedAt: now.Add(-time.Second).Format(time.RFC3339), Labels: []string{"dispatch:QUEUED"}},
+		{ID: "column-long-2", Title: longTitle, Status: "open", Priority: 2, IssueType: "feature", CreatedAt: now.Add(-2 * time.Second).Format(time.RFC3339), Labels: []string{"dispatch:RUNNING"}},
 	}
 }
 
-func TestTreeViewHidesLaneStageByDefault(t *testing.T) {
+func TestTreeViewShowsDispatchByDefault(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, adaptiveColumnFixture(t))
 
@@ -171,20 +171,34 @@ func TestTreeViewHidesLaneStageByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run tree TUI: %v", err)
 	}
-	if strings.Contains(string(out), "LANE STATE") {
-		t.Fatalf("lane stage should be hidden unless asked for:\n%s", out)
-	}
+	containsAll(t, out, []string{"DISPATCH", "RUNNING", "QUEUED"})
 }
 
-func TestTreeViewColumnSelectorForcesLaneStageVisible(t *testing.T) {
+func TestTreeViewColumnSelectorHidesDispatch(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, adaptiveColumnFixture(t))
 
-	out, err := runTreeTUI(t, tempDir, 1800, []keyStep{k("|"), k(" "), k("|")})
+	// Dispatch heads the selector; Space cycles Auto -> Show -> Hide.
+	out, err := runTreeTUI(t, tempDir, 1800, []keyStep{k("|"), k(" "), k(" "), k("|")})
 	if err != nil {
 		t.Fatalf("run tree TUI: %v", err)
 	}
-	containsAll(t, out, []string{"LANE STATE", "RUNNING"})
+	frame := ansi.Strip(treeFinalFrame(out))
+	if !strings.Contains(frame, "Short task") {
+		t.Fatalf("final frame should still list the issues:\n%s", frame)
+	}
+	if strings.Contains(frame, "DISPATCH") {
+		t.Fatalf("a Hide choice in the selector should hide the dispatch column:\n%s", frame)
+	}
+	out, err = runTreeTUI(t, tempDir, 1200, nil)
+	if err != nil {
+		t.Fatalf("restart tree TUI: %v", err)
+	}
+	frame = ansi.Strip(treeFinalFrame(out))
+	if !strings.Contains(frame, "Short task") || strings.Contains(frame, "DISPATCH") {
+		t.Fatalf("restart must preserve the hidden dispatch column:\n%s", frame)
+	}
 }
 
 // runTreeTUI launches bv in a PTY, sends the given key sequence, and returns the captured output.

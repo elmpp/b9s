@@ -504,7 +504,7 @@ func TestBoardCardHeight_MatchesDrawnCard(t *testing.T) {
 	b := newEpicBoard(BoardEpicRail)
 	long := model.Issue{ID: "spectroscope-z1", Title: "A very long title that wraps over more than two lines on a narrow card for sure",
 		IssueType: model.TypeTask, Status: model.StatusOpen, Priority: 1,
-		Labels:       []string{"lane:review"},
+		Labels:       []string{"dispatch:review"},
 		Dependencies: []*model.Dependency{{IssueID: "spectroscope-z1", DependsOnID: "spectroscope-eg0.1", Type: model.DepBlocks}}}
 	issues := append(epicBoardIssues(), long)
 	for _, is := range issues {

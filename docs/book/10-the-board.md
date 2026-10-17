@@ -42,7 +42,7 @@ A few facts are computed once and shared by everything the board draws.
 
 An issue's epic is its nearest ancestor of type epic along parent links. Completion counts every issue under the epic in the whole project, not only the ones on the board, so the bar does not change when you filter. Issues with no epic go in a last `No epic` lane. The epic's own issue is the lane header and is never drawn as a card, so selecting it highlights the lane rather than a card.
 
-`planBoardRegions` decides, from the terminal width, the column counts and the focus, which columns render in full and which fold into rails. `boardCardView` is the row contract that keeps four facts apart on a card: the column is the stored status, `blocked by X` names an open blocker, `lane: stage` comes from a `lane-stage=` label, and `blocks N` comes from the reverse dependency index. Each is a different thing and a card that blurred them would lie.
+`planBoardRegions` decides, from the terminal width, the column counts and the focus, which columns render in full and which fold into rails. `boardCardView` is the row contract that keeps four facts apart on a card: the column is the stored status, `blocked by X` names an open blocker, `dispatch: stage` comes from a `dispatch:<STAGE>` label, and `blocks N` comes from the reverse dependency index. Each is a different thing and a card that blurred them would lie.
 
 ## Folding
 

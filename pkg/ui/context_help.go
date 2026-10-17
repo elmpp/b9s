@@ -177,7 +177,7 @@ const contextHelpBoard = `## Board View
 
 **Row facts**
   blocked by X   An open blocker
-  lane: stage    Dispatcher lane stage
+  dispatch: X    Dispatcher stage
   blocks N       Issues waiting on this one
 
 **Actions**

@@ -113,11 +113,13 @@ Ready means open with no open blocker. Filters compose with each other and with 
 | Keys | Action |
 |------|--------|
 | `s` | Pick the sort field and direction for this session |
-| `\|` | Choose for each optional column whether it is automatic, shown or hidden: Lane state, Updated, ID, Priority, Creator, Assignee, Created, Deferred and Due. Priority, ID and Created show by default; Lane state and the others show on request |
+| `\|` | Choose for each optional column whether it is automatic, shown or hidden: Dispatch, Updated, ID, Priority, Creator, Assignee, Created, Deferred and Due. Dispatch, Priority, ID and Created show by default. Dispatch reads the harness-neutral `dispatch:<STAGE>` label. Choices are saved in `ui.columns` in your b9s config. |
 | `T` | Switch every time column between an age (`2h ago`, `in 3d`) and the local date and minute (`30-09 14:05`, or `09-30 14:05` in a month-first locale) |
 | `Ctrl-W` | Toggle wide columns |
 
 The four time columns each show one field, whatever the sort: Created (`created_at`), Updated (`updated_at`), Deferred (`defer_until`, set by `bd defer --until`) and Due (`due_at`). Only Created shows by default, as an age. An issue without a defer or due date leaves that cell blank. The current sort shows beside the Issue header, for example `Issue [Created ▼]`.
+
+Column choices survive restart and apply across projects. For example, `ui.columns.dispatch: hide` hides Dispatch. Values are `auto`, `show`, and `hide`. Column keys are `dispatch`, `updated`, `id`, `priority`, `creator`, `assignee`, `created`, `deferred`, `due`, and `memory_links`. The picker preserves other settings and reports save errors in the footer. `Ctrl-W` changes the current view only.
 
 Dates put the day first (`30-09`) unless the locale is month-first, as in the United States, Canada and the Philippines. On macOS b9s takes the region from System Settings (`AppleLocale`), because terminals often export `LC_ALL=en_US.UTF-8` whatever the region. Elsewhere it reads `LC_ALL`, `LC_TIME` and then `LANG`. Set `ui.date_order` to `dmy` or `mdy` to choose the order yourself.
 
@@ -371,7 +373,7 @@ The epics form the first column of the board: the rail cells in the rail design,
 
 Completion counts every issue under the epic in the project, closed ones included, so a filter never changes it. Lanes come in order of the most urgent open issue in them. A project without epics shows the plain board in every design.
 
-A row separates four facts: the column is the stored status, `blocked by X` names an open blocker, `lane: stage` comes from the `lane-stage=` label, and `blocks N` counts the issues that wait on this one. In single-project mode IDs drop the project prefix.
+A row separates four facts: the column is the stored status, `blocked by X` names an open blocker, `dispatch: stage` comes from the `dispatch:<STAGE>` label, and `blocks N` counts the issues that wait on this one. In single-project mode IDs drop the project prefix.
 
 | Keys | Action |
 |------|--------|

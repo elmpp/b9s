@@ -241,7 +241,7 @@ const selectionGutterWidth = 0
 const computedBlockerBadgeWidth = 4
 
 // ColumnPreference records whether an optional tree column follows the
-// responsive default or an explicit session override.
+// responsive default or an explicit preference.
 type ColumnPreference uint8
 
 const (
@@ -266,8 +266,21 @@ func (p ColumnPreference) String() string {
 // row itself.
 type TreeColumn uint8
 
+// ConfigKey stays independent of the visible column title.
+func (c TreeColumn) ConfigKey() string {
+	keys := [treeColumnCount]string{
+		TreeColumnDispatch: "dispatch", TreeColumnUpdated: "updated", TreeColumnID: "id",
+		TreeColumnPriority: "priority", TreeColumnCreator: "creator", TreeColumnAssignee: "assignee",
+		TreeColumnCreated: "created", TreeColumnDeferred: "deferred", TreeColumnDue: "due", TreeColumnDecisions: "memory_links",
+	}
+	if c >= treeColumnCount {
+		return ""
+	}
+	return keys[c]
+}
+
 const (
-	TreeColumnLaneStage TreeColumn = iota
+	TreeColumnDispatch TreeColumn = iota
 	TreeColumnUpdated
 	TreeColumnID
 	TreeColumnPriority
@@ -282,8 +295,8 @@ const (
 
 func (c TreeColumn) String() string {
 	switch c {
-	case TreeColumnLaneStage:
-		return "Lane state"
+	case TreeColumnDispatch:
+		return dispatchColumnName
 	case TreeColumnUpdated:
 		return "Updated"
 	case TreeColumnID:
@@ -308,7 +321,7 @@ func (c TreeColumn) String() string {
 }
 
 type treeColumnLayout struct {
-	laneStage  bool
+	dispatch   bool
 	priority   bool
 	creator    bool
 	assignee   bool
@@ -1209,7 +1222,7 @@ func (t *TreeModel) CycleColumnPreference() {
 	t.SetColumnPreference(column, (preference+1)%3)
 }
 
-// SetColumnPreference applies a session-only preference for an optional column.
+// SetColumnPreference changes visibility without writing user configuration.
 func (t *TreeModel) SetColumnPreference(column TreeColumn, preference ColumnPreference) {
 	if column >= treeColumnCount || preference > ColumnHide {
 		return
@@ -1218,7 +1231,7 @@ func (t *TreeModel) SetColumnPreference(column TreeColumn, preference ColumnPref
 	t.invalidateColumnLayout()
 }
 
-// ColumnPreference returns the current session preference for a column.
+// ColumnPreference returns the current preference for a column.
 func (t *TreeModel) ColumnPreference(column TreeColumn) ColumnPreference {
 	if column >= treeColumnCount {
 		return ColumnAuto
@@ -1259,8 +1272,8 @@ func (t *TreeModel) RenderColumnPopup() string {
 		if preference == ColumnAuto {
 			resolved := "hidden"
 			switch column {
-			case TreeColumnLaneStage:
-				if layout.laneStage {
+			case TreeColumnDispatch:
+				if layout.dispatch {
 					resolved = "shown"
 				}
 			case TreeColumnUpdated:
@@ -1857,14 +1870,14 @@ func (t *TreeModel) renderHeader(layout treeColumnLayout) string {
 	// because the sort field and the column contents are independent.
 	sortBadge := fmt.Sprintf(" [%s %s]", t.sortField.String(), t.sortDirection.Indicator())
 
-	// Right side matches the row. The dispatcher-owned lane stage gets its own
+	// Right side matches the row. The dispatcher-owned stage gets its own
 	// column on layouts wide enough to keep the issue title useful.
 	rightParts := make([]string, 0, 10)
 	if layout.priority {
 		rightParts = append(rightParts, fmt.Sprintf("%-*s", treePriorityColumnWidth, "PRI"))
 	}
-	if layout.laneStage {
-		rightParts = append(rightParts, fmt.Sprintf("%-12s", "LANE STATE"))
+	if layout.dispatch {
+		rightParts = append(rightParts, fmt.Sprintf("%-12s", strings.ToUpper(dispatchColumnName)))
 	}
 	if layout.creator {
 		rightParts = append(rightParts, fmt.Sprintf("%-*s", treePersonColumnWidth, "CREATOR"))
@@ -2003,7 +2016,7 @@ func (t *TreeModel) renderNodeWithLayout(node *IssueTreeNode, isSelected bool, l
 	// shift the right-side columns when the layout is tight.
 	fixedWidth := lipgloss.Width(leftSide.String())
 
-	// ── Right side: lane stage + age + short ID (bd-03l) ──
+	// ── Right side: dispatch state + age + short ID (bd-03l) ──
 	// Use dark text when selected (highlight background needs contrast, bd-hdgh)
 	rightWidth := 0
 	var rightParts []string
@@ -2015,8 +2028,8 @@ func (t *TreeModel) renderNodeWithLayout(node *IssueTreeNode, isSelected bool, l
 		}
 		rightParts = append(rightParts, priorityStyle.Render(formatPriorityCell(issue.Priority)))
 	}
-	if layout.laneStage {
-		stage := truncateRunesHelper(dispatcherLaneStage(issue.Labels), 12, "…")
+	if layout.dispatch {
+		stage := truncateRunesHelper(dispatchState(issue.Labels), 12, "…")
 		stageStyle := t.theme.SecondaryText
 		if isSelected {
 			stageStyle = r.NewStyle().Foreground(darkFg)
@@ -2198,9 +2211,7 @@ func (t *TreeModel) resolveColumnLayout() treeColumnLayout {
 		created:  resolveColumnPreference(t.ColumnPreference(TreeColumnCreated), effectiveWidth > 60),
 		id:       resolveColumnPreference(t.ColumnPreference(TreeColumnID), true),
 		priority: resolveColumnPreference(t.ColumnPreference(TreeColumnPriority), true),
-		// Lane state matters only to issues an Omnigent lane has picked up,
-		// so it costs title width on every other row and appears on request.
-		laneStage: resolveColumnPreference(t.ColumnPreference(TreeColumnLaneStage), false),
+		dispatch: resolveColumnPreference(t.ColumnPreference(TreeColumnDispatch), true),
 		// People and the other time columns cost title width on every row, so
 		// they appear only on request.
 		creator:  resolveColumnPreference(t.ColumnPreference(TreeColumnCreator), false),
@@ -2399,8 +2410,18 @@ func (t *TreeModel) displayedMaxIDWidth() int {
 	return maxIDWidth
 }
 
-func dispatcherLaneStage(labels []string) string {
-	const prefix = "lane-stage="
+// DispatchStateDimension identifies dispatch state independently of the harness
+// that wrote it. Readers derive their label prefix from this constant.
+const DispatchStateDimension = "dispatch"
+
+// dispatchColumnName names the dispatcher stage column in the column picker;
+// the tree header is its upper-case form.
+const dispatchColumnName = "Dispatch"
+
+// dispatchState returns the stage the dispatcher recorded on a task, or "" for
+// a task no dispatcher has picked up.
+func dispatchState(labels []string) string {
+	prefix := DispatchStateDimension + ":"
 	for _, label := range labels {
 		if strings.HasPrefix(label, prefix) {
 			return strings.TrimSpace(strings.TrimPrefix(label, prefix))

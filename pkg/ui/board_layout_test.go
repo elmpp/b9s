@@ -29,7 +29,7 @@ func sparseBoardIssues() []model.Issue {
 		model.Issue{
 			ID: "spectroscope-eg0.4.1", Title: "Add packet append API with cursor semantics",
 			Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 1,
-			Labels:    []string{"lane-stage=reviewing"},
+			Labels:    []string{"dispatch:reviewing"},
 			CreatedAt: now.Add(-48 * time.Hour), UpdatedAt: now.Add(-48 * time.Hour),
 		},
 		model.Issue{
@@ -44,7 +44,7 @@ func sparseBoardIssues() []model.Issue {
 		model.Issue{
 			ID: "spectroscope-eg0.14.1", Title: "Use recorded mac-k3s capture fixture",
 			Status: model.StatusInProgress, IssueType: model.TypeTask, Priority: 2,
-			Labels:    []string{"lane-stage=implementing"},
+			Labels:    []string{"dispatch:implementing"},
 			CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Minute),
 		},
 	)
@@ -176,7 +176,7 @@ func TestBoardCardView_SeparatesStatusReadinessLaneAndImpact(t *testing.T) {
 	}
 
 	blocker := b.cardView(*b.issueMap["spectroscope-eg0.4.1"])
-	if blocker.LaneStage != "reviewing" || blocker.BlocksCount != 1 {
+	if blocker.DispatchState != "reviewing" || blocker.BlocksCount != 1 {
 		t.Fatalf("blocker card = %+v, want lane reviewing and blocks 1", blocker)
 	}
 }
@@ -237,8 +237,8 @@ func TestBoardAdaptiveView_ShowsBoxedCardsAndRails(t *testing.T) {
 	for _, want := range []string{
 		"Epic rail 1/2",
 		"eg0.4.2", "Wire the flow subscription transport", "blocked by eg0.4.1",
-		"eg0.4.1", "lane: reviewing", "blocks 1",
-		"lane: implementing",
+		"eg0.4.1", "dispatch: reviewing", "blocks 1",
+		"dispatch: implementing",
 		"closed 20 hidden", "c closed",
 		"v design", "{ } epic", "↑↓ card",
 		"╭", "╰",
@@ -262,7 +262,7 @@ func TestBoardView_RemovesTerminalControlPayloads(t *testing.T) {
 		Description: "body\x1b]52;c;YXR0YWNr\x07",
 		Status:      model.StatusOpen,
 		IssueType:   model.TypeTask,
-		Labels:      []string{"lane-stage=ok\u009b31mbad"},
+		Labels:      []string{"dispatch:ok\u009b31mbad"},
 	}
 	for _, layout := range []BoardEpicView{BoardEpicRail, BoardEpicRows} {
 		b := NewBoardModel([]model.Issue{issue}, DefaultTheme(lipgloss.DefaultRenderer()))

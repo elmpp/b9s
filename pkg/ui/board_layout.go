@@ -166,17 +166,17 @@ func absInt(n int) int {
 
 // boardCardView is the presentation contract for one board row. It keeps the
 // four facts the spec separates: stored status (the column), dependency
-// readiness (BlockedBy), dispatcher lane state (LaneStage) and downstream
+// readiness (BlockedBy), dispatcher state (DispatchState) and downstream
 // impact (BlocksCount).
 type boardCardView struct {
-	ShortID     string
-	Title       string
-	Type        string
-	Priority    string
-	Age         string
-	BlockedBy   string
-	LaneStage   string
-	BlocksCount int
+	ShortID       string
+	Title         string
+	Type          string
+	Priority      string
+	Age           string
+	BlockedBy     string
+	DispatchState string
+	BlocksCount   int
 }
 
 // cardView derives the row fields for an issue. The issue is sanitized here so
@@ -184,14 +184,14 @@ type boardCardView struct {
 func (b *BoardModel) cardView(raw model.Issue) boardCardView {
 	issue := sanitizeIssueForTerminal(raw)
 	return boardCardView{
-		ShortID:     b.displayID(issue.ID),
-		Title:       withoutOwnIDPrefix(issue.Title, issue.ID),
-		Type:        strings.ToLower(string(issue.IssueType)),
-		Priority:    formatPriority(issue.Priority),
-		Age:         compactAge(issue),
-		BlockedBy:   b.displayID(sanitizeTerminalLine(b.openBlocker(raw))),
-		LaneStage:   dispatcherLaneStage(issue.Labels),
-		BlocksCount: len(b.blocksIndex[raw.ID]),
+		ShortID:       b.displayID(issue.ID),
+		Title:         withoutOwnIDPrefix(issue.Title, issue.ID),
+		Type:          strings.ToLower(string(issue.IssueType)),
+		Priority:      formatPriority(issue.Priority),
+		Age:           compactAge(issue),
+		BlockedBy:     b.displayID(sanitizeTerminalLine(b.openBlocker(raw))),
+		DispatchState: dispatchState(issue.Labels),
+		BlocksCount:   len(b.blocksIndex[raw.ID]),
 	}
 }
 
