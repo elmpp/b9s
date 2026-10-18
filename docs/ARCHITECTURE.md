@@ -141,6 +141,8 @@ The active source decides how changes are detected:
 
 Every path ends in the same reload message to the UI model, which reloads the issues and keeps the cursor, the marks and the fold state. `Ctrl-R` and `F5` send that message by hand.
 
+A Dolt reload never runs inside `Update`. The handler starts the read as a command and the snapshot already on screen stays usable; the footer shows `reloading…` until the reply arrives. One read runs at a time: a change that arrives meanwhile only marks the snapshot stale, and the reply starts one follow-up read however many commits landed. Each reply carries the project generation it was started under, so a reply for a project the user has since left is dropped. A read that takes longer than 60 seconds is reported as a timeout and the current snapshot stays.
+
 ## Control socket
 
 Every TUI instance serves `internal/control` on a unix socket in a 0700 state directory and writes `<pid>.json` beside it with its tmux pane. `b9s ctl` lists the registrations, drops those whose process is gone, picks the one in the caller's tmux window and sends one JSON request. The server checks the verb against a closed set and hands the request to the program with `tea.Program.Send`, so it enters `Update` like any other message. A request with `if_known` candidates becomes `ShowKnownBranchMsg`, which never waits for a missing id, so guessed ids leave no trace.

@@ -722,6 +722,15 @@ type Model struct {
 	allProjectsMode  bool
 	multiDoltReader  *datasource.MultiDoltReader
 	multiDoltWatcher *datasource.MultiDoltWatcher
+
+	// reloadLoader reads a Dolt snapshot off the event loop; nil means the
+	// real database. Tests substitute a loader they control.
+	reloadLoader func(doltReloadRequest) ([]model.Issue, error)
+	// reloadInFlight is true while a Dolt reload command runs. A change that
+	// arrives meanwhile sets reloadPending instead of starting a second read,
+	// so a burst of commits costs at most one extra snapshot.
+	reloadInFlight bool
+	reloadPending  bool
 }
 
 // labelCount is a simple label->count pair for display
@@ -2034,6 +2043,9 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 	case identitiesLoadedMsg:
 		return m.applyIdentities(msg), nil
 
+	case doltReloadedMsg:
+		return m.finishDoltReload(msg)
+
 	case FileChangedMsg:
 		// File changed on disk - reload issues
 		debug.Log("FileChangedMsg: reload triggered (sourceType=%s beadsPath=%s)", m.sourceType, m.beadsPath)
@@ -2058,285 +2070,26 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			return m, tea.Batch(cmds...)
 		}
+		if m.sourceType.IsDolt() {
+			return m.startDoltReload(cmds)
+		}
 		reloadStart := time.Now()
-		profileRefresh := debug.Enabled()
-		var refreshTimings map[string]time.Duration
-		recordTiming := func(name string, d time.Duration) {
-			if !profileRefresh {
-				return
-			}
-			if refreshTimings == nil {
-				refreshTimings = make(map[string]time.Duration, 12)
-			}
-			refreshTimings[name] = d
-			debug.LogTiming("refresh."+name, d)
-		}
-		if profileRefresh {
-			debug.Log("refresh: file change detected path=%s", m.beadsPath)
-		}
-
-		// Reload issues from the appropriate backend
 		var reloadWarnings []string
-		var loadStart time.Time
-		if profileRefresh {
-			loadStart = time.Now()
-		}
-		var newIssues []model.Issue
-		var err error
-		if beadsDir, hasCheckout := projectBeadsDir(m.activeProjectPath); m.sourceType == datasource.SourceTypeDolt && !hasCheckout {
-			// A project opened without a checkout has only its database.
-			debug.Log("FileChangedMsg: reloading via datasource.LoadFromSource (Dolt, no checkout, db=%s)", m.doltSource.Database)
-			newIssues, err = datasource.LoadFromSource(m.doltSource)
-			debug.Log("FileChangedMsg: Dolt reload done: %d issues, err=%v", len(newIssues), err)
-		} else if m.sourceType.IsDolt() {
-			// Project switching must bypass BEADS_DIR, which identifies the startup
-			// project and otherwise redirects every reload back to that database.
-			debug.Log("FileChangedMsg: reloading via datasource.LoadIssuesFromDir (Dolt, project=%s)", m.activeProjectPath)
-			newIssues, err = datasource.LoadIssuesFromDir(beadsDir)
-			debug.Log("FileChangedMsg: Dolt reload done: %d issues, err=%v", len(newIssues), err)
-		} else {
-			// JSONL/SQLite: use existing fast pooled loader
-			loadedIssues, loadErr := loader.LoadIssuesFromFileWithOptionsPooled(m.beadsPath, loader.ParseOptions{
-				WarningHandler: func(msg string) {
-					reloadWarnings = append(reloadWarnings, msg)
-				},
-				BufferSize: envMaxLineSizeBytes(),
-			})
-			err = loadErr
-			if err == nil {
-				if len(m.pooledIssues) > 0 {
-					loader.ReturnIssuePtrsToPool(m.pooledIssues)
-				}
-				m.pooledIssues = loadedIssues.PoolRefs
-				newIssues = loadedIssues.Issues
-			}
-		}
-		if profileRefresh {
-			recordTiming("load_issues", time.Since(loadStart))
-		}
-		if err != nil && !errors.Is(err, datasource.ErrCommentsUnavailable) {
-			m.isLoading = false
-			m.statusMsg = fmt.Sprintf("Reload error: %v", err)
-			m.statusIsError = true
-			if m.doltWatcher != nil {
-				cmds = append(cmds, DoltWatchCmd(m.doltWatcher))
-			} else if m.watcher != nil {
-				cmds = append(cmds, WatchFileCmd(m.watcher))
-			}
-			return m, tea.Batch(cmds...)
-		}
-		// A comments-only failure still has a complete issue list: keep
-		// reloading (below) instead of the early return above, and let the
-		// warning surface in the reload status rather than the R picker
-		// silently reading a failed load as "no attachments" (bd-t8j5.18).
-		m.commentsLoadErr = err
-		if err != nil {
-			debug.Log("FileChangedMsg: comments unavailable: %v", err)
-			reloadWarnings = append(reloadWarnings, "comments could not be loaded: "+err.Error())
-		}
-
-		// Apply default sorting: creation date descending (newest first) (bd-ctu)
-		var sortStart time.Time
-		if profileRefresh {
-			sortStart = time.Now()
-		}
-		sort.Slice(newIssues, func(i, j int) bool {
-			return newIssues[i].CreatedAt.After(newIssues[j].CreatedAt)
+		loadedIssues, err := loader.LoadIssuesFromFileWithOptionsPooled(m.beadsPath, loader.ParseOptions{
+			WarningHandler: func(msg string) {
+				reloadWarnings = append(reloadWarnings, msg)
+			},
+			BufferSize: envMaxLineSizeBytes(),
 		})
-		if profileRefresh {
-			recordTiming("sort_issues", time.Since(sortStart))
-		}
-
-		m.issues = newIssues
-		m.graph.SetIssues(newIssues)
-		m.isLoading = false
-
-		// Rebuild lookup map
-		var mapStart time.Time
-		if profileRefresh {
-			mapStart = time.Now()
-		}
-		m.issueMap = make(map[string]*model.Issue, len(newIssues))
-		for i := range m.issues {
-			m.issueMap[m.issues[i].ID] = &m.issues[i]
-		}
-		if profileRefresh {
-			recordTiming("issue_map", time.Since(mapStart))
-		}
-
-		// Recompute stats
-		var statsStart time.Time
-		if profileRefresh {
-			statsStart = time.Now()
-		}
-		m.countOpen, m.countReady, m.countBlocked, m.countClosed = 0, 0, 0, 0
-		for i := range m.issues {
-			issue := &m.issues[i]
-			if isClosedLikeStatus(issue.Status) {
-				m.countClosed++
-				continue
+		var newIssues []model.Issue
+		if err == nil {
+			if len(m.pooledIssues) > 0 {
+				loader.ReturnIssuePtrsToPool(m.pooledIssues)
 			}
-			m.countOpen++
-			if issue.Status == model.StatusBlocked {
-				m.countBlocked++
-				continue
-			}
-			isBlocked := false
-			for _, dep := range issue.Dependencies {
-				if dep == nil || !dep.Type.IsBlocking() {
-					continue
-				}
-				if blocker, exists := m.issueMap[dep.DependsOnID]; exists && !isClosedLikeStatus(blocker.Status) {
-					isBlocked = true
-					break
-				}
-			}
-			if !isBlocked {
-				m.countReady++
-			}
+			m.pooledIssues = loadedIssues.PoolRefs
+			newIssues = loadedIssues.Issues
 		}
-		if profileRefresh {
-			recordTiming("counts", time.Since(statsStart))
-		}
-
-		// Rebuild list items
-		var listStart time.Time
-		if profileRefresh {
-			listStart = time.Now()
-		}
-		items := make([]list.Item, len(m.issues))
-		for i := range m.issues {
-			items[i] = IssueItem{
-				Issue:      m.issues[i],
-				RepoPrefix: ExtractRepoPrefix(m.issues[i].ID),
-			}
-		}
-		if profileRefresh {
-			recordTiming("list_items", time.Since(listStart))
-		}
-		m.setListItems(items)
-
-		if m.isBoardView {
-			var graphStart time.Time
-			if profileRefresh {
-				graphStart = time.Now()
-			}
-			m.refreshBoardAndGraphForCurrentFilter()
-			if profileRefresh {
-				recordTiming("board_graph", time.Since(graphStart))
-			}
-		}
-
-		// Refresh label/assignee entries so the picker bars reflect any changes (bd-gswl, bd-gs45.1).
-		m.rebuildPickerEntries()
-
-		// Rebuild tree view if focused (bd-byp).
-		if m.focused == focusTree {
-			var treeStart time.Time
-			if profileRefresh {
-				treeStart = time.Now()
-			}
-			m.tree.Build(m.issues)
-			m.tree.SetSize(m.treeLayoutSize())
-			m.tree.SetGlobalIssueMap(m.issueMap)
-			m.tree.DetectAndFollowChanges(issueIDs(m.issues))
-			if profileRefresh {
-				recordTiming("tree_rebuild", time.Since(treeStart))
-			}
-		}
-
-		// Re-apply persisted label/assignee filters to tree and list after reload (bd-v2lx)
-		if m.labelFilter != "" || m.assigneeFilter != "" {
-			m.tree.SetLabelFilter(m.labelFilter)
-			m.tree.SetAssigneeFilter(m.assigneeFilter)
-			m.applyFilter()
-		}
-
-		m.statusMsg = fmt.Sprintf("Reloaded %d issues", len(newIssues))
-		if len(reloadWarnings) > 0 {
-			m.statusMsg += fmt.Sprintf(" (%d warnings)", len(reloadWarnings))
-		}
-		reloadDuration := time.Since(reloadStart)
-		if profileRefresh {
-			recordTiming("total", reloadDuration)
-		}
-		if reloadDuration >= 500*time.Millisecond {
-			m.statusMsg += fmt.Sprintf(" in %s", formatReloadDuration(reloadDuration))
-		}
-		if profileRefresh && len(refreshTimings) > 0 {
-			addTiming := func(label, key string) {
-				if d, ok := refreshTimings[key]; ok && d > 0 {
-					m.statusMsg += fmt.Sprintf(" %s=%s", label, formatReloadDuration(d))
-				}
-			}
-			m.statusMsg += " [debug"
-			addTiming("load", "load_issues")
-			addTiming("sort", "sort_issues")
-			addTiming("list", "list_items")
-			addTiming("graph", "board_graph")
-			addTiming("tree", "tree_rebuild")
-			addTiming("total", "total")
-			m.statusMsg += "]"
-		}
-		// Log UI filter state for debugging (bd-ic9p)
-		if profileRefresh {
-			treeFilter := m.tree.GetFilter()
-			treeLabel := m.tree.GetLabelFilter()
-			debug.Log("ui-state: project=%s issues=%d listItems=%d currentFilter=%q labelFilter=%q pickerMode=%d treeFilter=%q treeLabelFilter=%q",
-				m.activeProjectName, len(m.issues), len(m.list.Items()),
-				m.currentFilter, m.labelFilter, m.pickerMode,
-				treeFilter, treeLabel)
-		}
-
-		// Auto-enable background mode after slow sync reloads (opt-out via B9S_BACKGROUND_MODE=0).
-		autoEnabled := false
-		slowReload := reloadDuration >= time.Second
-		if slowReload && m.backgroundWorker == nil && m.beadsPath != "" && !m.sourceType.IsDolt() {
-			autoAllowed := true
-			if v := strings.TrimSpace(os.Getenv("B9S_BACKGROUND_MODE")); v != "" {
-				switch strings.ToLower(v) {
-				case "0", "false", "no", "off":
-					autoAllowed = false
-				}
-			}
-			if autoAllowed {
-				bw, err := NewBackgroundWorker(WorkerConfig{
-					BeadsPath:     m.beadsPath,
-					DebounceDelay: 200 * time.Millisecond,
-				})
-				if err == nil {
-					if m.watcher != nil {
-						m.watcher.Stop()
-					}
-					m.watcher = nil
-					m.backgroundWorker = bw
-					m.snapshotInitPending = true
-					autoEnabled = true
-					cmds = append(cmds, StartBackgroundWorkerCmd(m.backgroundWorker))
-					cmds = append(cmds, WaitForBackgroundWorkerMsgCmd(m.backgroundWorker))
-				} else {
-					m.statusMsg += fmt.Sprintf("; background mode unavailable: %v", err)
-				}
-			}
-		}
-		if slowReload {
-			if autoEnabled {
-				m.statusMsg += "; background mode auto-enabled"
-			} else {
-				m.statusMsg += "; consider B9S_BACKGROUND_MODE=1"
-			}
-		}
-		m.statusIsError = false
-		m.updateViewportContent()
-
-		// Re-start watching for next change
-		if !autoEnabled {
-			if m.doltWatcher != nil {
-				cmds = append(cmds, DoltWatchCmd(m.doltWatcher))
-			} else if m.watcher != nil {
-				cmds = append(cmds, WatchFileCmd(m.watcher))
-			}
-		}
+		m, cmds = m.applyReload(newIssues, err, reloadWarnings, reloadStart, time.Since(reloadStart), cmds)
 		return m, tea.Batch(cmds...)
 
 	case tea.KeyMsg:
@@ -5489,6 +5242,11 @@ func (m *Model) renderFooter() string {
 			hintParts = append([]string{keyStyle.Render(fmt.Sprintf("%d marked", n))}, hintParts...)
 		}
 	}
+	// The current snapshot stays usable while the next one loads; the
+	// marker says why a change made elsewhere has not appeared yet.
+	if m.reloadInFlight {
+		hintParts = append([]string{labelStyle.Render("reloading…")}, hintParts...)
+	}
 	// The final view wraps anything wider than the terminal, and a second
 	// footer line pushes the whole screen down by one row.
 	shortcutBar := lipgloss.NewStyle().MaxWidth(m.width).Render(" " + strings.Join(hintParts, "  "))
@@ -8107,4 +7865,248 @@ func kindGroup(k identity.Kind) int {
 	default:
 		return 0
 	}
+}
+
+// applyReload installs a freshly loaded snapshot, or reports why the load
+// failed while keeping the snapshot already on screen. It re-arms the watcher
+// that delivered the change and returns the commands to run next.
+func (m Model) applyReload(newIssues []model.Issue, err error, reloadWarnings []string, reloadStart time.Time, loadDuration time.Duration, cmds []tea.Cmd) (Model, []tea.Cmd) {
+	profileRefresh := debug.Enabled()
+	var refreshTimings map[string]time.Duration
+	recordTiming := func(name string, d time.Duration) {
+		if !profileRefresh {
+			return
+		}
+		if refreshTimings == nil {
+			refreshTimings = make(map[string]time.Duration, 12)
+		}
+		refreshTimings[name] = d
+		debug.LogTiming("refresh."+name, d)
+	}
+	recordTiming("load_issues", loadDuration)
+	if err != nil && !errors.Is(err, datasource.ErrCommentsUnavailable) {
+		m.isLoading = false
+		m.statusMsg = fmt.Sprintf("Reload error: %v", err)
+		m.statusIsError = true
+		if m.doltWatcher != nil {
+			cmds = append(cmds, DoltWatchCmd(m.doltWatcher))
+		} else if m.watcher != nil {
+			cmds = append(cmds, WatchFileCmd(m.watcher))
+		}
+		return m, cmds
+	}
+	// A comments-only failure still has a complete issue list: keep
+	// reloading (below) instead of the early return above, and let the
+	// warning surface in the reload status rather than the R picker
+	// silently reading a failed load as "no attachments" (bd-t8j5.18).
+	m.commentsLoadErr = err
+	if err != nil {
+		debug.Log("FileChangedMsg: comments unavailable: %v", err)
+		reloadWarnings = append(reloadWarnings, "comments could not be loaded: "+err.Error())
+	}
+
+	// Apply default sorting: creation date descending (newest first) (bd-ctu)
+	var sortStart time.Time
+	if profileRefresh {
+		sortStart = time.Now()
+	}
+	sort.Slice(newIssues, func(i, j int) bool {
+		return newIssues[i].CreatedAt.After(newIssues[j].CreatedAt)
+	})
+	if profileRefresh {
+		recordTiming("sort_issues", time.Since(sortStart))
+	}
+
+	m.issues = newIssues
+	m.graph.SetIssues(newIssues)
+	m.isLoading = false
+
+	// Rebuild lookup map
+	var mapStart time.Time
+	if profileRefresh {
+		mapStart = time.Now()
+	}
+	m.issueMap = make(map[string]*model.Issue, len(newIssues))
+	for i := range m.issues {
+		m.issueMap[m.issues[i].ID] = &m.issues[i]
+	}
+	if profileRefresh {
+		recordTiming("issue_map", time.Since(mapStart))
+	}
+
+	// Recompute stats
+	var statsStart time.Time
+	if profileRefresh {
+		statsStart = time.Now()
+	}
+	m.countOpen, m.countReady, m.countBlocked, m.countClosed = 0, 0, 0, 0
+	for i := range m.issues {
+		issue := &m.issues[i]
+		if isClosedLikeStatus(issue.Status) {
+			m.countClosed++
+			continue
+		}
+		m.countOpen++
+		if issue.Status == model.StatusBlocked {
+			m.countBlocked++
+			continue
+		}
+		isBlocked := false
+		for _, dep := range issue.Dependencies {
+			if dep == nil || !dep.Type.IsBlocking() {
+				continue
+			}
+			if blocker, exists := m.issueMap[dep.DependsOnID]; exists && !isClosedLikeStatus(blocker.Status) {
+				isBlocked = true
+				break
+			}
+		}
+		if !isBlocked {
+			m.countReady++
+		}
+	}
+	if profileRefresh {
+		recordTiming("counts", time.Since(statsStart))
+	}
+
+	// Rebuild list items
+	var listStart time.Time
+	if profileRefresh {
+		listStart = time.Now()
+	}
+	items := make([]list.Item, len(m.issues))
+	for i := range m.issues {
+		items[i] = IssueItem{
+			Issue:      m.issues[i],
+			RepoPrefix: ExtractRepoPrefix(m.issues[i].ID),
+		}
+	}
+	if profileRefresh {
+		recordTiming("list_items", time.Since(listStart))
+	}
+	m.setListItems(items)
+
+	if m.isBoardView {
+		var graphStart time.Time
+		if profileRefresh {
+			graphStart = time.Now()
+		}
+		m.refreshBoardAndGraphForCurrentFilter()
+		if profileRefresh {
+			recordTiming("board_graph", time.Since(graphStart))
+		}
+	}
+
+	// Refresh label/assignee entries so the picker bars reflect any changes (bd-gswl, bd-gs45.1).
+	m.rebuildPickerEntries()
+
+	// Rebuild tree view if focused (bd-byp).
+	if m.focused == focusTree {
+		var treeStart time.Time
+		if profileRefresh {
+			treeStart = time.Now()
+		}
+		m.tree.Build(m.issues)
+		m.tree.SetSize(m.treeLayoutSize())
+		m.tree.SetGlobalIssueMap(m.issueMap)
+		m.tree.DetectAndFollowChanges(issueIDs(m.issues))
+		if profileRefresh {
+			recordTiming("tree_rebuild", time.Since(treeStart))
+		}
+	}
+
+	// Re-apply persisted label/assignee filters to tree and list after reload (bd-v2lx)
+	if m.labelFilter != "" || m.assigneeFilter != "" {
+		m.tree.SetLabelFilter(m.labelFilter)
+		m.tree.SetAssigneeFilter(m.assigneeFilter)
+		m.applyFilter()
+	}
+
+	m.statusMsg = fmt.Sprintf("Reloaded %d issues", len(newIssues))
+	if len(reloadWarnings) > 0 {
+		m.statusMsg += fmt.Sprintf(" (%d warnings)", len(reloadWarnings))
+	}
+	reloadDuration := time.Since(reloadStart)
+	if profileRefresh {
+		recordTiming("total", reloadDuration)
+	}
+	if reloadDuration >= 500*time.Millisecond {
+		m.statusMsg += fmt.Sprintf(" in %s", formatReloadDuration(reloadDuration))
+	}
+	if profileRefresh && len(refreshTimings) > 0 {
+		addTiming := func(label, key string) {
+			if d, ok := refreshTimings[key]; ok && d > 0 {
+				m.statusMsg += fmt.Sprintf(" %s=%s", label, formatReloadDuration(d))
+			}
+		}
+		m.statusMsg += " [debug"
+		addTiming("load", "load_issues")
+		addTiming("sort", "sort_issues")
+		addTiming("list", "list_items")
+		addTiming("graph", "board_graph")
+		addTiming("tree", "tree_rebuild")
+		addTiming("total", "total")
+		m.statusMsg += "]"
+	}
+	// Log UI filter state for debugging (bd-ic9p)
+	if profileRefresh {
+		treeFilter := m.tree.GetFilter()
+		treeLabel := m.tree.GetLabelFilter()
+		debug.Log("ui-state: project=%s issues=%d listItems=%d currentFilter=%q labelFilter=%q pickerMode=%d treeFilter=%q treeLabelFilter=%q",
+			m.activeProjectName, len(m.issues), len(m.list.Items()),
+			m.currentFilter, m.labelFilter, m.pickerMode,
+			treeFilter, treeLabel)
+	}
+
+	// Auto-enable background mode after slow sync reloads (opt-out via B9S_BACKGROUND_MODE=0).
+	autoEnabled := false
+	slowReload := reloadDuration >= time.Second
+	if slowReload && m.backgroundWorker == nil && m.beadsPath != "" && !m.sourceType.IsDolt() {
+		autoAllowed := true
+		if v := strings.TrimSpace(os.Getenv("B9S_BACKGROUND_MODE")); v != "" {
+			switch strings.ToLower(v) {
+			case "0", "false", "no", "off":
+				autoAllowed = false
+			}
+		}
+		if autoAllowed {
+			bw, err := NewBackgroundWorker(WorkerConfig{
+				BeadsPath:     m.beadsPath,
+				DebounceDelay: 200 * time.Millisecond,
+			})
+			if err == nil {
+				if m.watcher != nil {
+					m.watcher.Stop()
+				}
+				m.watcher = nil
+				m.backgroundWorker = bw
+				m.snapshotInitPending = true
+				autoEnabled = true
+				cmds = append(cmds, StartBackgroundWorkerCmd(m.backgroundWorker))
+				cmds = append(cmds, WaitForBackgroundWorkerMsgCmd(m.backgroundWorker))
+			} else {
+				m.statusMsg += fmt.Sprintf("; background mode unavailable: %v", err)
+			}
+		}
+	}
+	// The hint names a JSONL-only mode, so a Dolt project never shows it.
+	if slowReload && !m.sourceType.IsDolt() {
+		if autoEnabled {
+			m.statusMsg += "; background mode auto-enabled"
+		} else {
+			m.statusMsg += "; consider B9S_BACKGROUND_MODE=1"
+		}
+	}
+	m.statusIsError = false
+	m.updateViewportContent()
+
+	// Re-start watching for next change
+	if !autoEnabled {
+		if m.doltWatcher != nil {
+			cmds = append(cmds, DoltWatchCmd(m.doltWatcher))
+		} else if m.watcher != nil {
+			cmds = append(cmds, WatchFileCmd(m.watcher))
+		}
+	}
+	return m, cmds
 }

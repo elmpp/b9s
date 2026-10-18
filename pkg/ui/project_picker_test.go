@@ -689,8 +689,13 @@ func TestProjectReload_DoltIgnoresStartupBeadsDir(t *testing.T) {
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	m = newM.(ui.Model)
 
-	newM, _ = m.Update(ui.FileChangedMsg{})
+	// A Dolt reload runs as a command; deliver its reply as the runtime would.
+	newM, reloadCmd := m.Update(ui.FileChangedMsg{})
 	m = newM.(ui.Model)
+	for _, msg := range runCmdsUntil(reloadCmd, 5*time.Second) {
+		newM, _ = m.Update(msg)
+		m = newM.(ui.Model)
+	}
 	view := m.View()
 
 	if !strings.Contains(view, "Selected project database") {
@@ -1365,5 +1370,48 @@ func TestProjectPicker_UpIndicatorWhenScrolled(t *testing.T) {
 	plain := stripAnsiCodes(view)
 	if !strings.Contains(plain, "↑") {
 		t.Errorf("expected up-scroll indicator after scrolling down, view:\n%s", plain)
+	}
+}
+
+// runCmdsUntil runs every leaf command of cmd concurrently and returns the
+// messages that arrive before limit. A command still blocked at the deadline
+// contributes nothing.
+func runCmdsUntil(cmd tea.Cmd, limit time.Duration) []tea.Msg {
+	out := make(chan tea.Msg, 64)
+	var run func(c tea.Cmd)
+	pending := make(chan struct{}, 64)
+	run = func(c tea.Cmd) {
+		if c == nil {
+			return
+		}
+		pending <- struct{}{}
+		go func() {
+			defer func() { <-pending }()
+			msg := c()
+			if batch, ok := msg.(tea.BatchMsg); ok {
+				for _, sub := range batch {
+					run(sub)
+				}
+				return
+			}
+			if msg != nil {
+				out <- msg
+			}
+		}()
+	}
+	run(cmd)
+	deadline := time.After(limit)
+	var msgs []tea.Msg
+	for {
+		select {
+		case msg := <-out:
+			msgs = append(msgs, msg)
+		case <-deadline:
+			return msgs
+		case <-time.After(50 * time.Millisecond):
+			if len(pending) == 0 && len(out) == 0 {
+				return msgs
+			}
+		}
 	}
 }

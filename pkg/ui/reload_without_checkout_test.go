@@ -5,11 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/vanderheijden86/b9s/internal/datasource"
 	"github.com/vanderheijden86/b9s/pkg/config"
+	"github.com/vanderheijden86/b9s/pkg/model"
 )
 
 // A project opened from its database has no checkout path. Its reload must use
@@ -38,8 +40,23 @@ func TestReloadWithoutCheckoutNeverReadsWorkingDirectoryBeads(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	m = updated.(Model)
 
-	updated, _ = m.Update(FileChangedMsg{})
+	var asked doltReloadRequest
+	m.reloadLoader = func(req doltReloadRequest) ([]model.Issue, error) {
+		asked = req
+		return loadDoltSnapshot(req)
+	}
+	updated, cmd := m.Update(FileChangedMsg{})
 	m = updated.(Model)
+	reply, ok := findReloadMsg(runCmdMsgs(t, cmd, 5*time.Second))
+	if !ok {
+		t.Fatal("expected a reload reply")
+	}
+	updated, _ = m.Update(reply)
+	m = updated.(Model)
+
+	if !asked.fromSource || asked.source.Database != "remote" {
+		t.Fatalf("reload request = %+v, want a read of database remote", asked)
+	}
 
 	if strings.Contains(m.View(), "Wrong startup database") {
 		t.Fatal("reload of a project without a checkout showed the startup project's issues")

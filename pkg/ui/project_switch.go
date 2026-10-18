@@ -241,6 +241,9 @@ func (m Model) applyProjectSwitch(project config.Project) (Model, tea.Cmd) {
 	// it knows about, and writeAllowedForGeneration refuses any write from
 	// one still in flight (bd-l66t).
 	m.projectGeneration++
+	// A reload of the previous project may still be running; its reply is
+	// dropped by generation, so the new project starts with none in flight.
+	m.reloadInFlight, m.reloadPending = false, false
 	m.memoryBrowser, m.memoryVisible, m.memoryRefused = nil, false, false
 	m.memoryGeneration++
 	checkout, hasCheckout := NewCheckout(project.ResolvedPath())
