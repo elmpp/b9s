@@ -235,15 +235,18 @@ func renderIssueDetail(item model.Issue, issueMap map[string]*model.Issue, t The
 			head := r.NewStyle().Bold(true).Foreground(t.Primary).Render(sanitizeTerminalLine(c.Author)) +
 				muted.Render(" · "+FormatTimeRel(c.CreatedAt))
 			text := sanitizeTerminalText(attachref.StripMachineLines(c.Text))
-			if md != nil {
-				originalWidth := md.width
-				md.SetWidth(width - 4)
-				if rendered, err := md.Render(text); err == nil {
-					text = strings.Trim(rendered, "\n")
-				}
-				md.SetWidth(originalWidth)
+			var rendered string
+			if md == nil {
+				rendered = body.Render(text)
+			} else {
+				rendered = md.Block("comment", width, text, func() string {
+					if out, err := md.RenderAt(width-4, text); err == nil {
+						text = strings.Trim(out, "\n")
+					}
+					return body.Render(text)
+				})
 			}
-			blocks = append(blocks, wrap.Render(head), body.Render(text), "")
+			blocks = append(blocks, wrap.Render(head), rendered, "")
 		}
 	}
 

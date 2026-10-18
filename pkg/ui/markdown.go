@@ -19,6 +19,10 @@ type MarkdownRenderer struct {
 	isDark   bool
 	theme    *Theme // nil if using built-in styles, non-nil if using custom theme
 	useTheme bool   // true if created with NewMarkdownRendererWithTheme
+
+	renderCache  map[renderKey]string
+	atWidth      map[int]*MarkdownRenderer
+	renderMisses int
 }
 
 // NewMarkdownRenderer creates a new markdown renderer using built-in styles.
@@ -323,6 +327,7 @@ func (mr *MarkdownRenderer) SetWidthWithTheme(width int, theme Theme) {
 		mr.width = width
 		mr.theme = &theme
 		mr.useTheme = true
+		mr.clearRenderCache()
 	}
 }
 
@@ -623,4 +628,69 @@ func boolPtr(b bool) *bool {
 
 func uintPtr(u uint) *uint {
 	return &u
+}
+
+// renderCacheLimit bounds the RenderAt cache. Comment text is the bulk of
+// it, and a detail pane holds a few hundred comments at most, so a cache
+// this size keeps every comment of recently viewed issues.
+const renderCacheLimit = 4096
+
+type renderKey struct {
+	kind  string
+	width int
+	text  string
+}
+
+// RenderAt renders markdown wrapped at width without changing the width of mr.
+// Output is cached by width and text until the style changes, because glamour
+// takes milliseconds per comment and the detail pane re-renders the same
+// comments on every selection change.
+func (mr *MarkdownRenderer) RenderAt(width int, markdown string) (string, error) {
+	key := renderKey{kind: "markdown", width: width, text: markdown}
+	if out, ok := mr.renderCache[key]; ok {
+		return out, nil
+	}
+	side := mr.atWidth[width]
+	if side == nil {
+		side = &MarkdownRenderer{isDark: mr.isDark, theme: mr.theme, useTheme: mr.useTheme}
+		side.SetWidth(width)
+		if mr.atWidth == nil {
+			mr.atWidth = map[int]*MarkdownRenderer{}
+		}
+		mr.atWidth[width] = side
+	}
+	mr.renderMisses++
+	out, err := side.Render(markdown)
+	if err != nil {
+		return out, err
+	}
+	mr.store(key, out)
+	return out, nil
+}
+
+// Block returns render() for a styled block of output, cached under kind,
+// width and text until the style changes. render must depend on nothing else.
+func (mr *MarkdownRenderer) Block(kind string, width int, text string, render func() string) string {
+	key := renderKey{kind: kind, width: width, text: text}
+	if out, ok := mr.renderCache[key]; ok {
+		return out
+	}
+	mr.renderMisses++
+	out := render()
+	mr.store(key, out)
+	return out
+}
+
+func (mr *MarkdownRenderer) store(key renderKey, out string) {
+	if mr.renderCache == nil || len(mr.renderCache) >= renderCacheLimit {
+		mr.renderCache = map[renderKey]string{}
+	}
+	mr.renderCache[key] = out
+}
+
+// clearRenderCache drops cached output and side renderers; they carry the
+// style they were made with.
+func (mr *MarkdownRenderer) clearRenderCache() {
+	mr.renderCache = nil
+	mr.atWidth = nil
 }

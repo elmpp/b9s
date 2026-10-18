@@ -82,6 +82,7 @@ func TestDetailCommentsNewestFirst(t *testing.T) {
 	m := NewModel([]model.Issue{issue}, "")
 	m.viewport.Width = 100
 	m.viewport.Height = 100
+	m.focused = focusDetail
 	m.updateViewportContent()
 	out := stripANSI(m.viewport.View())
 	for _, text := range []string{"newest-message", "middle-message", "oldest-message"} {
@@ -92,7 +93,6 @@ func TestDetailCommentsNewestFirst(t *testing.T) {
 	if strings.Index(out, "newest-message") >= strings.Index(out, "middle-message") || strings.Index(out, "middle-message") >= strings.Index(out, "oldest-message") {
 		t.Fatalf("comments must be newest first: %s", out)
 	}
-	m.focused = focusDetail
 	for _, want := range []bool{true, false} {
 		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 		m = next.(Model)

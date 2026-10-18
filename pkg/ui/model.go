@@ -731,6 +731,12 @@ type Model struct {
 	// so a burst of commits costs at most one extra snapshot.
 	reloadInFlight bool
 	reloadPending  bool
+	// detailRenders counts detail pane renders, so a test can tell that a
+	// hidden pane costs nothing.
+	detailRenders int
+	// detailStale is true when the selection or data changed while the
+	// detail pane was hidden; Update renders it once the pane shows.
+	detailStale bool
 }
 
 // labelCount is a simple label->count pair for display
@@ -1444,6 +1450,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if updated.pendingCmd != nil {
 			cmd = tea.Batch(cmd, updated.pendingCmd)
 			updated.pendingCmd = nil
+		}
+		if updated.detailStale && updated.detailVisible() {
+			updated.updateViewportContent()
 		}
 		next = updated
 	}
@@ -5887,7 +5896,33 @@ func (m *Model) detailPaneWidth() int {
 	return availWidth - listInnerWidth
 }
 
+// detailVisible reports whether View draws the detail viewport. It follows
+// the body branches of View; overlays are ignored, so a pane under a modal
+// still counts as visible and stays current for when the modal closes.
+func (m Model) detailVisible() bool {
+	switch {
+	case m.focused == focusDetail && (m.isGraphView || m.isBoardView):
+		return true
+	case m.isGraphView:
+		return false
+	case m.focused == focusTree || (m.focused == focusDetail && m.treeViewActive):
+		return (m.focused == focusDetail && m.treeDetailHidden) || (m.isSplitView && !m.treeDetailHidden)
+	case m.isBoardView:
+		return false
+	default:
+		return m.isSplitView
+	}
+}
+
+// updateViewportContent renders the selected issue into the detail viewport.
+// A hidden pane is only marked stale: rendering an issue with many comments
+// costs more than a keypress may, and nobody sees the result.
 func (m *Model) updateViewportContent() {
+	if !m.detailVisible() {
+		m.detailStale = true
+		return
+	}
+	m.detailStale = false
 	selected := m.detailIssue()
 	if selected == nil {
 		m.viewport.SetContent("No issues selected")
@@ -5905,6 +5940,7 @@ func (m *Model) updateViewportContent() {
 	} else if b := m.memoryBrowser; b != nil && b.graphLoad == graphReading {
 		decisions = []string{m.theme.MutedText.Render(memoryGraphProgressText(b.graphDone, b.graphTotal))}
 	}
+	m.detailRenders++
 	m.viewport.SetContent(renderIssueDetail(item, m.issueMap, m.theme, m.viewport.Width, m.renderer, update, decisions, m.commentsOldestFirst))
 }
 
