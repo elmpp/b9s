@@ -548,6 +548,8 @@ Two rules keep the preview contained: never run the release `bd` against this `.
 
 ### Startup troubleshooting
 
+On a Dolt server, b9s first shows the issues that are not closed and the epics, then reads the closed issues in the background. Until that read finishes, the footer shows `reloading`, and closed counts, a `status:closed` filter and the closed board column are empty. See [ADR 0064](adr/0064-show-the-first-page-before-the-full-read.md).
+
 If the regular b9s project reports `Access denied for user 'bd_b9s'`, load that project's credential environment. A shell inherited from another workspace can hold a different `BEADS_DOLT_PASSWORD`. From the b9s checkout, `direnv exec . b9s` runs with the project's approved environment.
 
 If the Memory POC reports a schema mismatch, the release `bd` is first on `PATH`. Set up the folder as in [Use the preview bd in your own repository](#use-the-preview-bd-in-your-own-repository), or run `scripts/memory-preview b9s` from this feature checkout. It selects the pinned preview `bd` and rebuilds this checkout's viewer. Plain `b9s` uses the binaries on your shell's `PATH`, which may belong to the released schema. Do not bypass the schema check or migrate the preview store to fix a launch command.

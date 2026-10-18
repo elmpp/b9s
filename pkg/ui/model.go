@@ -490,12 +490,19 @@ type Model struct {
 	identityConfig      datasource.IdentityConfig
 	identityErr         error // last identity load or parse error, shown in the health popup
 	commentsLoadErr     error // last comments query/scan error; issues still loaded, R picker must not read this as "no attachments"
-	actorLookup         actorLookup
-	doltFailure         *DoltFailure // Non-nil when Dolt was detected but connection failed
-	startupDoltUser     string       // User the startup project connects as; projects without a checkout reuse it
-	startupDoltHost     string       // Server the startup project connects to; :project lists its databases
-	showProjectTable    bool
-	projectTable        ProjectTableModel
+	// partialSnapshot is set when startup showed only the first page; Init
+	// then reads the rest (docs/adr/0064-show-the-first-page-before-the-full-read.md).
+	partialSnapshot bool
+	// projectCountsDeferred holds the project counts back until the rest of
+	// a partial snapshot has loaded, so they do not share the tunnel with it.
+	projectCountsDeferred bool
+
+	actorLookup      actorLookup
+	doltFailure      *DoltFailure // Non-nil when Dolt was detected but connection failed
+	startupDoltUser  string       // User the startup project connects as; projects without a checkout reuse it
+	startupDoltHost  string       // Server the startup project connects to; :project lists its databases
+	showProjectTable bool
+	projectTable     ProjectTableModel
 
 	openProject         projectOpenFunc
 	projectSwitch       projectSwitch
@@ -1249,7 +1256,7 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 		tutorialModel: NewTutorialModel(theme),
 		// Issue writer for in-app editing (bd-a83)
 		issueWriter: NewIssueWriter(),
-		openProject: datasource.OpenProjectLean,
+		openProject: datasource.OpenProjectFirstPage,
 		attachTemp:  &attachTempState{},
 	}
 }
@@ -1368,6 +1375,13 @@ func (m Model) WithDoltSource(s datasource.DataSource) Model {
 	return m
 }
 
+// WithPartialSnapshot records that the issues the model starts with are only
+// the first page, as OpenedProject.Partial reports it.
+func (m Model) WithPartialSnapshot(partial bool) Model {
+	m.partialSnapshot = partial
+	return m
+}
+
 // WithCommentsLoadErr records that the startup load's comments query or scan
 // failed. The issue list is already complete (OpenProject only returns this
 // alongside a full load), so this only adds a status note; it does not
@@ -1413,8 +1427,10 @@ func (m Model) Init() tea.Cmd {
 	if cmd := m.loadIdentitiesCmd(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// Load picker counts outside the update loop, then schedule periodic refreshes.
-	if len(m.allProjects) > 1 {
+	if m.partialSnapshot {
+		cmds = append(cmds, func() tea.Msg { return firstPageShownMsg{} })
+	} else if len(m.allProjects) > 1 {
+		// Load picker counts outside the update loop, then schedule periodic refreshes.
 		cmds = append(cmds, loadProjectCountsCmd(m.allProjects, m.startupDoltUser))
 	}
 	return tea.Batch(cmds...)
@@ -2110,6 +2126,9 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 
 	case doltReloadedMsg:
 		return m.finishDoltReload(msg)
+
+	case firstPageShownMsg:
+		return m.loadRestOfSnapshot()
 
 	case FileChangedMsg:
 		// File changed on disk - reload issues

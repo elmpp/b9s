@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vanderheijden86/b9s/pkg/debug"
@@ -72,19 +73,141 @@ func (r *DoltReader) LoadLeanIssues() ([]model.Issue, error) {
 	return r.readLeanIssues(nil)
 }
 
+// LoadFirstPage reads what the tree shows before any closed issue is needed:
+// every issue that is not closed, and every epic, each exactly as
+// LoadLeanIssues returns it. Closed issues other than epics are left out, so
+// a caller that shows this must follow it with a full read.
+func (r *DoltReader) LoadFirstPage() ([]model.Issue, error) {
+	return r.readLean(leanScope{firstPage: true})
+}
+
 // readLeanIssues reads the lean snapshot of the issues in ids, or of every
-// issue when ids is nil. A restricted read never falls back to the full read,
-// because that returns every issue and the caller asked for a few.
+// issue when ids is nil. A restricted read never falls back to the full read:
+// it runs only after a lean read succeeded against the same schema.
 func (r *DoltReader) readLeanIssues(ids []string) ([]model.Issue, error) {
-	inIssues, args := idFilter("id", ids)
-	rows, err := r.db.Query(leanIssueQuery+inIssues+leanIssueOrder, args...)
-	if err != nil {
-		if ids == nil && doltMissingColumnError(err) {
-			debug.Log("dolt: lean query FAILED (%v), falling back to the full read", err)
+	return r.readLean(leanScope{ids: ids})
+}
+
+// leanScope names the issues one lean read covers: those in ids, the first
+// page, or every issue when neither is set.
+type leanScope struct {
+	ids       []string
+	firstPage bool
+}
+
+// firstPageCondition matches the issues whose text a lean read carries
+// (wholeIssueCondition), on the issues table without an alias.
+const firstPageCondition = `(status NOT IN ('closed', 'tombstone') OR issue_type = 'epic')`
+
+// issueFilter restricts a query on the issues table.
+func (s leanScope) issueFilter(column string) (string, []any) {
+	if s.firstPage {
+		return " AND " + firstPageCondition, nil
+	}
+	return idFilter(column, s.ids)
+}
+
+// relationFilter restricts a query on a table keyed by issue id.
+func (s leanScope) relationFilter(column string) (string, []any) {
+	if s.firstPage {
+		return " AND " + column + " IN (SELECT id FROM issues WHERE " + firstPageCondition + ")", nil
+	}
+	return idFilter(column, s.ids)
+}
+
+// textIDs restricts the text and comment queries, which already cover only
+// the first page's issues.
+func (s leanScope) textIDs() []string {
+	if s.firstPage {
+		return nil
+	}
+	return s.ids
+}
+
+// leanReadQueries is how many queries one lean read runs at once. Each costs
+// a round trip through the tunnel, so they run in parallel rather than in
+// turn, and the reader's pool must hold a connection for each.
+const leanReadQueries = 6
+
+func (r *DoltReader) readLean(scope leanScope) ([]model.Issue, error) {
+	var (
+		wg          sync.WaitGroup
+		issues      []model.Issue
+		issuesErr   error
+		texts       map[string]IssueText
+		textErr     error
+		allLabels   map[string][]string
+		allDeps     map[string][]*model.Dependency
+		depsErr     error
+		comments    map[string][]*model.Comment
+		commentsErr error
+		creators    map[string]issueCreator
+	)
+	run := func(f func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			f()
+		}()
+	}
+	inIssues, args := scope.issueFilter("id")
+	run(func() { issues, issuesErr = r.queryLeanIssues(inIssues, args) })
+	run(func() { texts, textErr = r.loadWholeIssueText(scope.textIDs()) })
+	inRelation, relationArgs := scope.relationFilter("issue_id")
+	run(func() { allLabels = r.labelsWhere(inRelation, relationArgs...) })
+	run(func() { allDeps, depsErr = r.dependenciesWhere(inRelation, relationArgs...) })
+	run(func() {
+		inComments, commentArgs := idFilter("c.issue_id", scope.textIDs())
+		commentRows, err := r.db.Query(wholeIssueCommentsQuery+inComments+wholeIssueCommentsOrder, commentArgs...)
+		if err != nil {
+			commentsErr = fmt.Errorf("%w: query comments: %w", ErrCommentsUnavailable, err)
+			return
+		}
+		comments, commentsErr = scanAllComments(commentRows)
+	})
+	run(func() { creators = loadCreatorsWhere(r.db, inIssues, args...) })
+	wg.Wait()
+
+	if issuesErr != nil {
+		if scope.ids == nil && doltMissingColumnError(issuesErr) {
+			debug.Log("dolt: lean query FAILED (%v), falling back to the full read", issuesErr)
 			return r.LoadIssuesFiltered(nil)
 		}
-		return nil, fmt.Errorf("query issues: %w", err)
+		return nil, fmt.Errorf("query issues: %w", issuesErr)
 	}
+	if textErr != nil {
+		return nil, textErr
+	}
+	if depsErr != nil {
+		return nil, depsErr
+	}
+	if commentsErr != nil {
+		debug.Log("dolt: comments unavailable, issues will report no comments: %v", commentsErr)
+	}
+	for i := range issues {
+		issues[i].Labels = allLabels[issues[i].ID]
+		issues[i].Dependencies = allDeps[issues[i].ID]
+		if c, ok := creators[issues[i].ID]; ok {
+			issues[i].CreatedBy, issues[i].Owner = c.createdBy, c.owner
+		}
+		text, whole := texts[issues[i].ID]
+		if !whole {
+			issues[i].Abridged = true
+			continue
+		}
+		text.Comments = comments[issues[i].ID]
+		text.ApplyTo(&issues[i])
+	}
+	debug.Log("dolt: lean RESULT: %d issues, %d whole, firstPage=%t", len(issues), len(texts), scope.firstPage)
+	return issues, commentsErr
+}
+
+func (r *DoltReader) queryLeanIssues(and string, args []any) ([]model.Issue, error) {
+	rows, err := r.db.Query(leanIssueQuery+and+leanIssueOrder, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 	var issues []model.Issue
 	for rows.Next() {
 		issue, err := scanLeanIssue(rows)
@@ -94,47 +217,10 @@ func (r *DoltReader) readLeanIssues(ids []string) ([]model.Issue, error) {
 		}
 		issues = append(issues, issue)
 	}
-	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating issues: %w", err)
 	}
-
-	texts, err := r.loadWholeIssueText(ids)
-	if err != nil {
-		return nil, err
-	}
-	inLabels, labelArgs := idFilter("issue_id", ids)
-	allLabels := r.labelsWhere(inLabels, labelArgs...)
-	allDeps, err := r.dependenciesWhere(inLabels, labelArgs...)
-	if err != nil {
-		return nil, err
-	}
-	inComments, commentArgs := idFilter("c.issue_id", ids)
-	var comments map[string][]*model.Comment
-	commentRows, commentsErr := r.db.Query(wholeIssueCommentsQuery+inComments+wholeIssueCommentsOrder, commentArgs...)
-	if commentsErr == nil {
-		comments, commentsErr = scanAllComments(commentRows)
-	} else {
-		commentsErr = fmt.Errorf("%w: query comments: %w", ErrCommentsUnavailable, commentsErr)
-	}
-	if commentsErr != nil {
-		debug.Log("dolt: comments unavailable, issues will report no comments: %v", commentsErr)
-	}
-	applyCreatorsWhere(r.db, issues, inIssues, args...)
-
-	for i := range issues {
-		issues[i].Labels = allLabels[issues[i].ID]
-		issues[i].Dependencies = allDeps[issues[i].ID]
-		text, whole := texts[issues[i].ID]
-		if !whole {
-			issues[i].Abridged = true
-			continue
-		}
-		text.Comments = comments[issues[i].ID]
-		text.ApplyTo(&issues[i])
-	}
-	debug.Log("dolt: lean RESULT: %d issues, %d whole", len(issues), len(texts))
-	return issues, commentsErr
+	return issues, nil
 }
 
 // idFilter returns an AND clause that restricts column to ids, with its

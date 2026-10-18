@@ -131,6 +131,9 @@ type OpenTarget struct {
 	// Lean reads a Dolt server with LoadLeanFromSource. Only a caller that
 	// loads an Abridged issue's text before using it may set it.
 	Lean bool
+	// FirstPage reads a Dolt server with LoadFirstPageFromSource, which
+	// implies Lean. The opened project is then Partial.
+	FirstPage bool
 }
 
 // OpenedProject is a project whose issues loaded.
@@ -146,6 +149,9 @@ type OpenedProject struct {
 	// (a status line, a debug log), not a reason to treat the open as
 	// failed or to fall back to a lower-priority source.
 	CommentsErr error
+	// Partial is set when Issues holds only the first page: closed issues
+	// other than epics are missing until the caller reads the project in full.
+	Partial bool
 }
 
 // OpenProject loads a project's issues from its most authoritative readable
@@ -164,13 +170,17 @@ func OpenProject(target OpenTarget) (OpenedProject, *OpenFailure) {
 		if target.Lean {
 			load = LoadLeanFromSource
 		}
+		partial := target.FirstPage && source.Type == SourceTypeDolt
+		if partial {
+			load = LoadFirstPageFromSource
+		}
 		issues, err := load(source)
 		if err == nil || errors.Is(err, ErrCommentsUnavailable) {
 			// A comments-only failure means the source itself opened and every
 			// other column loaded; treating it like a source failure would
 			// fall back to a lower-priority, possibly stale source over a
 			// live connection with one broken table.
-			return OpenedProject{Issues: issues, Source: source, DoltFailure: doltFailure, CommentsErr: err}, nil
+			return OpenedProject{Issues: issues, Source: source, DoltFailure: doltFailure, CommentsErr: err, Partial: partial}, nil
 		}
 		f := &OpenFailure{Reason: OpenUnreadable, Project: target.Name, Dir: target.Dir, Err: err}
 		if source.Type == SourceTypeDoltEmbedded {
@@ -201,6 +211,14 @@ func OpenProject(target OpenTarget) (OpenedProject, *OpenFailure) {
 // OpenProjectLean is OpenProject with OpenTarget.Lean set.
 func OpenProjectLean(target OpenTarget) (OpenedProject, *OpenFailure) {
 	target.Lean = true
+	return OpenProject(target)
+}
+
+// OpenProjectFirstPage is OpenProject with OpenTarget.FirstPage set, for a
+// caller that shows the first page at once and reads the rest after it
+// (docs/adr/0064-show-the-first-page-before-the-full-read.md).
+func OpenProjectFirstPage(target OpenTarget) (OpenedProject, *OpenFailure) {
+	target.Lean, target.FirstPage = true, true
 	return OpenProject(target)
 }
 

@@ -50,6 +50,33 @@ type doltReloadedMsg struct {
 	loadTime   time.Duration
 }
 
+// firstPageShownMsg arrives once the first page is on screen and asks for the
+// rest of a partial snapshot.
+type firstPageShownMsg struct{}
+
+// loadRestOfSnapshot starts the full read a partial snapshot owes. The sync
+// state is still zero, so the read is full, and its reply replaces the first
+// page. The project counts wait for that reply.
+func (m Model) loadRestOfSnapshot() (Model, tea.Cmd) {
+	m.partialSnapshot = false
+	m.projectCountsDeferred = len(m.allProjects) > 1
+	if !m.sourceType.IsDolt() {
+		m.projectCountsDeferred = false
+		return m, tea.Batch(m.projectCountsCmd(), func() tea.Msg { return FileChangedMsg{} })
+	}
+	m.resetDoltSync()
+	return m.startDoltReload(nil)
+}
+
+// projectCountsCmd loads the project picker's counts, or nothing when there is
+// no other project to count.
+func (m Model) projectCountsCmd() tea.Cmd {
+	if len(m.allProjects) <= 1 {
+		return nil
+	}
+	return loadProjectCountsCmd(m.allProjects, m.startupDoltUser)
+}
+
 // loadDoltSnapshot reads a lean snapshot, or what changed since req.since.
 // Every reader of an Abridged issue's text goes through Model.wholeIssue,
 // which loads it first.
@@ -167,6 +194,10 @@ func (m Model) finishDoltReload(msg doltReloadedMsg) (Model, tea.Cmd) {
 		m.doltDeltaCount++
 	}
 	m, cmds := m.applyReload(issues, msg.err, nil, msg.started, msg.loadTime, nil)
+	if m.projectCountsDeferred {
+		m.projectCountsDeferred = false
+		cmds = append(cmds, m.projectCountsCmd())
+	}
 	if m.reloadPending {
 		return m.startDoltReload(cmds)
 	}

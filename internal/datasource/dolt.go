@@ -74,7 +74,7 @@ func NewDoltReader(source DataSource) (*DoltReader, error) {
 		return nil, fmt.Errorf("cannot open Dolt connection: %w", err)
 	}
 
-	db.SetMaxOpenConns(2)
+	db.SetMaxOpenConns(leanReadQueries)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(2 * time.Minute) // Close idle conns before server drops them (bd-gc9o)

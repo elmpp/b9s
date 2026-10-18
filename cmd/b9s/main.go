@@ -199,9 +199,18 @@ func main() {
 	startupBeadsDir, _ := loader.GetBeadsDir("")
 	startupDir := filepath.Dir(startupBeadsDir)
 	interactive := !*noFallback && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-	// The TUI reads a lean snapshot and loads an Abridged issue's text when
+	// The TUI starts on the first page of a lean snapshot and reads the rest
+	// once it is on screen (ADR 0064). It loads an Abridged issue's text when
 	// it is shown, copied or edited (ADR 0060).
-	choice, err := chooseStartupProject(filepath.Base(startupDir), startupDir, &appCfg, interactive, datasource.OpenProjectLean)
+	// The watcher opens its own connection, which costs as much as a query
+	// through the tunnel, so it connects while the first page is read.
+	early := make(chan startupSource, 1)
+	pollInterval := appCfg.RefreshPollInterval()
+	go func() {
+		path, _ := loader.FindJSONLPath(startupBeadsDir)
+		early <- connectStartupSource(startupBeadsDir, path, pollInterval)
+	}()
+	choice, err := chooseStartupProject(filepath.Base(startupDir), startupDir, &appCfg, interactive, datasource.OpenProjectFirstPage)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -219,83 +228,13 @@ func main() {
 	}
 	beadsPath, _ := loader.FindJSONLPath(beadsDir)
 
-	// Detect source type and create Dolt watcher if applicable.
-	// If Dolt is detected but connection fails, fall back to JSONL/SQLite
-	// and record the failure so the health popup can show what went wrong.
 	debug.Log("datasource: beadsDir=%s beadsPath=%s", beadsDir, beadsPath)
-	detectedSourceType := datasource.SourceTypeJSONLLocal
-	var doltWatcher *datasource.DoltWatcher
-	var doltSource datasource.DataSource
-	var doltFailure *ui.DoltFailure
-	sourceInfo := ""
-	if sources, discErr := datasource.DiscoverSources(datasource.DiscoveryOptions{
-		BeadsDir:               beadsDir,
-		ValidateAfterDiscovery: false,
-	}); discErr == nil {
-		debug.Log("datasource: discovered %d sources", len(sources))
-		for i, s := range sources {
-			debug.Log("datasource: source[%d] type=%s path=%s db=%s user=%s", i, s.Type, s.Path, s.Database, s.User)
-			if s.Type == datasource.SourceTypeDolt {
-				db := s.Database
-				if db == "" {
-					db = "beads"
-				}
-				user := s.User
-				if user == "" {
-					user = "root"
-				}
-				doltLabel := fmt.Sprintf("dolt://%s/%s", s.Path, db)
-				debug.Log("datasource: attempting Dolt connection to %s", doltLabel)
-				dw, dwErr := datasource.NewDoltWatcher(sources[i], appCfg.RefreshPollInterval())
-				if dwErr != nil {
-					debug.Log("datasource: Dolt watcher creation failed: %v", dwErr)
-					doltFailure = &ui.DoltFailure{
-						Server:   s.Path,
-						Database: db,
-						User:     user,
-						Error:    dwErr.Error(),
-					}
-				} else {
-					if err := dw.Start(); err != nil {
-						debug.Log("datasource: Dolt watcher start failed: %v", err)
-						dw.Stop()
-						doltFailure = &ui.DoltFailure{
-							Server:   s.Path,
-							Database: db,
-							User:     user,
-							Error:    err.Error(),
-						}
-					} else {
-						doltWatcher = dw
-						doltSource = sources[i]
-						detectedSourceType = datasource.SourceTypeDolt
-						sourceInfo = doltLabel + " ✓"
-						debug.Log("datasource: Dolt connected successfully to %s", doltLabel)
-					}
-				}
-				break
-			} else if s.Type == datasource.SourceTypeDoltEmbedded {
-				// An embedded watcher holds nothing open, so only a bug fails it.
-				if dw, dwErr := datasource.NewDoltWatcher(sources[i], appCfg.RefreshPollInterval()); dwErr == nil && dw.Start() == nil {
-					doltWatcher = dw
-					doltSource = sources[i]
-					detectedSourceType = datasource.SourceTypeDoltEmbedded
-					sourceInfo = s.EmbeddedLabel() + " ✓"
-				}
-				break
-			} else if s.Type == datasource.SourceTypeSQLite {
-				sourceInfo = fmt.Sprintf("sqlite %s", filepath.Base(s.Path))
-			}
-		}
+	connected := <-early
+	if beadsDir != startupBeadsDir {
+		connected.stop()
+		connected = connectStartupSource(beadsDir, beadsPath, pollInterval)
 	}
-	if sourceInfo == "" {
-		if beadsPath != "" {
-			sourceInfo = fmt.Sprintf("jsonl %s", filepath.Base(beadsPath))
-		} else {
-			sourceInfo = "no source"
-		}
-	}
-	debug.Log("datasource: selected source=%s type=%s", sourceInfo, detectedSourceType)
+	detectedSourceType, doltWatcher, doltSource, doltFailure, sourceInfo := connected.sourceType, connected.watcher, connected.source, connected.failure, connected.info
 
 	// Automatically ensure .bv/ is in .gitignore
 	projectDir := filepath.Dir(beadsDir)
@@ -363,7 +302,8 @@ func main() {
 		WithMonthFirst(appCfg.UI.DateOrder.MonthFirst(config.SystemLocale)).
 		WithInitialQuery(*initialFilter).
 		WithStartupFailure(choice.StartupFailure).
-		WithCommentsLoadErr(choice.Opened.CommentsErr)
+		WithCommentsLoadErr(choice.Opened.CommentsErr).
+		WithPartialSnapshot(choice.Opened.Partial)
 	defer m.Stop()
 
 	if err := runTUIProgram(m); err != nil {

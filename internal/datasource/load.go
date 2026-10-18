@@ -175,6 +175,23 @@ func LoadLeanFromSource(source DataSource) ([]model.Issue, error) {
 	return issues, err
 }
 
+// LoadFirstPageFromSource reads a Dolt server source with
+// DoltReader.LoadFirstPage. Every other source is read as LoadLeanFromSource
+// reads it, so only a Dolt server can return a partial snapshot.
+func LoadFirstPageFromSource(source DataSource) ([]model.Issue, error) {
+	if source.Type != SourceTypeDolt {
+		return LoadLeanFromSource(source)
+	}
+	reader, err := NewDoltReader(source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Dolt source %s: %w", source.Path, err)
+	}
+	defer reader.Close()
+	issues, err := reader.LoadFirstPage()
+	debug.Log("load: Dolt first page returned %d issues, err=%v", len(issues), err)
+	return issues, err
+}
+
 // ReadLeanFromSource is LoadLeanFromSource that reads only what changed since
 // a previous read's AsOf when since is set. Every source other than a Dolt
 // server reads in full and carries no AsOf, so every read of it stays full.

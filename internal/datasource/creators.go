@@ -21,16 +21,30 @@ func applyCreators(db *sql.DB, issues []model.Issue) {
 	applyCreatorsWhere(db, issues, "")
 }
 
+// issueCreator is one issue's created_by and owner.
+type issueCreator struct {
+	createdBy string
+	owner     string
+}
+
 // applyCreatorsWhere reads only the issues rows that match an AND clause such
 // as idFilter's.
 func applyCreatorsWhere(db *sql.DB, issues []model.Issue, and string, args ...any) {
 	if len(issues) == 0 {
 		return
 	}
-	index := make(map[string]int, len(issues))
+	creators := loadCreatorsWhere(db, and, args...)
 	for i := range issues {
-		index[issues[i].ID] = i
+		if c, ok := creators[issues[i].ID]; ok {
+			issues[i].CreatedBy, issues[i].Owner = c.createdBy, c.owner
+		}
 	}
+}
+
+// loadCreatorsWhere reads created_by and owner of the issues rows that match
+// an AND clause. A schema without either column gives an empty map.
+func loadCreatorsWhere(db *sql.DB, and string, args ...any) map[string]issueCreator {
+	result := map[string]issueCreator{}
 	for _, query := range creatorQueries {
 		rows, err := db.Query(query+and, args...)
 		if err != nil {
@@ -44,13 +58,9 @@ func applyCreatorsWhere(db *sql.DB, issues []model.Issue, and string, args ...an
 			if err := rows.Scan(&id, &createdBy, &owner); err != nil {
 				continue
 			}
-			i, ok := index[id]
-			if !ok {
-				continue
-			}
-			issues[i].CreatedBy = createdBy.String
-			issues[i].Owner = owner.String
+			result[id] = issueCreator{createdBy: createdBy.String, owner: owner.String}
 		}
-		return
+		return result
 	}
+	return result
 }
