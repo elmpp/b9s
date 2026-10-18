@@ -251,7 +251,7 @@ sequenceDiagram
     participant D as Dolt / embedded store
     participant UI as ui.Model
     participant R as reader
-    loop every refresh.poll_interval (500 ms)
+    loop every refresh.poll_interval (500 ms), backing off in the TUI while idle (ADR 0061)
         alt Dolt server or proxied
             W->>D: SELECT DOLT_HASHOF_DB()
         else embedded

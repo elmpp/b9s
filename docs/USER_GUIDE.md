@@ -663,6 +663,7 @@ ui:
     direction: desc     # asc or desc; leave out for the field's natural order
 refresh:
   poll_interval: 500ms  # Dolt hash polling; at least 100ms; restart b9s after a change
+  idle_poll_interval: 5s  # polling after 2 idle minutes or without focus; 30s after 15 minutes
 lock_recent: false      # true freezes the list below
 recent_projects:        # b9s maintains this list; edit it to remove an entry
   - name: b9s
@@ -671,6 +672,8 @@ recent_projects:        # b9s maintains this list; edit it to remove an entry
     path: /Users/me/src/b9s   # empty for a database without a local checkout
 # attachments:          # absent by default; see Attachments
 ```
+
+The TUI polls at `poll_interval` while you use it. After two minutes without a key or mouse event, or while the terminal reports that it has lost focus, it polls at `idle_poll_interval`. After fifteen minutes it polls every 30 seconds, or at `idle_poll_interval` when that is longer. The first key after an idle period polls at once, so the screen is current before you act on it. Changes made by others while you are idle therefore show up after up to 30 seconds. `b9s web` always polls at `poll_interval`. See [ADR 0061](adr/0061-back-off-the-dolt-poll-while-the-user-is-idle.md).
 
 `s` picks another sort for the current session only. The override survives reloads and is not saved, so the next start returns to the configured sort. If the file does not parse, for example because of an unknown sort field, b9s ignores the whole file, starts with the defaults and never saves over it. See [ADR 0010](adr/0010-take-tree-sort-from-user-config.md).
 

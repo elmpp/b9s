@@ -15,6 +15,7 @@ type DoltWatcher struct {
 	pollInterval time.Duration
 	lastHash     string
 	onChange     func()
+	activity     *Activity
 
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -45,8 +46,11 @@ func NewDoltWatcher(source DataSource, pollInterval time.Duration) (*DoltWatcher
 		return nil, fmt.Errorf("DoltWatcher requires a Dolt source, got: %s", source.Type)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	return newHashWatcher(hash, closeSource, pollInterval), nil
+}
 
+func newHashWatcher(hash func() (string, error), closeSource func(), pollInterval time.Duration) *DoltWatcher {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &DoltWatcher{
 		hash:         hash,
 		closeSource:  closeSource,
@@ -54,7 +58,28 @@ func NewDoltWatcher(source DataSource, pollInterval time.Duration) (*DoltWatcher
 		changeCh:     make(chan struct{}, 1),
 		ctx:          ctx,
 		cancel:       cancel,
-	}, nil
+	}
+}
+
+// FollowActivity makes the watcher back off while the user is idle (see
+// Activity). A watcher that follows nothing polls at its fixed interval,
+// which is what the web server wants: it has no keyboard to be idle at.
+func (w *DoltWatcher) FollowActivity(a *Activity) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.activity = a
+}
+
+// nextPoll returns how long to wait before the next poll and the channel that
+// cuts that wait short when the user returns from idle.
+func (w *DoltWatcher) nextPoll() (time.Duration, <-chan struct{}) {
+	w.mu.RLock()
+	a := w.activity
+	w.mu.RUnlock()
+	if a == nil {
+		return w.pollInterval, nil
+	}
+	return a.Interval(w.pollInterval), a.Woken()
 }
 
 // Start captures the current database hash as a baseline and launches the
@@ -118,36 +143,47 @@ func (w *DoltWatcher) IsPolling() bool {
 	return true
 }
 
-// poll compares the current working-set content hash to the last known hash.
-// It terminates when the context is cancelled.
+// poll checks the hash once per interval, waking early when the user returns
+// from idle. It terminates when the context is cancelled.
 func (w *DoltWatcher) poll() {
-	ticker := time.NewTicker(w.pollInterval)
-	defer ticker.Stop()
+	timer := time.NewTimer(w.pollInterval)
+	defer timer.Stop()
 
 	for {
+		interval, wake := w.nextPoll()
+		timer.Reset(interval)
+
 		select {
 		case <-w.ctx.Done():
 			return
-
-		case <-ticker.C:
-			hash, err := w.hash()
-			if err != nil {
-				// Transient error — skip and retry next tick.
-				continue
-			}
-
-			w.mu.Lock()
-			last := w.lastHash
-			changed := last != "" && hash != last
-			if hash != last {
-				w.lastHash = hash
-			}
-			w.mu.Unlock()
-
-			if changed {
-				w.notifyChange()
-			}
+		case <-wake:
+			// Go 1.23 timers discard a pending tick on Stop and Reset, so
+			// no drain is needed here.
+			timer.Stop()
+		case <-timer.C:
 		}
+		w.check()
+	}
+}
+
+// check compares the current working-set content hash to the last known hash.
+func (w *DoltWatcher) check() {
+	hash, err := w.hash()
+	if err != nil {
+		// Transient error: the next poll retries.
+		return
+	}
+
+	w.mu.Lock()
+	last := w.lastHash
+	changed := last != "" && hash != last
+	if hash != last {
+		w.lastHash = hash
+	}
+	w.mu.Unlock()
+
+	if changed {
+		w.notifyChange()
 	}
 }
 

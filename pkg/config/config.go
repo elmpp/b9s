@@ -127,7 +127,10 @@ func (s *SortConfig) UnmarshalYAML(node *yaml.Node) error {
 
 const (
 	DefaultRefreshPollInterval = 500 * time.Millisecond
-	minimumRefreshPollInterval = 100 * time.Millisecond
+	// DefaultRefreshIdlePollInterval is the poll interval once nobody has
+	// pressed a key for two minutes or the terminal has lost focus.
+	DefaultRefreshIdlePollInterval = 5 * time.Second
+	minimumRefreshPollInterval     = 100 * time.Millisecond
 )
 
 // RefreshInterval is a human-readable duration used in YAML configuration.
@@ -152,6 +155,10 @@ func (d RefreshInterval) MarshalYAML() (any, error) {
 // RefreshConfig controls automatic data refresh behavior.
 type RefreshConfig struct {
 	PollInterval RefreshInterval `yaml:"poll_interval,omitempty"`
+	// IdlePollInterval replaces PollInterval in the TUI while the user is
+	// idle. After fifteen idle minutes the TUI polls every 30 seconds, or at
+	// this interval when it is longer.
+	IdlePollInterval RefreshInterval `yaml:"idle_poll_interval,omitempty"`
 }
 
 // ExperimentalConfig holds experimental feature flags.
@@ -214,6 +221,15 @@ func (c Config) RefreshPollInterval() time.Duration {
 	interval := time.Duration(c.Refresh.PollInterval)
 	if interval == 0 {
 		return DefaultRefreshPollInterval
+	}
+	return interval
+}
+
+// RefreshIdlePollInterval returns the configured idle interval or its default.
+func (c Config) RefreshIdlePollInterval() time.Duration {
+	interval := time.Duration(c.Refresh.IdlePollInterval)
+	if interval == 0 {
+		return DefaultRefreshIdlePollInterval
 	}
 	return interval
 }

@@ -377,6 +377,9 @@ func runTUIProgram(m ui.Model) error {
 		m,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
+		// Focus reports let the Dolt watchers back off while the terminal
+		// is in the background. Terminals without them stay "focused".
+		tea.WithReportFocus(),
 		tea.WithoutSignalHandler(),
 	)
 

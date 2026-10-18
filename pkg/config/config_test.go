@@ -335,3 +335,27 @@ func TestLoadFrom_UISortRejectsUnknownDirection(t *testing.T) {
 		t.Fatal("expected unknown sort direction to fail config loading")
 	}
 }
+
+func TestLoadFrom_IdlePollInterval(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("refresh:\n  idle_poll_interval: 10s\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if got := cfg.RefreshIdlePollInterval(); got != 10*time.Second {
+		t.Fatalf("idle poll interval = %s, want 10s", got)
+	}
+}
+
+func TestRefreshIdlePollIntervalDefaultsToFiveSeconds(t *testing.T) {
+	if got := (Config{}).RefreshIdlePollInterval(); got != 5*time.Second {
+		t.Fatalf("idle poll interval of an empty config = %s, want 5s", got)
+	}
+	if got := DefaultConfig().RefreshIdlePollInterval(); got != 5*time.Second {
+		t.Fatalf("idle poll interval of the default config = %s, want 5s", got)
+	}
+}

@@ -505,6 +505,9 @@ type Model struct {
 	openFailureFellBack bool           // the failure happened at startup and another project opened instead
 
 	doltPollInterval time.Duration // Configured Dolt live-refresh interval
+	// activity is shared by every Dolt watcher the model starts, so they
+	// back off together while the user is idle (ADR 0061).
+	activity *datasource.Activity
 
 	// Background Worker (Phase 2 architecture - bv-m7v8)
 	// snapshot is the current immutable data snapshot from BackgroundWorker.
@@ -1232,6 +1235,7 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 		statusIsError:    initialStatusErr,
 		clipboardWrite:   clipboard.WriteAll,
 		doltPollInterval: config.DefaultRefreshPollInterval,
+		activity:         datasource.NewActivity(config.DefaultRefreshIdlePollInterval, nil),
 		pickerVisible:    true, // bd-2me: visible by default, H toggles (bd-j764)
 		// Tutorial integration (bv-8y31)
 		tutorialModel: NewTutorialModel(theme),
@@ -1271,6 +1275,9 @@ func (m Model) WithConfig(cfg config.Config, projectName, projectPath string) Mo
 		m.tree.SetColumnPreference(column, preference)
 	}
 	m.doltPollInterval = cfg.RefreshPollInterval()
+	if m.activity != nil {
+		m.activity.SetIdleInterval(cfg.RefreshIdlePollInterval())
+	}
 	m.tree.SetSort(sortFromConfig(cfg.UI.Sort))
 	m.activeProjectName = projectName
 	m.activeProjectPath = projectPath
@@ -1300,8 +1307,36 @@ func (m Model) WithSourceType(st datasource.SourceType) Model {
 // responsible for having called Start() on the watcher before passing it here.
 // The model's Stop() method will call Stop() on the watcher.
 func (m Model) WithDoltWatcher(dw *datasource.DoltWatcher) Model {
+	if dw != nil && m.activity != nil {
+		dw.FollowActivity(m.activity)
+	}
 	m.doltWatcher = dw
 	return m
+}
+
+// newDoltWatcher creates a watcher for source that backs off with the rest
+// of the model's watchers while the user is idle.
+func (m Model) newDoltWatcher(source datasource.DataSource) (*datasource.DoltWatcher, error) {
+	dw, err := datasource.NewDoltWatcher(source, m.doltPollInterval)
+	if err == nil && m.activity != nil {
+		dw.FollowActivity(m.activity)
+	}
+	return dw, err
+}
+
+// noteActivity tells the watchers whether the user is at the keyboard.
+func (m Model) noteActivity(msg tea.Msg) {
+	if m.activity == nil {
+		return
+	}
+	switch msg.(type) {
+	case tea.KeyMsg, tea.MouseMsg:
+		m.activity.Touch()
+	case tea.FocusMsg:
+		m.activity.SetFocused(true)
+	case tea.BlurMsg:
+		m.activity.SetFocused(false)
+	}
 }
 
 // WithSourceInfo sets a human-readable datasource description shown in the title bar.
@@ -1472,6 +1507,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
+	m.noteActivity(msg)
 	if m.backgroundWorker != nil {
 		switch msg.(type) {
 		case tea.KeyMsg:
@@ -7063,6 +7099,9 @@ func (m *Model) enterAllProjectsMode() tea.Cmd {
 
 	// Start multi watcher
 	watcher := datasource.NewMultiDoltWatcher(reader, m.doltPollInterval)
+	if m.activity != nil {
+		watcher.FollowActivity(m.activity)
+	}
 	if err := watcher.Start(); err != nil {
 		debug.Log("all-projects: watcher start failed: %v", err)
 	}
@@ -7106,7 +7145,7 @@ func (m *Model) exitAllProjectsMode() {
 				if db == "" {
 					db = "beads"
 				}
-				dw, dwErr := datasource.NewDoltWatcher(s, m.doltPollInterval)
+				dw, dwErr := m.newDoltWatcher(s)
 				if dwErr == nil {
 					if err := dw.Start(); err == nil {
 						m.doltWatcher = dw
@@ -7119,7 +7158,7 @@ func (m *Model) exitAllProjectsMode() {
 			}
 			if s.Type == datasource.SourceTypeDoltEmbedded {
 				m.tree.SetDecisionLookup(decisionLookupFor(s))
-				if dw, dwErr := datasource.NewDoltWatcher(s, m.doltPollInterval); dwErr == nil && dw.Start() == nil {
+				if dw, dwErr := m.newDoltWatcher(s); dwErr == nil && dw.Start() == nil {
 					m.doltWatcher = dw
 					m.doltSource = s
 					m.sourceType = datasource.SourceTypeDoltEmbedded

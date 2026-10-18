@@ -134,7 +134,7 @@ It adds no automatic Memory graph refresh.
 
 The active source decides how changes are detected:
 
-- **Dolt.** `DoltWatcher` polls `DOLT_HASHOF_DB()` at `refresh.poll_interval`, 500 ms by default. That hash covers the working set, not only `HEAD`, so a write from `bd` shows up without a Dolt commit.
+- **Dolt.** `DoltWatcher` polls `DOLT_HASHOF_DB()` at `refresh.poll_interval`, 500 ms by default. That hash covers the working set, not only `HEAD`, so a write from `bd` shows up without a Dolt commit. In the TUI every watcher follows one `datasource.Activity`: after two minutes without input, or while the terminal has lost focus, it polls at `refresh.idle_poll_interval` (5 s), and after fifteen minutes every 30 s. The first key after idle closes the activity's wake channel and every watcher polls at once. `b9s web` attaches no activity and polls at the fixed interval. See [ADR 0061](adr/0061-back-off-the-dolt-poll-while-the-user-is-idle.md).
 - **Embedded Dolt.** The same `DoltWatcher` polls a fingerprint of the store instead: the content of each `manifest` and the size of the chunk journal. Every other file is left out, because `bd` rewrites `journal.idx` and writes temporary manifests while it only reads, and those would turn each reload into the trigger for the next.
 - **JSONL.** `pkg/watcher` uses fsnotify with a debounce window, and switches to polling on NFS, SMB and similar filesystems where events do not arrive.
 - **SQLite.** The file is watched like JSONL.

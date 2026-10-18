@@ -14,6 +14,7 @@ type MultiDoltWatcher struct {
 	reader       *MultiDoltReader
 	pollInterval time.Duration
 	lastHashes   map[string]string
+	activity     *Activity
 
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -53,6 +54,24 @@ func (w *MultiDoltWatcher) Start() error {
 	return nil
 }
 
+// FollowActivity makes the watcher back off while the user is idle, as
+// DoltWatcher.FollowActivity does.
+func (w *MultiDoltWatcher) FollowActivity(a *Activity) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.activity = a
+}
+
+func (w *MultiDoltWatcher) nextPoll() (time.Duration, <-chan struct{}) {
+	w.mu.RLock()
+	a := w.activity
+	w.mu.RUnlock()
+	if a == nil {
+		return w.pollInterval, nil
+	}
+	return a.Interval(w.pollInterval), a.Woken()
+}
+
 // WaitForChange blocks until any database changes or the context is cancelled.
 func (w *MultiDoltWatcher) WaitForChange() bool {
 	select {
@@ -69,31 +88,40 @@ func (w *MultiDoltWatcher) Stop() {
 }
 
 func (w *MultiDoltWatcher) poll() {
-	ticker := time.NewTicker(w.pollInterval)
-	defer ticker.Stop()
+	timer := time.NewTimer(w.pollInterval)
+	defer timer.Stop()
 
 	for {
+		interval, wake := w.nextPoll()
+		timer.Reset(interval)
+
 		select {
 		case <-w.ctx.Done():
 			return
-		case <-ticker.C:
-			hashes := w.reader.GetDatabaseHashes()
-			changed := false
-			for db, hash := range hashes {
-				if old, ok := w.lastHashes[db]; !ok || old != hash {
-					debug.Log("multi-dolt-watcher: %s changed %s -> %s", db, old, hash)
-					changed = true
-				}
-			}
-			if changed {
-				w.mu.Lock()
-				w.lastHashes = hashes
-				w.mu.Unlock()
-				select {
-				case w.changeCh <- struct{}{}:
-				default:
-				}
-			}
+		case <-wake:
+			timer.Stop()
+		case <-timer.C:
+		}
+		w.check()
+	}
+}
+
+func (w *MultiDoltWatcher) check() {
+	hashes := w.reader.GetDatabaseHashes()
+	changed := false
+	for db, hash := range hashes {
+		if old, ok := w.lastHashes[db]; !ok || old != hash {
+			debug.Log("multi-dolt-watcher: %s changed %s -> %s", db, old, hash)
+			changed = true
+		}
+	}
+	if changed {
+		w.mu.Lock()
+		w.lastHashes = hashes
+		w.mu.Unlock()
+		select {
+		case w.changeCh <- struct{}{}:
+		default:
 		}
 	}
 }

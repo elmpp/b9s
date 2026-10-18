@@ -313,7 +313,7 @@ func (m Model) applyProjectSwitch(project config.Project) (Model, tea.Cmd) {
 					db = "beads"
 				}
 				doltLabel := fmt.Sprintf("dolt://%s/%s", s.Path, db)
-				dw, dwErr := datasource.NewDoltWatcher(s, m.doltPollInterval)
+				dw, dwErr := m.newDoltWatcher(s)
 				if dwErr != nil {
 					m.doltFailure = &DoltFailure{Server: s.Path, Database: db, User: s.User, Error: dwErr.Error()}
 				} else if err := dw.Start(); err != nil {
@@ -329,7 +329,7 @@ func (m Model) applyProjectSwitch(project config.Project) (Model, tea.Cmd) {
 			} else if s.Type == datasource.SourceTypeDoltEmbedded {
 				m.tree.SetDecisionLookup(decisionLookupFor(s))
 				// An embedded watcher holds nothing open, so only a bug fails it.
-				if dw, dwErr := datasource.NewDoltWatcher(s, m.doltPollInterval); dwErr == nil && dw.Start() == nil {
+				if dw, dwErr := m.newDoltWatcher(s); dwErr == nil && dw.Start() == nil {
 					m.doltWatcher = dw
 					m.doltSource = s
 					m.sourceType = datasource.SourceTypeDoltEmbedded
