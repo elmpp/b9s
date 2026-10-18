@@ -3,6 +3,7 @@ package datasource
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/vanderheijden86/b9s/pkg/debug"
@@ -21,9 +22,10 @@ const leanIssueQuery = `
 		compacted_at, compacted_at_commit, original_size,
 		source_repo, defer_until
 	FROM issues
-	WHERE status != 'tombstone'
-	ORDER BY updated_at DESC
-`
+	WHERE status != 'tombstone'`
+
+const leanIssueOrder = `
+	ORDER BY updated_at DESC`
 
 // wholeIssueCondition selects the issues whose text and comments arrive with
 // the snapshot: the ones a user is likely to open, and epics, whose
@@ -38,7 +40,9 @@ const wholeIssueTextQuery = `
 const wholeIssueCommentsQuery = `
 	SELECT c.id, c.issue_id, c.author, c.text, c.created_at
 	FROM comments c JOIN issues i ON i.id = c.issue_id
-	WHERE ` + wholeIssueCondition + `
+	WHERE ` + wholeIssueCondition
+
+const wholeIssueCommentsOrder = `
 	ORDER BY c.created_at`
 
 // IssueText is the part of an issue a lean snapshot leaves out.
@@ -65,9 +69,17 @@ func (t IssueText) ApplyTo(issue *model.Issue) {
 // other issues come back Abridged; LoadIssueText supplies their text. A schema
 // without the lean columns falls back to the full read.
 func (r *DoltReader) LoadLeanIssues() ([]model.Issue, error) {
-	rows, err := r.db.Query(leanIssueQuery)
+	return r.readLeanIssues(nil)
+}
+
+// readLeanIssues reads the lean snapshot of the issues in ids, or of every
+// issue when ids is nil. A restricted read never falls back to the full read,
+// because that returns every issue and the caller asked for a few.
+func (r *DoltReader) readLeanIssues(ids []string) ([]model.Issue, error) {
+	inIssues, args := idFilter("id", ids)
+	rows, err := r.db.Query(leanIssueQuery+inIssues+leanIssueOrder, args...)
 	if err != nil {
-		if doltMissingColumnError(err) {
+		if ids == nil && doltMissingColumnError(err) {
 			debug.Log("dolt: lean query FAILED (%v), falling back to the full read", err)
 			return r.LoadIssuesFiltered(nil)
 		}
@@ -87,17 +99,19 @@ func (r *DoltReader) LoadLeanIssues() ([]model.Issue, error) {
 		return nil, fmt.Errorf("error iterating issues: %w", err)
 	}
 
-	texts, err := r.loadWholeIssueText()
+	texts, err := r.loadWholeIssueText(ids)
 	if err != nil {
 		return nil, err
 	}
-	allLabels := r.loadAllLabels()
-	allDeps, err := r.loadAllDependencies()
+	inLabels, labelArgs := idFilter("issue_id", ids)
+	allLabels := r.labelsWhere(inLabels, labelArgs...)
+	allDeps, err := r.dependenciesWhere(inLabels, labelArgs...)
 	if err != nil {
 		return nil, err
 	}
+	inComments, commentArgs := idFilter("c.issue_id", ids)
 	var comments map[string][]*model.Comment
-	commentRows, commentsErr := r.db.Query(wholeIssueCommentsQuery)
+	commentRows, commentsErr := r.db.Query(wholeIssueCommentsQuery+inComments+wholeIssueCommentsOrder, commentArgs...)
 	if commentsErr == nil {
 		comments, commentsErr = scanAllComments(commentRows)
 	} else {
@@ -106,7 +120,7 @@ func (r *DoltReader) LoadLeanIssues() ([]model.Issue, error) {
 	if commentsErr != nil {
 		debug.Log("dolt: comments unavailable, issues will report no comments: %v", commentsErr)
 	}
-	applyCreators(r.db, issues)
+	applyCreatorsWhere(r.db, issues, inIssues, args...)
 
 	for i := range issues {
 		issues[i].Labels = allLabels[issues[i].ID]
@@ -123,8 +137,25 @@ func (r *DoltReader) LoadLeanIssues() ([]model.Issue, error) {
 	return issues, commentsErr
 }
 
-func (r *DoltReader) loadWholeIssueText() (map[string]IssueText, error) {
-	rows, err := r.db.Query(wholeIssueTextQuery)
+// idFilter returns an AND clause that restricts column to ids, with its
+// arguments, or nothing when ids is nil.
+func idFilter(column string, ids []string) (string, []any) {
+	if ids == nil {
+		return "", nil
+	}
+	if len(ids) == 0 {
+		return " AND 1 = 0", nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	return " AND " + column + " IN (?" + strings.Repeat(", ?", len(ids)-1) + ")", args
+}
+
+func (r *DoltReader) loadWholeIssueText(ids []string) (map[string]IssueText, error) {
+	in, args := idFilter("i.id", ids)
+	rows, err := r.db.Query(wholeIssueTextQuery+in, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query issue text: %w", err)
 	}

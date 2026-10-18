@@ -728,7 +728,15 @@ type Model struct {
 
 	// reloadLoader reads a Dolt snapshot off the event loop; nil means the
 	// real database. Tests substitute a loader they control.
-	reloadLoader func(doltReloadRequest) ([]model.Issue, error)
+	reloadLoader func(doltReloadRequest) (datasource.LeanRead, error)
+	// doltSyncedAt is the server time of the last successful read, the start
+	// point of the next incremental one; doltDeltaCount and doltFullAt
+	// decide when the next read is full again, as does doltForceFull after
+	// Ctrl-R (docs/adr/0062-read-only-what-changed-since-the-last-reload.md).
+	doltSyncedAt   time.Time
+	doltDeltaCount int
+	doltFullAt     time.Time
+	doltForceFull  bool
 	// textLoader reads one Abridged issue's text off the event loop; nil
 	// means loadIssueText. issueTexts keeps what it read across reloads,
 	// issueTextLoading the requests running, issueTextErr the ones that
@@ -2465,6 +2473,7 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 				return m, nil
 			}
 			m.lastForceRefresh = now
+			m.doltForceFull = true
 
 			m.statusMsg = "Refreshing…"
 			m.statusIsError = false

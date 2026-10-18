@@ -11,13 +11,19 @@ import (
 // owner, and the oldest lack created_by too; a missing column must never cost
 // the rest of the issue data, so creators load apart from the main query.
 var creatorQueries = []string{
-	`SELECT id, created_by, owner FROM issues`,
-	`SELECT id, created_by, NULL FROM issues`,
+	`SELECT id, created_by, owner FROM issues WHERE 1 = 1`,
+	`SELECT id, created_by, NULL FROM issues WHERE 1 = 1`,
 }
 
 // applyCreators fills CreatedBy and Owner on issues from the issues table.
 // A schema without either column leaves the issues unchanged.
 func applyCreators(db *sql.DB, issues []model.Issue) {
+	applyCreatorsWhere(db, issues, "")
+}
+
+// applyCreatorsWhere reads only the issues rows that match an AND clause such
+// as idFilter's.
+func applyCreatorsWhere(db *sql.DB, issues []model.Issue, and string, args ...any) {
 	if len(issues) == 0 {
 		return
 	}
@@ -26,7 +32,7 @@ func applyCreators(db *sql.DB, issues []model.Issue) {
 		index[issues[i].ID] = i
 	}
 	for _, query := range creatorQueries {
-		rows, err := db.Query(query)
+		rows, err := db.Query(query+and, args...)
 		if err != nil {
 			debug.Log("creators: %q failed: %v", query, err)
 			continue

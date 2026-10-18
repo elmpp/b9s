@@ -427,7 +427,12 @@ func (r *DoltReader) loadDependencies(issueID string) []*model.Dependency {
 // loadAllLabels loads labels for all issues in a single query.
 // Returns a map from issue ID to label slice.
 func (r *DoltReader) loadAllLabels() map[string][]string {
-	rows, err := r.db.Query(`SELECT issue_id, label FROM labels`)
+	return r.labelsWhere("")
+}
+
+// labelsWhere loads the labels that match an AND clause such as idFilter's.
+func (r *DoltReader) labelsWhere(and string, args ...any) map[string][]string {
+	rows, err := r.db.Query(`SELECT issue_id, label FROM labels WHERE 1 = 1`+and, args...)
 	if err != nil {
 		debug.Log("dolt: batch labels query failed: %v", err)
 		return nil
@@ -448,12 +453,18 @@ func (r *DoltReader) loadAllLabels() map[string][]string {
 // loadAllDependencies loads dependencies for all issues in a single query.
 // Beads stores issue, wisp, and external targets in separate nullable columns.
 func (r *DoltReader) loadAllDependencies() (map[string][]*model.Dependency, error) {
+	return r.dependenciesWhere("")
+}
+
+// dependenciesWhere loads the dependencies that match an AND clause such as
+// idFilter's.
+func (r *DoltReader) dependenciesWhere(and string, args ...any) (map[string][]*model.Dependency, error) {
 	rows, err := r.db.Query(`
 		SELECT issue_id,
 			COALESCE(depends_on_issue_id, depends_on_wisp_id, depends_on_external),
 			type
 		FROM dependencies
-	`)
+		WHERE 1 = 1`+and, args...)
 	if err != nil {
 		debug.Log("dolt: batch dependencies query failed: %v", err)
 		return nil, fmt.Errorf("query dependencies: %w", err)

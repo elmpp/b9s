@@ -3,6 +3,7 @@ package datasource
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/vanderheijden86/b9s/pkg/debug"
 	"github.com/vanderheijden86/b9s/pkg/loader"
@@ -172,6 +173,40 @@ func LoadLeanFromSource(source DataSource) ([]model.Issue, error) {
 	issues, err := reader.LoadLeanIssues()
 	debug.Log("load: Dolt lean returned %d issues, err=%v", len(issues), err)
 	return issues, err
+}
+
+// ReadLeanFromSource is LoadLeanFromSource that reads only what changed since
+// a previous read's AsOf when since is set. Every source other than a Dolt
+// server reads in full and carries no AsOf, so every read of it stays full.
+func ReadLeanFromSource(source DataSource, since time.Time) (LeanRead, error) {
+	if source.Type != SourceTypeDolt {
+		issues, err := LoadFromSource(source)
+		return LeanRead{Full: true, Issues: issues}, err
+	}
+	reader, err := NewDoltReader(source)
+	if err != nil {
+		return LeanRead{}, fmt.Errorf("failed to open Dolt source %s: %w", source.Path, err)
+	}
+	defer reader.Close()
+	return reader.ReadLean(since)
+}
+
+// ReadLeanFromDir is ReadLeanFromSource for the best source in beadsDir, with
+// LoadLeanIssuesFromDir's JSONL fallback.
+func ReadLeanFromDir(beadsDir string, since time.Time) (LeanRead, error) {
+	best, err := bestSource(beadsDir, "")
+	if err == nil {
+		read, readErr := ReadLeanFromSource(best, since)
+		if readErr == nil || errors.Is(readErr, ErrCommentsUnavailable) {
+			return read, readErr
+		}
+	}
+	jsonlPath, err := loader.FindJSONLPath(beadsDir)
+	if err != nil {
+		return LeanRead{}, err
+	}
+	issues, err := loader.LoadIssuesFromFile(jsonlPath)
+	return LeanRead{Full: true, Issues: issues}, err
 }
 
 // LoadIssueText reads the text and comments of one issue that a lean read

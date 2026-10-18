@@ -11,7 +11,6 @@ import (
 
 	"github.com/vanderheijden86/b9s/internal/datasource"
 	"github.com/vanderheijden86/b9s/pkg/config"
-	"github.com/vanderheijden86/b9s/pkg/model"
 )
 
 // A project opened from its database has no checkout path. Its reload must use
@@ -41,7 +40,7 @@ func TestReloadWithoutCheckoutNeverReadsWorkingDirectoryBeads(t *testing.T) {
 	m = updated.(Model)
 
 	var asked doltReloadRequest
-	m.reloadLoader = func(req doltReloadRequest) ([]model.Issue, error) {
+	m.reloadLoader = func(req doltReloadRequest) (datasource.LeanRead, error) {
 		asked = req
 		return loadDoltSnapshot(req)
 	}

@@ -648,7 +648,7 @@ In proxied-server mode bd runs a loopback proxy in front of a private Dolt serve
 
 ### Live reload
 
-b9s polls the Dolt working-set hash every 500 ms by default, so changes from `bd` or another agent appear by themselves, uncommitted ones included. JSONL files reload on filesystem events, with polling on network filesystems where events are unreliable. `Ctrl-R` or `F5` reloads at once.
+b9s polls the Dolt working-set hash every 500 ms by default, so changes from `bd` or another agent appear by themselves, uncommitted ones included. JSONL files reload on filesystem events, with polling on network filesystems where events are unreliable. A reload from a Dolt server reads only the issues that changed since the last one, and reads everything again every five minutes. `Ctrl-R` or `F5` reloads everything at once.
 
 ## Configuration
 

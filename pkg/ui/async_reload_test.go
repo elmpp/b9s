@@ -85,7 +85,12 @@ func newDoltReloadModel(t *testing.T, load func(doltReloadRequest) ([]model.Issu
 		WithSourceType(datasource.SourceTypeDolt)
 	m.doltSource = datasource.DataSource{Type: datasource.SourceTypeDolt, Path: "127.0.0.1:1", Database: "remote", User: "reader"}
 	m.beadsPath = "stands-in-for-watcher.jsonl"
-	m.reloadLoader = load
+	if load != nil {
+		m.reloadLoader = func(req doltReloadRequest) (datasource.LeanRead, error) {
+			issues, err := load(req)
+			return datasource.LeanRead{Full: true, Issues: issues}, err
+		}
+	}
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	return updated.(Model)
 }
