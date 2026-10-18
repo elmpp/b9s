@@ -244,6 +244,7 @@ func (m Model) applyProjectSwitch(project config.Project) (Model, tea.Cmd) {
 	// A reload of the previous project may still be running; its reply is
 	// dropped by generation, so the new project starts with none in flight.
 	m.reloadInFlight, m.reloadPending = false, false
+	m.resetIssueTexts()
 	m.memoryBrowser, m.memoryVisible, m.memoryRefused = nil, false, false
 	m.memoryGeneration++
 	checkout, hasCheckout := NewCheckout(project.ResolvedPath())

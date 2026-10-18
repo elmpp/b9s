@@ -330,7 +330,7 @@ func probeProjects(projects []config.Project, startupUser string) (map[string]pr
 				if beadsDir, ok := projectBeadsDir(project.ResolvedPath()); ok {
 					// The checkout's own source decides its reachability; its
 					// JSONL export must not answer for a database it cannot read.
-					issues, err := datasource.LoadIssuesFromCanonicalSource(beadsDir)
+					issues, err := datasource.LoadLeanIssuesFromCanonicalSource(beadsDir)
 					results <- result{key: key, counts: summarizeProjectIssues(issues), err: err}
 					return
 				}
@@ -340,7 +340,7 @@ func probeProjects(projects []config.Project, startupUser string) (map[string]pr
 				}
 				// Never the working directory: a project without a checkout is
 				// counted from its own database.
-				issues, err := datasource.LoadFromSource(databaseSource(project, startupUser))
+				issues, err := datasource.LoadLeanFromSource(databaseSource(project, startupUser))
 				results <- result{key: key, counts: summarizeProjectIssues(issues), err: err}
 			}(project)
 		}
@@ -726,6 +726,14 @@ type Model struct {
 	// reloadLoader reads a Dolt snapshot off the event loop; nil means the
 	// real database. Tests substitute a loader they control.
 	reloadLoader func(doltReloadRequest) ([]model.Issue, error)
+	// textLoader reads one Abridged issue's text off the event loop; nil
+	// means loadIssueText. issueTexts keeps what it read across reloads,
+	// issueTextLoading the requests running, issueTextErr the ones that
+	// failed until the next reload.
+	textLoader       func(doltReloadRequest, string) (datasource.IssueText, error)
+	issueTexts       map[string]cachedIssueText
+	issueTextLoading map[string]bool
+	issueTextErr     map[string]error
 	// reloadInFlight is true while a Dolt reload command runs. A change that
 	// arrives meanwhile sets reloadPending instead of starting a second read,
 	// so a burst of commits costs at most one extra snapshot.
@@ -1229,7 +1237,7 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 		tutorialModel: NewTutorialModel(theme),
 		// Issue writer for in-app editing (bd-a83)
 		issueWriter: NewIssueWriter(),
-		openProject: datasource.OpenProject,
+		openProject: datasource.OpenProjectLean,
 		attachTemp:  &attachTempState{},
 	}
 }
@@ -1445,14 +1453,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = tea.Batch(cmd, read)
 			updated.updateViewportContent()
 		}
-		// Key handlers return only a Model, so a command one of them needs to
-		// run (the editor O starts) waits on the model until here.
+		if updated.detailStale && updated.detailVisible() {
+			updated.updateViewportContent()
+		}
+		// Key handlers and renders return only a Model, so a command one of
+		// them needs to run (the editor O starts, an Abridged issue's text)
+		// waits on the model until here.
 		if updated.pendingCmd != nil {
 			cmd = tea.Batch(cmd, updated.pendingCmd)
 			updated.pendingCmd = nil
-		}
-		if updated.detailStale && updated.detailVisible() {
-			updated.updateViewportContent()
 		}
 		next = updated
 	}
@@ -2051,6 +2060,9 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 
 	case identitiesLoadedMsg:
 		return m.applyIdentities(msg), nil
+
+	case issueTextLoadedMsg:
+		return m.finishIssueText(msg), nil
 
 	case doltReloadedMsg:
 		return m.finishDoltReload(msg)
@@ -2897,7 +2909,7 @@ func (m Model) dispatchMsg(msg tea.Msg) (Model, tea.Cmd) {
 				// The search bar only captures keys while the tree has focus
 				// (bd-9k90); the detail view edits the issue it shows.
 				if (m.focused == focusTree && !m.tree.IsSearchMode()) || m.focused == focusDetail {
-					if issue := m.getSelectedIssue(); issue != nil {
+					if issue := m.wholeIssue(m.getSelectedIssue()); issue != nil {
 						m.openEditModal(issue)
 						return m, m.editModal.Init()
 					}
@@ -3925,7 +3937,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (Model, bool) {
 		if m.modalRefusedBySwitch() {
 			return m, true
 		}
-		if issue := m.getSelectedIssue(); issue != nil {
+		if issue := m.wholeIssue(m.getSelectedIssue()); issue != nil {
 			m.openEditModal(issue)
 			m.focused = focusEditModal
 		}
@@ -5929,6 +5941,14 @@ func (m *Model) updateViewportContent() {
 		return
 	}
 	item := *selected
+	if item.Abridged {
+		if whole, ok := m.issueMap[item.ID]; ok && !whole.Abridged {
+			item = *whole
+		} else {
+			m.requestIssueText(item)
+			item = m.placeholderText(item)
+		}
+	}
 
 	var update *detailUpdateNotice
 	if m.updateAvailable {
@@ -6255,7 +6275,7 @@ func (m Model) TreeNodeCount() int {
 // do (bd-t8j5.9).
 func (m Model) AttachmentList() []attachref.Attachment {
 	issue := m.getSelectedIssue()
-	if issue == nil {
+	if issue == nil || issue.Abridged {
 		return nil
 	}
 	return attachref.Collect(issue.Comments)
@@ -6426,6 +6446,11 @@ func (m Model) renderTimeTravelPrompt() string {
 // copyIssueToClipboard copies the selected issue to the clipboard as Markdown.
 func (m *Model) copyIssueToClipboard() {
 	selected := m.detailIssue()
+	if selected != nil && selected.Abridged {
+		if selected = m.wholeIssue(selected); selected == nil {
+			return
+		}
+	}
 	if selected == nil {
 		m.statusMsg = "❌ No issue selected"
 		m.statusIsError = true
@@ -6770,6 +6795,11 @@ func (m *Model) openInEditor() {
 		// has not moved to.
 		if issue := m.detailIssue(); issue != nil {
 			selected = issue
+		}
+	}
+	if selected != nil && selected.Abridged {
+		if selected = m.wholeIssue(selected); selected == nil {
+			return
 		}
 	}
 	if selected == nil {
@@ -7823,6 +7853,11 @@ func (m *Model) issueConfirmationFor(action issueConfirmAction) (issueConfirmati
 // silently skips the generation stamp that the save path's staleness check
 // depends on (bd-l66t).
 func (m *Model) openEditModal(issue *model.Issue) {
+	// An Abridged issue's empty description means "not loaded"; a form
+	// opened on it would save the empty text over the real one.
+	if issue = m.wholeIssue(issue); issue == nil {
+		return
+	}
 	m.editModal = NewEditModal(issue, m.theme, m.collectEditSuggestions())
 	m.editModal.SetSize(m.width, m.height)
 	m.showEditModal = true
@@ -7969,6 +8004,7 @@ func (m Model) applyReload(newIssues []model.Issue, err error, reloadWarnings []
 	if profileRefresh {
 		recordTiming("issue_map", time.Since(mapStart))
 	}
+	m.restoreIssueTexts()
 
 	// Recompute stats
 	var statsStart time.Time

@@ -199,7 +199,9 @@ func main() {
 	startupBeadsDir, _ := loader.GetBeadsDir("")
 	startupDir := filepath.Dir(startupBeadsDir)
 	interactive := !*noFallback && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-	choice, err := chooseStartupProject(filepath.Base(startupDir), startupDir, &appCfg, interactive, datasource.OpenProject)
+	// The TUI reads a lean snapshot and loads an Abridged issue's text when
+	// it is shown, copied or edited (ADR 0060).
+	choice, err := chooseStartupProject(filepath.Base(startupDir), startupDir, &appCfg, interactive, datasource.OpenProjectLean)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

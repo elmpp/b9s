@@ -39,6 +39,11 @@ type Issue struct {
 	Dependencies      []*Dependency `json:"dependencies,omitempty"`
 	Comments          []*Comment    `json:"comments,omitempty"`
 	SourceRepo        string        `json:"source_repo,omitempty"`
+	// Abridged marks an issue read without its long text and comments
+	// (Description, Design, AcceptanceCriteria, Notes, Comments). They are
+	// unknown, not empty: a reader must load them before showing, copying or
+	// editing them.
+	Abridged bool `json:"-"`
 }
 
 // issueAlias is used by UnmarshalJSON to avoid infinite recursion.

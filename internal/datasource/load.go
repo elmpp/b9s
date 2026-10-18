@@ -66,6 +66,26 @@ func LoadIssuesFromCanonicalSource(beadsDir string) ([]model.Issue, error) {
 	return loadSmart(beadsDir, "")
 }
 
+// LoadLeanIssuesFromCanonicalSource is LoadIssuesFromCanonicalSource with
+// LoadLeanFromSource's lean read.
+func LoadLeanIssuesFromCanonicalSource(beadsDir string) ([]model.Issue, error) {
+	return loadSmartMode(beadsDir, "", true)
+}
+
+// LoadLeanIssuesFromDir is LoadIssuesFromDir with LoadLeanFromSource's lean
+// read. The JSONL fallback is whole, as every JSONL read is.
+func LoadLeanIssuesFromDir(beadsDir string) ([]model.Issue, error) {
+	issues, smartErr := loadSmartMode(beadsDir, "", true)
+	if smartErr == nil || errors.Is(smartErr, ErrCommentsUnavailable) {
+		return issues, smartErr
+	}
+	jsonlPath, err := loader.FindJSONLPath(beadsDir)
+	if err != nil {
+		return nil, err
+	}
+	return loader.LoadIssuesFromFile(jsonlPath)
+}
+
 // loadDiscoveryOptions avoids a separate validation pass because LoadFromSource
 // opens and queries the selected source immediately afterward. This matters for
 // remote Dolt servers, where validation otherwise adds another connection and
@@ -82,17 +102,42 @@ func loadDiscoveryOptions(beadsDir, repoPath string) DiscoveryOptions {
 // loadSmart discovers sources, selects the best candidate, and loads from it.
 // Opening and querying the source is the authoritative validation step.
 func loadSmart(beadsDir, repoPath string) ([]model.Issue, error) {
+	return loadSmartMode(beadsDir, repoPath, false)
+}
+
+func loadSmartMode(beadsDir, repoPath string, lean bool) ([]model.Issue, error) {
+	best, err := bestSource(beadsDir, repoPath)
+	if err != nil {
+		return nil, err
+	}
+	if lean {
+		return LoadLeanFromSource(best)
+	}
+	return LoadFromSource(best)
+}
+
+// LoadIssueTextFromDir is LoadIssueText for the source a lean read of
+// beadsDir chose.
+func LoadIssueTextFromDir(beadsDir, id string) (IssueText, error) {
+	best, err := bestSource(beadsDir, "")
+	if err != nil {
+		return IssueText{}, err
+	}
+	return LoadIssueText(best, id)
+}
+
+func bestSource(beadsDir, repoPath string) (DataSource, error) {
 	sources, err := DiscoverSources(loadDiscoveryOptions(beadsDir, repoPath))
 	if err != nil {
 		debug.Log("load: DiscoverSources failed: %v", err)
-		return nil, err
+		return DataSource{}, err
 	}
 	debug.Log("load: discovered %d valid sources", len(sources))
 	for i, s := range sources {
 		debug.Log("load:   [%d] type=%s path=%s db=%s priority=%d", i, s.Type, s.Path, s.Database, s.Priority)
 	}
 	if len(sources) == 0 {
-		return nil, fmt.Errorf("no valid sources discovered")
+		return DataSource{}, fmt.Errorf("no valid sources discovered")
 	}
 
 	// Use priority-first selection so Dolt (110) always beats JSONL (50).
@@ -104,11 +149,43 @@ func loadSmart(beadsDir, repoPath string) ([]model.Issue, error) {
 	best, err := SelectBestSourceWithOptions(sources, opts)
 	if err != nil {
 		debug.Log("load: SelectBestSource failed: %v", err)
-		return nil, err
+		return DataSource{}, err
 	}
 	debug.Log("load: selected best source: type=%s path=%s db=%s (priority=%d)", best.Type, best.Path, best.Database, best.Priority)
+	return best, nil
+}
 
-	return LoadFromSource(best)
+// LoadLeanFromSource reads a Dolt server source with DoltReader.LoadLeanIssues,
+// so closed issues other than epics arrive Abridged, and reads every other
+// source whole: a file or a local database is read at disk speed, and only the
+// server pays for its text over the network
+// (docs/adr/0060-load-a-lean-snapshot-and-text-on-demand.md).
+func LoadLeanFromSource(source DataSource) ([]model.Issue, error) {
+	if source.Type != SourceTypeDolt {
+		return LoadFromSource(source)
+	}
+	reader, err := NewDoltReader(source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Dolt source %s: %w", source.Path, err)
+	}
+	defer reader.Close()
+	issues, err := reader.LoadLeanIssues()
+	debug.Log("load: Dolt lean returned %d issues, err=%v", len(issues), err)
+	return issues, err
+}
+
+// LoadIssueText reads the text and comments of one issue that a lean read
+// left Abridged. Only a Dolt server source abridges issues.
+func LoadIssueText(source DataSource, id string) (IssueText, error) {
+	if source.Type != SourceTypeDolt {
+		return IssueText{}, fmt.Errorf("source %s does not abridge issues", source.Type)
+	}
+	reader, err := NewDoltReader(source)
+	if err != nil {
+		return IssueText{}, fmt.Errorf("failed to open Dolt source %s: %w", source.Path, err)
+	}
+	defer reader.Close()
+	return reader.LoadIssueText(id)
 }
 
 // LoadFromSource loads issues from a specific DataSource, dispatching to the

@@ -39,11 +39,23 @@ type doltReloadedMsg struct {
 	loadTime   time.Duration
 }
 
+// loadDoltSnapshot reads a lean snapshot. Every reader of an Abridged issue's
+// text goes through Model.wholeIssue, which loads it first.
 func loadDoltSnapshot(req doltReloadRequest) ([]model.Issue, error) {
 	if req.fromSource {
-		return datasource.LoadFromSource(req.source)
+		return datasource.LoadLeanFromSource(req.source)
 	}
-	return datasource.LoadIssuesFromDir(req.beadsDir)
+	return datasource.LoadLeanIssuesFromDir(req.beadsDir)
+}
+
+// doltRequest names the active project's database.
+func (m Model) doltRequest() doltReloadRequest {
+	beadsDir, hasCheckout := projectBeadsDir(m.activeProjectPath)
+	return doltReloadRequest{
+		source:     m.doltSource,
+		fromSource: m.sourceType == datasource.SourceTypeDolt && !hasCheckout,
+		beadsDir:   beadsDir,
+	}
 }
 
 // startDoltReload reads the active Dolt project off the event loop. While one
@@ -57,12 +69,7 @@ func (m Model) startDoltReload(cmds []tea.Cmd) (Model, tea.Cmd) {
 	m.reloadInFlight = true
 	m.reloadPending = false
 
-	beadsDir, hasCheckout := projectBeadsDir(m.activeProjectPath)
-	req := doltReloadRequest{
-		source:     m.doltSource,
-		fromSource: m.sourceType == datasource.SourceTypeDolt && !hasCheckout,
-		beadsDir:   beadsDir,
-	}
+	req := m.doltRequest()
 	load := m.reloadLoader
 	if load == nil {
 		load = loadDoltSnapshot

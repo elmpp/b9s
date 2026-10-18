@@ -144,7 +144,7 @@ func (m *Model) openAttachmentPicker() {
 		m.statusIsError = false
 		return
 	}
-	issue := m.getSelectedIssue()
+	issue := m.wholeIssue(m.getSelectedIssue())
 	if issue == nil {
 		return
 	}

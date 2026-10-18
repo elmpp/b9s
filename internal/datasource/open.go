@@ -128,6 +128,9 @@ type OpenTarget struct {
 	Name string
 	Dir  string
 	Dolt *DataSource
+	// Lean reads a Dolt server with LoadLeanFromSource. Only a caller that
+	// loads an Abridged issue's text before using it may set it.
+	Lean bool
 }
 
 // OpenedProject is a project whose issues loaded.
@@ -157,7 +160,11 @@ func OpenProject(target OpenTarget) (OpenedProject, *OpenFailure) {
 
 	var doltFailure, lastFailure *OpenFailure
 	for _, source := range sources {
-		issues, err := LoadFromSource(source)
+		load := LoadFromSource
+		if target.Lean {
+			load = LoadLeanFromSource
+		}
+		issues, err := load(source)
 		if err == nil || errors.Is(err, ErrCommentsUnavailable) {
 			// A comments-only failure means the source itself opened and every
 			// other column loaded; treating it like a source failure would
@@ -189,6 +196,12 @@ func OpenProject(target OpenTarget) (OpenedProject, *OpenFailure) {
 		return OpenedProject{}, doltFailure
 	}
 	return OpenedProject{}, lastFailure
+}
+
+// OpenProjectLean is OpenProject with OpenTarget.Lean set.
+func OpenProjectLean(target OpenTarget) (OpenedProject, *OpenFailure) {
+	target.Lean = true
+	return OpenProject(target)
 }
 
 func openSources(target OpenTarget) ([]DataSource, *OpenFailure) {
