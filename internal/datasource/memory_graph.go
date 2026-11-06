@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vanderheijden86/b9s/internal/bdrun"
 	"github.com/vanderheijden86/b9s/pkg/model"
 )
 
@@ -75,7 +76,11 @@ func (c *GraphPreviewClient) Graph(ctx context.Context, progress func(done, tota
 	if err != nil {
 		return MemoryGraph{}, err
 	}
-	seeds := componentSeeds(inv)
+	// A Preview 3 inventory is already the whole graph, every Link Type included.
+	var seeds []string
+	if c.dialect != bdrun.MemoryDialectPreviewV3 {
+		seeds = componentSeeds(inv)
+	}
 	done := 0
 	report := func() {
 		if progress != nil {
@@ -138,7 +143,8 @@ func (c *GraphPreviewClient) Graph(ctx context.Context, progress func(done, tota
 		return MemoryGraph{}, firstErr
 	}
 	// Traversals return summaries; the complete owned records carry properties.
-	return buildMemoryGraph(inv.Beads, append(inv.Links, links...)), nil
+	inv.Links = append(inv.Links, links...)
+	return buildMemoryGraph(inv), nil
 }
 
 // componentSeeds groups roots by known owned Links. The preview-memory-v2
@@ -224,11 +230,11 @@ func shortBeadID(id string) string {
 	return id
 }
 
-func buildMemoryGraph(beads []GraphBead, links []GraphLink) MemoryGraph {
+func buildMemoryGraph(inv GraphPreview) MemoryGraph {
 	g := MemoryGraph{index: map[string]int{}, out: map[string][]int{}, in: map[string][]int{}}
-	for _, bead := range beads {
+	for _, bead := range inv.Beads {
 		n := GraphNode{
-			ID:      shortBeadID(bead.ID),
+			ID:      inv.nodeID(bead.ID),
 			Kind:    bead.Kind,
 			Title:   bead.Properties.Title,
 			Body:    bead.Properties.Body,
@@ -245,8 +251,8 @@ func buildMemoryGraph(beads []GraphBead, links []GraphLink) MemoryGraph {
 	}
 
 	seen := map[string]bool{}
-	for _, l := range links {
-		e := GraphEdge{ID: shortBeadID(l.ID), Type: l.Type, Source: shortBeadID(l.Source), Target: shortBeadID(l.Target), Note: l.Properties.Note}
+	for _, l := range inv.Links {
+		e := GraphEdge{ID: inv.nodeID(l.ID), Type: l.Type, Source: inv.nodeID(l.Source), Target: inv.nodeID(l.Target), Note: l.Properties.Note}
 		if seen[e.ID] {
 			continue
 		}
@@ -295,14 +301,15 @@ func (g *MemoryGraph) reindex() {
 	}
 }
 
-// Only exact installed preview Type names receive a display label.
+// Only exact installed preview Type names receive a display label. blocks is
+// the Preview 3 Dependency Type that bd dep add writes.
 func edgeKind(linkType string) string {
 	switch shortBeadID(linkType) {
 	case "example-follows":
 		return EdgeFollows
 	case "example-cites":
 		return EdgeCites
-	case "preview-blocks-v1":
+	case "preview-blocks-v1", "blocks":
 		return EdgeBlocks
 	case "preview-related-v2":
 		return EdgeRelated
@@ -416,11 +423,16 @@ func (b *GraphBead) UnmarshalJSON(data []byte) error {
 	}
 	var raw struct {
 		Properties json.RawMessage `json:"properties"`
+		// Revision is Preview 3's name for the version token.
+		Revision string `json:"revision"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&raw); err != nil {
 		return err
 	}
 	*b = GraphBead(p)
 	b.rawProperties = raw.Properties
+	if b.Version == "" {
+		b.Version = raw.Revision
+	}
 	return nil
 }

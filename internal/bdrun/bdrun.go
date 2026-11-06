@@ -18,10 +18,20 @@ import (
 	"github.com/vanderheijden86/b9s/pkg/debug"
 )
 
-// Resolve locates the bd binary on PATH. ok is false when bd is not
-// installed, in which case path is empty.
+// BDEnv names the bd binary to run instead of the bd on PATH, for a host
+// that installs a preview build beside a released one.
+const BDEnv = "B9S_BD"
+
+// Resolve locates the bd binary: BDEnv when it is set, else bd on PATH. ok
+// is false when that binary is not found, in which case path is empty. A
+// BDEnv that names a missing binary never falls back to PATH, because the
+// bd on PATH may speak a different dialect than the one asked for.
 func Resolve() (path string, ok bool) {
-	p, err := exec.LookPath("bd")
+	name := "bd"
+	if override := os.Getenv(BDEnv); override != "" {
+		name = override
+	}
+	p, err := exec.LookPath(name)
 	if err != nil {
 		return "", false
 	}

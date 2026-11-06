@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vanderheijden86/b9s/internal/bdrun"
 	"github.com/vanderheijden86/b9s/pkg/model"
 )
 
@@ -55,7 +56,7 @@ func TestMemoryPreviewGraphReadTiming(t *testing.T) {
 		}
 	}
 	t.Setenv("BEADS_DOLT_AUTO_START", "0")
-	client, err := newGraphPreviewClient(workspace, filepath.Join(workspace, ".memory-preview", "bin", "bd"))
+	client, err := newGraphPreviewClient(workspace, filepath.Join(workspace, ".memory-preview", "bin", "bd"), bdrun.MemoryDialectPreviewV2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func readEveryGraphComponent(ctx context.Context, client *GraphPreviewClient) (M
 		}
 		links = append(links, found...)
 	}
-	return buildMemoryGraph(inv.Beads, links), nil
+	return buildMemoryGraph(GraphPreview{Beads: inv.Beads, Links: links}), nil
 }
 
 // graphFixtureScript answers one inventory and two traversals. The inventory
@@ -163,7 +164,7 @@ esac
 func readFixtureGraph(t *testing.T, workers int) (MemoryGraph, string) {
 	t.Helper()
 	bd, log := fakeGraphBd(t, graphFixtureScript)
-	client, err := newGraphPreviewClient(graphWorkspace(t), bd)
+	client, err := newGraphPreviewClient(graphWorkspace(t), bd, bdrun.MemoryDialectPreviewV2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +205,7 @@ list) echo '{"preview":true,"result":{"hasMore":false,"items":[
 *) exit 42 ;;
 esac
 `)
-	client, err := newGraphPreviewClient(graphWorkspace(t), bd)
+	client, err := newGraphPreviewClient(graphWorkspace(t), bd, bdrun.MemoryDialectPreviewV2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +355,7 @@ func TestGraphRejectsIncompleteTraversal(t *testing.T) {
 list) echo '{"preview":true,"result":{"hasMore":false,"items":[{"id":"s/beads/a","type":"s/types/preview-issue-v2","properties":{"title":"A"},"owned":[]}]}}' ;;
 graph) echo '{"preview":true,"result":{"complete":false,"nodes":[],"links":[]}}' ;;
 esac`)
-	client, err := newGraphPreviewClient(graphWorkspace(t), bd)
+	client, err := newGraphPreviewClient(graphWorkspace(t), bd, bdrun.MemoryDialectPreviewV2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,7 +450,7 @@ func TestStoreMemoryGraphKeepsNothingWithMemoryOff(t *testing.T) {
 // Progress counts Issue components, the unit of slow work: one traversal each.
 func TestGraphCountsEachComponent(t *testing.T) {
 	bd, _ := fakeGraphBd(t, graphFixtureScript)
-	client, err := newGraphPreviewClient(graphWorkspace(t), bd)
+	client, err := newGraphPreviewClient(graphWorkspace(t), bd, bdrun.MemoryDialectPreviewV2)
 	if err != nil {
 		t.Fatal(err)
 	}

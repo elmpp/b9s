@@ -123,13 +123,12 @@ func loadMemoryGraph(ctx context.Context, client *datasource.GraphPreviewClient,
 		if bead.ID == "" {
 			return datasource.GraphPreview{}, fmt.Errorf("Memory %q: graph record has no ID", selected)
 		}
-		if !strings.HasSuffix(bead.Type, "/preview-memory-v2") {
+		if bead.Kind != "memory" {
 			return datasource.GraphPreview{}, fmt.Errorf("record %q is not a Memory", selected)
 		}
 		if !memoryMatches(bead, selected) {
 			return datasource.GraphPreview{}, fmt.Errorf("Memory %q: bd returned record %q", selected, bead.ID)
 		}
-		bead.Kind = "memory"
 		graph = datasource.GraphPreview{Beads: []datasource.GraphBead{bead}, Links: append([]datasource.GraphLink(nil), bead.Owned...)}
 	}
 	links := make(map[string]datasource.GraphLink)

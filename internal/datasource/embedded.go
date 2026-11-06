@@ -92,7 +92,7 @@ func loadEmbeddedIssues(source DataSource) ([]model.Issue, error) {
 	beadsDir := EmbeddedBeadsDir(source)
 	project := filepath.Dir(beadsDir)
 	if capability := detectGraphReadable(context.Background(), project); capability.State == MemoryReady {
-		client, err := newGraphPreviewClient(project, capability.BD)
+		client, err := newGraphPreviewClient(project, capability.BD, capability.Dialect)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +110,7 @@ func loadEmbeddedIssues(source DataSource) ([]model.Issue, error) {
 			memoryGraphs.workspaces[beadsDir] = true
 		}
 		memoryGraphs.Unlock()
-		return buildMemoryGraph(inv.Beads, inv.Links).Issues(), nil
+		return buildMemoryGraph(inv).Issues(), nil
 	}
 	memoryGraphs.Lock()
 	delete(memoryGraphs.byDir, beadsDir)

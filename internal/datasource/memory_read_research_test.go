@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vanderheijden86/b9s/internal/bdrun"
 )
 
 // This investigation reads explicitly prepared local copies. It never provisions
@@ -51,7 +53,7 @@ func researchClient(t *testing.T, mode string) (*GraphPreviewClient, string) {
 	if mode == "server" && (meta["dolt_server_host"] != "127.0.0.1" || meta["dolt_server_port"] != float64(58441) || meta["dolt_server_user"] != "root") {
 		t.Fatal("server workspace must use the isolated loopback endpoint")
 	}
-	client, err := newGraphPreviewClient(workspace, filepath.Join(workspace, ".memory-preview/bin/bd"))
+	client, err := newGraphPreviewClient(workspace, filepath.Join(workspace, ".memory-preview/bin/bd"), bdrun.MemoryDialectPreviewV2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +111,7 @@ func TestMemoryReadResearchStages(t *testing.T) {
 					t.Fatal(err)
 				}
 			default:
-				_ = buildMemoryGraph(beads, inv.Links)
+				_ = buildMemoryGraph(GraphPreview{Beads: beads, Links: inv.Links})
 			}
 		}
 		t.Logf("stage=%s iterations=%d per_snapshot=%s", stage, iterations, time.Since(start)/iterations)

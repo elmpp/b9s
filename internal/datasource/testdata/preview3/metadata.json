@@ -1,0 +1,13 @@
+{
+  "database": "",
+  "backend": "dolt",
+  "graph_mode": "link",
+  "graph_scope_url": "https://sandbox.example.invalid/x/",
+  "graph_authority_id": "d0c41d33e8f8592cf068365becbebd98",
+  "graph_workspace": "/work/demo/.beads",
+  "graph_schema_version": 11,
+  "graph_ready": true,
+  "dolt_mode": "embedded",
+  "dolt_database": "beads_graph_d0c41d33e8f8592cf068365becbebd98",
+  "project_id": "d0c41d33e8f8592cf068365becbebd98"
+}

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vanderheijden86/b9s/internal/bdrun"
@@ -17,7 +18,7 @@ import (
 )
 
 // ErrBDNotGraphPreview identifies missing commands, independent of release names.
-var ErrBDNotGraphPreview = errors.New("this bd has no compatible Memory Beads graph commands; use a bd installation with Memory support on PATH")
+var ErrBDNotGraphPreview = errors.New("this bd has no compatible Memory Beads graph commands; use a bd installation with Memory support on PATH or in " + bdrun.BDEnv)
 
 var ErrMemoryNotEnabled = errors.New("not a ready Memory Beads graph workspace")
 
@@ -32,7 +33,7 @@ func ExplainMemoryFailure(err error) string {
 	var syntax *json.SyntaxError
 	switch {
 	case errors.Is(err, ErrBDNotFound):
-		category, hint = "bd missing", "Put the project's bd installation on PATH."
+		category, hint = "bd missing", "Put the project's bd installation on PATH, or name it in "+bdrun.BDEnv+"."
 	case errors.Is(err, ErrMemoryNotEnabled), errors.Is(err, os.ErrNotExist):
 		category, hint = "Memories not enabled", "This project needs a ready Memory graph workspace."
 	case errors.Is(err, ErrBDNotGraphPreview), strings.Contains(detail, "unknown command"), strings.Contains(detail, "unknown flag"):
@@ -55,6 +56,18 @@ func ExplainMemoryFailure(err error) string {
 type GraphPreview struct {
 	Beads []GraphBead
 	Links []GraphLink
+	// Scope is the workspace scope URL that Preview 3 ids were made relative
+	// to. Those ids are paths that must stay whole; preview-v2 ids are URLs
+	// whose last segment names the Bead, so an empty Scope shortens them.
+	Scope string
+}
+
+// nodeID is the id a MemoryGraph uses for a Bead or Link of this inventory.
+func (g GraphPreview) nodeID(id string) string {
+	if g.Scope != "" {
+		return id
+	}
+	return shortBeadID(id)
 }
 
 type GraphBead struct {
@@ -105,20 +118,52 @@ func ParseGraphPreview(r io.Reader) (GraphPreview, error) {
 	}
 	for i := range payload.Result.Items {
 		bead := &payload.Result.Items[i]
-		switch {
-		case strings.HasSuffix(bead.Type, "/preview-memory-v2"):
-			bead.Kind = "memory"
-		case strings.HasSuffix(bead.Type, "/preview-issue-v2"):
-			bead.Kind = "issue"
-		default:
-			bead.Kind = "other"
-		}
+		bead.Kind = previewV2Kind(bead.Type)
 	}
 	graph := GraphPreview{Beads: payload.Result.Items}
 	for _, bead := range graph.Beads {
 		graph.Links = append(graph.Links, bead.Owned...)
 	}
 	return graph, nil
+}
+
+// previewV2Kind reads a Bead's kind from its preview-v2 Type name, the only
+// place that dialect records it.
+func previewV2Kind(beadType string) string {
+	switch {
+	case strings.HasSuffix(beadType, "/preview-memory-v2"):
+		return "memory"
+	case strings.HasSuffix(beadType, "/preview-issue-v2"):
+		return "issue"
+	}
+	return "other"
+}
+
+// parsePreview3Graph reads a whole-workspace bd graph --all. The traversal
+// is bounded like any other, so an incomplete one is refused rather than
+// drawn without the Beads and Links it left out.
+func parsePreview3Graph(r io.Reader) (GraphPreview, string, error) {
+	var payload struct {
+		Preview bool `json:"preview"`
+		Result  struct {
+			Beads     []GraphBead `json:"beads"`
+			Links     []GraphLink `json:"links"`
+			Scope     string      `json:"scope"`
+			Traversal struct {
+				Complete bool `json:"complete"`
+			} `json:"traversal"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(r).Decode(&payload); err != nil {
+		return GraphPreview{}, "", fmt.Errorf("parse graph preview: %w", err)
+	}
+	if !payload.Preview {
+		return GraphPreview{}, "", fmt.Errorf("bd did not return graph preview records")
+	}
+	if !payload.Result.Traversal.Complete {
+		return GraphPreview{}, "", fmt.Errorf("graph preview inventory exceeds the CLI limit; no complete graph is available")
+	}
+	return GraphPreview{Beads: payload.Result.Beads, Links: payload.Result.Links}, payload.Result.Scope, nil
 }
 
 func ParseGraphPreviewLinks(r io.Reader) ([]GraphLink, error) {
@@ -142,6 +187,14 @@ type GraphPreviewClient struct {
 	projectDir string
 	beadsDir   string
 	bd         string
+	dialect    bdrun.MemoryDialect
+	// scope is the workspace scope URL. Preview 3 prints every id and Type
+	// as an absolute URL under it; the client hands out the part after it.
+	scope string
+
+	kindsMu sync.Mutex
+	// kinds maps each Preview 3 Bead Type to the kind it conforms to.
+	kinds map[string]string
 	// traversalWorkers bounds concurrent traversals in Graph; zero means
 	// defaultTraversalWorkers.
 	traversalWorkers int
@@ -174,10 +227,16 @@ type GraphVersion struct {
 	Removed  bool      `json:"removed"`
 }
 
-// maxGraphSchemaVersion is the newest graph workspace format the preview-v2
-// reader understands. A newer workspace may encode Types or Links this reader
-// would misdraw, so it reads as not enabled rather than as a parse failure.
-const maxGraphSchemaVersion = 6
+// maxGraphSchemaVersion is the newest graph workspace format b9s reads. A newer
+// workspace may encode Types or Links this reader would misdraw, so it reads
+// as not enabled rather than as a parse failure. b9s reads a graph workspace
+// only through bd's JSON, never its tables, so the schema number matters for
+// which bd dialect can open it: preview-v2 bd writes schemas up to
+// maxPreviewV2GraphSchema, Preview 3 bd writes the ones after it.
+const (
+	maxGraphSchemaVersion   = 11
+	maxPreviewV2GraphSchema = 6
+)
 
 // MemoryState says whether Memory views can open for a project.
 type MemoryState string
@@ -255,7 +314,8 @@ func memoryTurnedOff() bool { return os.Getenv(MemoryLeverEnv) == "off" }
 // a graph workspace refuses bd export, so its Issues come only from the graph
 // read, and turning the Memory views off must not take the Issues with them.
 func detectGraphReadable(ctx context.Context, projectDir string) MemoryCapability {
-	if err := checkGraphWorkspace(projectDir); err != nil {
+	meta, err := checkGraphWorkspace(projectDir)
+	if err != nil {
 		reason := "this project is not a Memory graph workspace"
 		var schema *graphSchemaError
 		if errors.As(err, &schema) {
@@ -265,12 +325,21 @@ func detectGraphReadable(ctx context.Context, projectDir string) MemoryCapabilit
 	}
 	bd, ok := bdrun.Resolve()
 	if !ok {
-		return MemoryCapability{State: MemoryUnsupported, Err: unavailable("bd is not on PATH", ErrBDNotFound)}
+		return MemoryCapability{State: MemoryUnsupported, Err: unavailable("bd is not on PATH and "+bdrun.BDEnv+" is not set", ErrBDNotFound)}
 	}
 	dialect, _ := bdrun.ProbeMemoryCached(ctx, bd, bdrun.DefaultProbeCacheFile())
-	if dialect != bdrun.MemoryDialectPreviewV2 {
+	refuse := func(reason string) MemoryCapability {
 		return MemoryCapability{State: MemoryUnsupported, Dialect: dialect, BD: bd,
-			Err: unavailable("bd at "+bd+" has no Memory Beads support", fmt.Errorf("%s: %w", bd, ErrBDNotGraphPreview))}
+			Err: unavailable(reason, fmt.Errorf("%s: %w", bd, ErrBDNotGraphPreview))}
+	}
+	preview3 := meta.SchemaVersion > maxPreviewV2GraphSchema
+	switch {
+	case dialect == bdrun.MemoryDialectPreviewV2 && preview3:
+		return refuse(fmt.Sprintf("this project uses graph schema %d, which needs a Preview 3 bd; bd at %s reads Preview 2", meta.SchemaVersion, bd))
+	case dialect == bdrun.MemoryDialectPreviewV3 && !preview3:
+		return refuse(fmt.Sprintf("this project uses graph schema %d, which needs a Preview 2 bd; bd at %s reads Preview 3", meta.SchemaVersion, bd))
+	case dialect != bdrun.MemoryDialectPreviewV2 && dialect != bdrun.MemoryDialectPreviewV3:
+		return refuse("bd at " + bd + " has no Memory Beads support")
 	}
 	return MemoryCapability{State: MemoryReady, Dialect: dialect, BD: bd}
 }
@@ -282,38 +351,48 @@ func OpenGraphPreview(projectDir string) (*GraphPreviewClient, error) {
 	if capability.Err != nil {
 		return nil, capability.Err
 	}
-	return newGraphPreviewClient(projectDir, capability.BD)
+	return newGraphPreviewClient(projectDir, capability.BD, capability.Dialect)
 }
 
-func newGraphPreviewClient(projectDir, bd string) (*GraphPreviewClient, error) {
-	if err := checkGraphWorkspace(projectDir); err != nil {
+func newGraphPreviewClient(projectDir, bd string, dialect bdrun.MemoryDialect) (*GraphPreviewClient, error) {
+	meta, err := checkGraphWorkspace(projectDir)
+	if err != nil {
 		return nil, err
 	}
-	return &GraphPreviewClient{projectDir: projectDir, beadsDir: filepath.Join(projectDir, ".beads"), bd: bd}, nil
+	if dialect == bdrun.MemoryDialectPreviewV3 && meta.ScopeURL == "" {
+		return nil, fmt.Errorf("%s has no graph_scope_url: %w", projectDir, ErrMemoryNotEnabled)
+	}
+	return &GraphPreviewClient{projectDir: projectDir, beadsDir: filepath.Join(projectDir, ".beads"), bd: bd,
+		dialect: dialect, scope: meta.ScopeURL}, nil
+}
+
+// graphMetadata is what .beads/metadata.json says about a graph workspace.
+type graphMetadata struct {
+	Mode          string `json:"graph_mode"`
+	Ready         bool   `json:"graph_ready"`
+	SchemaVersion int    `json:"graph_schema_version"`
+	// ScopeURL ends in a slash; Preview 3 ids are absolute URLs under it.
+	ScopeURL string `json:"graph_scope_url"`
 }
 
 // checkGraphWorkspace reports, from .beads/metadata.json alone, whether
 // projectDir is a ready graph workspace in a format this reader understands.
-func checkGraphWorkspace(projectDir string) error {
+func checkGraphWorkspace(projectDir string) (graphMetadata, error) {
 	metadata, err := os.ReadFile(filepath.Join(projectDir, ".beads", "metadata.json"))
 	if err != nil {
-		return fmt.Errorf("read graph workspace metadata: %w", err)
+		return graphMetadata{}, fmt.Errorf("read graph workspace metadata: %w", err)
 	}
-	var meta struct {
-		GraphMode          string `json:"graph_mode"`
-		GraphReady         bool   `json:"graph_ready"`
-		GraphSchemaVersion int    `json:"graph_schema_version"`
-	}
+	var meta graphMetadata
 	if err := json.Unmarshal(metadata, &meta); err != nil {
-		return fmt.Errorf("parse graph workspace metadata: %w", err)
+		return graphMetadata{}, fmt.Errorf("parse graph workspace metadata: %w", err)
 	}
-	if meta.GraphMode != "link" || !meta.GraphReady {
-		return fmt.Errorf("%s is %w", projectDir, ErrMemoryNotEnabled)
+	if meta.Mode != "link" || !meta.Ready {
+		return graphMetadata{}, fmt.Errorf("%s is %w", projectDir, ErrMemoryNotEnabled)
 	}
-	if meta.GraphSchemaVersion > maxGraphSchemaVersion {
-		return &graphSchemaError{project: projectDir, version: meta.GraphSchemaVersion}
+	if meta.SchemaVersion > maxGraphSchemaVersion {
+		return graphMetadata{}, &graphSchemaError{project: projectDir, version: meta.SchemaVersion}
 	}
-	return nil
+	return meta, nil
 }
 
 type graphSchemaError struct {
@@ -351,12 +430,124 @@ func (c *GraphPreviewClient) run(ctx context.Context, args ...string) ([]byte, e
 
 // Inventory returns every current Bead with its owned Links. Incoming Links
 // owned by other Beads appear only on their owners; use Links for one Bead.
+//
+// Preview 3 lists only Issues in list, so its inventory is the whole-workspace
+// graph read with every Link Type, which carries Memories, Issues and all
+// their Links at once. The ids it returns are relative to the scope.
 func (c *GraphPreviewClient) Inventory(ctx context.Context) (GraphPreview, error) {
-	out, err := c.run(ctx, "list", "--format", "records-json", "--all")
+	if c.dialect != bdrun.MemoryDialectPreviewV3 {
+		out, err := c.run(ctx, "list", "--format", "records-json", "--all")
+		if err != nil {
+			return GraphPreview{}, err
+		}
+		return ParseGraphPreview(bytes.NewReader(out))
+	}
+	kinds, err := c.typeKinds(ctx)
 	if err != nil {
 		return GraphPreview{}, err
 	}
-	return ParseGraphPreview(bytes.NewReader(out))
+	out, err := c.run(ctx, "graph", "--all", "--link-type", "any", "--json")
+	if err != nil {
+		return GraphPreview{}, err
+	}
+	graph, scope, err := parsePreview3Graph(bytes.NewReader(out))
+	if err != nil {
+		return GraphPreview{}, err
+	}
+	if scope != "" && scope != c.scope {
+		return GraphPreview{}, fmt.Errorf("bd read scope %s, but %s names %s", scope, c.beadsDir, c.scope)
+	}
+	for i := range graph.Beads {
+		graph.Beads[i].Kind = kindOf(kinds, graph.Beads[i].Type)
+		c.localBead(&graph.Beads[i])
+	}
+	for i := range graph.Links {
+		c.localLink(&graph.Links[i])
+	}
+	graph.Scope = c.scope
+	return graph, nil
+}
+
+// typeKinds reads the Bead Types once per client. A Type's kind is the root it
+// conforms to, through any chain: policy conforms to constraint, which
+// conforms to memory.
+func (c *GraphPreviewClient) typeKinds(ctx context.Context) (map[string]string, error) {
+	c.kindsMu.Lock()
+	defer c.kindsMu.Unlock()
+	if c.kinds != nil {
+		return c.kinds, nil
+	}
+	out, err := c.run(ctx, "types", "--json")
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Preview bool `json:"preview"`
+		Result  struct {
+			BeadTypes []struct {
+				ID         string   `json:"id"`
+				ConformsTo []string `json:"conformsTo"`
+			} `json:"beadTypes"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &payload); err != nil {
+		return nil, fmt.Errorf("parse graph types: %w", err)
+	}
+	if !payload.Preview {
+		return nil, fmt.Errorf("bd did not return graph types")
+	}
+	parents := map[string][]string{}
+	for _, t := range payload.Result.BeadTypes {
+		parents[t.ID] = t.ConformsTo
+	}
+	roots := map[string]string{c.scope + "memory": "memory", c.scope + "issue": "issue"}
+	var resolve func(id string, seen map[string]bool) string
+	resolve = func(id string, seen map[string]bool) string {
+		if kind, ok := roots[id]; ok {
+			return kind
+		}
+		if seen[id] {
+			return "other"
+		}
+		seen[id] = true
+		for _, parent := range parents[id] {
+			if kind := resolve(parent, seen); kind != "other" {
+				return kind
+			}
+		}
+		return "other"
+	}
+	c.kinds = map[string]string{}
+	for id := range parents {
+		c.kinds[id] = resolve(id, map[string]bool{})
+	}
+	return c.kinds, nil
+}
+
+func kindOf(kinds map[string]string, beadType string) string {
+	if kind, ok := kinds[beadType]; ok {
+		return kind
+	}
+	return "other"
+}
+
+// local strips the workspace scope from a Preview 3 id or Type.
+func (c *GraphPreviewClient) local(id string) string {
+	if c.dialect != bdrun.MemoryDialectPreviewV3 {
+		return id
+	}
+	return strings.TrimPrefix(id, c.scope)
+}
+
+func (c *GraphPreviewClient) localBead(b *GraphBead) {
+	b.ID, b.Type = c.local(b.ID), c.local(b.Type)
+	for i := range b.Owned {
+		c.localLink(&b.Owned[i])
+	}
+}
+
+func (c *GraphPreviewClient) localLink(l *GraphLink) {
+	l.ID, l.Type, l.Source, l.Target = c.local(l.ID), c.local(l.Type), c.local(l.Source), c.local(l.Target)
 }
 
 // SearchMemories lists Memory summaries whose title or body contains query
@@ -375,6 +566,8 @@ func (c *GraphPreviewClient) SearchMemories(ctx context.Context, query string) (
 		Result  struct {
 			Items   []MemorySummary `json:"items"`
 			HasMore bool            `json:"hasMore"`
+			// Complete is Preview 3's form of the same signal.
+			Complete *bool `json:"complete"`
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(out, &payload); err != nil {
@@ -383,7 +576,7 @@ func (c *GraphPreviewClient) SearchMemories(ctx context.Context, query string) (
 	if !payload.Preview {
 		return nil, fmt.Errorf("bd did not return graph memory summaries")
 	}
-	if payload.Result.HasMore {
+	if payload.Result.HasMore || (payload.Result.Complete != nil && !*payload.Result.Complete) {
 		return nil, fmt.Errorf("graph memory search exceeds the CLI limit; no complete result is available")
 	}
 	return payload.Result.Items, nil
@@ -393,8 +586,12 @@ func (c *GraphPreviewClient) SearchMemories(ctx context.Context, query string) (
 // otherwise that exact retained version. Owned holds the outgoing Links as
 // of the version read.
 func (c *GraphPreviewClient) Memory(ctx context.Context, id, version string) (GraphBead, error) {
+	preview3 := c.dialect == bdrun.MemoryDialectPreviewV3
 	args := []string{"show", id, "--json"}
-	if version != "" {
+	switch {
+	case version != "" && preview3:
+		args = append(args, "--revision", "="+version)
+	case version != "":
 		args = append(args, "--version", version)
 	}
 	out, err := c.run(ctx, args...)
@@ -411,16 +608,38 @@ func (c *GraphPreviewClient) Memory(ctx context.Context, id, version string) (Gr
 	if !payload.Preview {
 		return GraphBead{}, fmt.Errorf("bd did not return a graph record")
 	}
-	return payload.Result, nil
+	bead := payload.Result
+	if !preview3 {
+		bead.Kind = previewV2Kind(bead.Type)
+		return bead, nil
+	}
+	kinds, err := c.typeKinds(ctx)
+	if err != nil {
+		return GraphBead{}, err
+	}
+	bead.Kind = kindOf(kinds, bead.Type)
+	c.localBead(&bead)
+	return bead, nil
 }
 
 // Links returns the current Links in both directions for one Bead.
 func (c *GraphPreviewClient) Links(ctx context.Context, id string) ([]GraphLink, error) {
-	out, err := c.run(ctx, "links", id, "--json")
+	args := []string{"links", id, "--json"}
+	if c.dialect == bdrun.MemoryDialectPreviewV3 {
+		args = []string{"link", "list", id, "--json"}
+	}
+	out, err := c.run(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGraphPreviewLinks(bytes.NewReader(out))
+	links, err := ParseGraphPreviewLinks(bytes.NewReader(out))
+	if err != nil {
+		return nil, err
+	}
+	for i := range links {
+		c.localLink(&links[i])
+	}
+	return links, nil
 }
 
 // Versions returns the retained versions of one Resource, newest first.
@@ -432,7 +651,11 @@ func (c *GraphPreviewClient) Versions(ctx context.Context, id string) ([]GraphVe
 	var payload struct {
 		Preview bool `json:"preview"`
 		Result  struct {
-			Versions []GraphVersion `json:"versions"`
+			Versions []struct {
+				GraphVersion
+				// LocalRevision is Preview 3's name for the ordinal.
+				LocalRevision int `json:"local_revision"`
+			} `json:"versions"`
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(out, &payload); err != nil {
@@ -441,5 +664,12 @@ func (c *GraphPreviewClient) Versions(ctx context.Context, id string) ([]GraphVe
 	if !payload.Preview {
 		return nil, fmt.Errorf("bd did not return graph versions")
 	}
-	return payload.Result.Versions, nil
+	versions := make([]GraphVersion, 0, len(payload.Result.Versions))
+	for _, v := range payload.Result.Versions {
+		if v.Ordinal == 0 {
+			v.Ordinal = v.LocalRevision
+		}
+		versions = append(versions, v.GraphVersion)
+	}
+	return versions, nil
 }

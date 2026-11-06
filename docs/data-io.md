@@ -206,7 +206,11 @@ after a write, so the cost is paid once per change.
 A graph workspace (`graph_mode: "link"` in `metadata.json`) holds Memories and
 typed Links that the issue readers do not understand. b9s reads it entirely
 through the matching preview `bd`, after a capability probe
-([ADR 0045](adr/0045-probe-bd-help-before-memory-reads.md)).
+([ADR 0045](adr/0045-probe-bd-help-before-memory-reads.md)). The diagram shows
+the `preview-v2` dialect. Graph-mode Preview 3 (schema 11) replaces the
+inventory and the traversals with one `graph --all --link-type any --json`,
+classifies Beads with `types --json`, and reads incident Links with
+`link list ID --json` ([ADR 0065](adr/0065-read-graph-preview-3-from-the-whole-workspace-graph.md)).
 
 ```mermaid
 sequenceDiagram

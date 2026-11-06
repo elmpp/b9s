@@ -53,6 +53,7 @@ func itoa(n int) string {
 func TestResolve_FindsBdOnPath(t *testing.T) {
 	binDir := writeFakeBd(t, 0)
 	t.Setenv("PATH", binDir)
+	t.Setenv(BDEnv, "")
 
 	path, ok := Resolve()
 
@@ -66,11 +67,39 @@ func TestResolve_FindsBdOnPath(t *testing.T) {
 
 func TestResolve_NotFoundWhenBdIsMissing(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+	t.Setenv(BDEnv, "")
 
 	_, ok := Resolve()
 
 	if ok {
 		t.Fatal("Resolve() ok = true, want false: no bd on PATH")
+	}
+}
+
+func TestResolve_EnvOverrideWinsOverPath(t *testing.T) {
+	t.Setenv("PATH", writeFakeBd(t, 0))
+	override := filepath.Join(writeFakeBd(t, 0), "bd")
+	graphBd := filepath.Join(filepath.Dir(override), "bd-graph")
+	if err := os.Rename(override, graphBd); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(BDEnv, graphBd)
+
+	path, ok := Resolve()
+
+	if !ok || path != graphBd {
+		t.Fatalf("Resolve() = %q, %v; want %q, true", path, ok, graphBd)
+	}
+}
+
+func TestResolve_MissingEnvOverrideDoesNotFallBackToPath(t *testing.T) {
+	t.Setenv("PATH", writeFakeBd(t, 0))
+	t.Setenv(BDEnv, filepath.Join(t.TempDir(), "bd-graph"))
+
+	_, ok := Resolve()
+
+	if ok {
+		t.Fatal("Resolve() ok = true, want false: an explicit bd that is missing must not be replaced by the one on PATH")
 	}
 }
 

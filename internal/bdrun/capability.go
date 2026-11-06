@@ -24,6 +24,10 @@ const (
 	// MemoryDialectPreviewV2 is the graph preview build: records-json
 	// summaries and the /preview-memory-v2 and /preview-issue-v2 Types.
 	MemoryDialectPreviewV2 MemoryDialect = "preview-v2"
+	// MemoryDialectPreviewV3 is Graph-mode Preview 3: Memory Types and Link
+	// Types are absolute scope URLs, Bead ids are local paths, and incident
+	// Links come from link list rather than links.
+	MemoryDialectPreviewV3 MemoryDialect = "preview-v3"
 )
 
 // probeTimeout bounds each help call. A preview bd answers in about 0.5s;
@@ -40,9 +44,10 @@ func ProbeMemory(ctx context.Context, bdPath string) MemoryDialect {
 // probeMemory also reports whether the answer is conclusive: a timed-out or
 // cancelled call says nothing about the binary and must not be cached.
 //
-// The preview needs all three signals. versions and links alone are what
-// upstream Beads History will ship, which has no Memory records; only the
-// records-json Memory summaries mark the preview read format b9s parses.
+// A preview needs versions, an incident-Link command and records-json Memory
+// summaries. versions and Links alone are what upstream Beads History will
+// ship, which has no Memory records. The Link command names the dialect:
+// preview-v2 has links, Preview 3 replaced it with link list.
 func probeMemory(ctx context.Context, bdPath string) (MemoryDialect, bool) {
 	dir, err := os.MkdirTemp("", "b9s-bd-probe-")
 	if err != nil {
@@ -51,10 +56,8 @@ func probeMemory(ctx context.Context, bdPath string) (MemoryDialect, bool) {
 	}
 	defer os.RemoveAll(dir)
 
-	for _, args := range [][]string{{"versions", "--help"}, {"links", "--help"}} {
-		if _, ok, conclusive := probeHelp(ctx, bdPath, dir, args); !ok {
-			return MemoryDialectNone, conclusive
-		}
+	if _, ok, conclusive := probeHelp(ctx, bdPath, dir, []string{"versions", "--help"}); !ok {
+		return MemoryDialectNone, conclusive
 	}
 	out, ok, conclusive := probeHelp(ctx, bdPath, dir, []string{"memories", "--help"})
 	if !ok {
@@ -63,7 +66,17 @@ func probeMemory(ctx context.Context, bdPath string) (MemoryDialect, bool) {
 	if !strings.Contains(out, "records-json") {
 		return MemoryDialectNone, true
 	}
-	return MemoryDialectPreviewV2, true
+	_, ok, conclusive = probeHelp(ctx, bdPath, dir, []string{"links", "--help"})
+	if ok {
+		return MemoryDialectPreviewV2, true
+	}
+	if !conclusive {
+		return MemoryDialectNone, false
+	}
+	if _, ok, conclusive := probeHelp(ctx, bdPath, dir, []string{"link", "list", "--help"}); !ok {
+		return MemoryDialectNone, conclusive
+	}
+	return MemoryDialectPreviewV3, true
 }
 
 // probeHelp runs one help call in the empty dir with the workspace selectors

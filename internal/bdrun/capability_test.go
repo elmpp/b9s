@@ -30,6 +30,20 @@ esac
 exit 1
 `
 
+// preview3BdScript answers like Graph-mode Preview 3, which replaced the
+// links command with link list.
+const preview3BdScript = `#!/bin/sh
+case "$1 $2" in
+"link list") echo "List current Links incident to a Bead"; exit 0 ;;
+esac
+case "$1" in
+versions) echo "Use bd versions ID to list one Memory's retained versions"; exit 0 ;;
+links) echo "Error: unknown command \"links\" for \"bd\"" >&2; exit 1 ;;
+memories) echo "      --format string   Graph Memory summaries: table or records-json (preview only)"; exit 0 ;;
+esac
+exit 1
+`
+
 // historyOnlyBdScript has retained versions and Links but no Memory records,
 // the shape upstream may ship when Beads History lands before Memory Beads.
 const historyOnlyBdScript = `#!/bin/sh
@@ -69,6 +83,16 @@ func TestProbeMemory_PreviewBdHasPreviewDialect(t *testing.T) {
 
 	if got != MemoryDialectPreviewV2 {
 		t.Errorf("ProbeMemory = %q, want %q", got, MemoryDialectPreviewV2)
+	}
+}
+
+func TestProbeMemory_Preview3BdHasPreviewV3Dialect(t *testing.T) {
+	bd := installFakeBd(t, preview3BdScript)
+
+	got := ProbeMemory(context.Background(), bd)
+
+	if got != MemoryDialectPreviewV3 {
+		t.Errorf("ProbeMemory = %q, want %q", got, MemoryDialectPreviewV3)
 	}
 }
 
